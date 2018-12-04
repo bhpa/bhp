@@ -24,3 +24,5 @@ Development
 To start building peer applications for BHP on Windows, you need to download [Visual Studio 2017](https://www.visualstudio.com/products/visual-studio-community-vs), install the [.NET Framework 4.7 Developer Pack](https://www.microsoft.com/en-us/download/details.aspx?id=55168) and the [.NET Core SDK](https://www.microsoft.com/net/core).
 
 If you need to develop on Linux or macOS, just install the [.NET Core SDK](https://www.microsoft.com/net/core).
+
+For more information, please click the [build-all](https://github.com/BhpAlpha/build-all).
