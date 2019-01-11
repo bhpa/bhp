@@ -1,6 +1,6 @@
 ﻿using Bhp.VM;
 using System;
-using System.Collections.Generic; 
+using System.Collections.Generic;
 
 namespace Bhp.SmartContract.Iterators
 {

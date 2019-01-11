@@ -39,7 +39,7 @@ namespace Bhp.SmartContract
                     this.Value = new byte[0];
                     break;
                 case ContractParameterType.PublicKey:
-                    this.Value = ECCurve.Secp256r1.G;
+                    this.Value = ECCurve.Secp256.G;
                     break;
                 case ContractParameterType.String:
                     this.Value = "";
@@ -81,7 +81,7 @@ namespace Bhp.SmartContract
                         parameter.Value = UInt256.Parse(json["value"].AsString());
                         break;
                     case ContractParameterType.PublicKey:
-                        parameter.Value = ECPoint.Parse(json["value"].AsString(), ECCurve.Secp256r1);
+                        parameter.Value = ECPoint.Parse(json["value"].AsString(), ECCurve.Secp256);
                         break;
                     case ContractParameterType.String:
                         parameter.Value = json["value"].AsString();
@@ -123,7 +123,7 @@ namespace Bhp.SmartContract
                     Value = text.HexToBytes();
                     break;
                 case ContractParameterType.PublicKey:
-                    Value = ECPoint.Parse(text, ECCurve.Secp256r1);
+                    Value = ECPoint.Parse(text, ECCurve.Secp256);
                     break;
                 case ContractParameterType.String:
                     Value = text;

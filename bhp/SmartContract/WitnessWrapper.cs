@@ -1,6 +1,5 @@
 ﻿using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
-using Bhp.VM;
 using System.Linq;
 
 namespace Bhp.SmartContract

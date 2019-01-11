@@ -71,6 +71,43 @@ namespace Bhp
             return result;
         }
 
+        internal static byte[] ToByteArrayUnsigned(this BigInteger i, bool bigEndian)
+        {
+            byte[] bytes = i.ToByteArray();
+            if (bytes[bytes.Length - 1] == 0x00)
+                Array.Resize(ref bytes, bytes.Length - 1);
+            if (bigEndian)
+                Array.Reverse(bytes, 0, bytes.Length);
+
+            return bytes;
+        }
+
+        internal static BigInteger ToBigIntegerUnsigned(this byte[] bytes, bool bigEndian)
+        {
+            byte[] clone;
+            if (bigEndian)
+            {
+                if (bytes[0] != 0x00)
+                {
+                    clone = new byte[bytes.Length + 1];
+                    Buffer.BlockCopy(bytes, 0, clone, 1, bytes.Length);
+                    Array.Reverse(clone);
+                    return new BigInteger(clone);
+                }
+                clone = new byte[bytes.Length];
+                Buffer.BlockCopy(bytes, 0, clone, 0, bytes.Length);
+                Array.Reverse(clone);
+                return new BigInteger(clone);
+            }
+
+            if (bytes[bytes.Length - 1] == 0x00)
+                return new BigInteger(bytes);
+
+            clone = new byte[bytes.Length + 1];
+            Buffer.BlockCopy(bytes, 0, clone, 0, bytes.Length);
+            return new BigInteger(clone);
+        }
+
         internal static BigInteger Mod(this BigInteger x, BigInteger y)
         {
             x %= y;

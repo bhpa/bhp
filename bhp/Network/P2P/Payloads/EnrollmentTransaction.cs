@@ -38,7 +38,7 @@ namespace Bhp.Network.P2P.Payloads
         protected override void DeserializeExclusiveData(BinaryReader reader)
         {
             if (Version != 0) throw new FormatException();
-            PublicKey = ECPoint.DeserializeFrom(reader, ECCurve.Secp256r1);
+            PublicKey = ECPoint.DeserializeFrom(reader, ECCurve.Secp256);
         }
 
         public override UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)

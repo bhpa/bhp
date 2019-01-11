@@ -65,7 +65,7 @@ namespace Bhp.Ledger
             reader.ReadByte(); //FeeMode
             Fee = reader.ReadSerializable<Fixed8>(); //Fee
             FeeAddress = reader.ReadSerializable<UInt160>();
-            Owner = ECPoint.DeserializeFrom(reader, ECCurve.Secp256r1);
+            Owner = ECPoint.DeserializeFrom(reader, ECCurve.Secp256);
             Admin = reader.ReadSerializable<UInt160>();
             Issuer = reader.ReadSerializable<UInt160>();
             Expiration = reader.ReadUInt32();
@@ -95,7 +95,7 @@ namespace Bhp.Ledger
         public string GetName(CultureInfo culture = null)
         {
             if (AssetType == AssetType.GoverningToken) return "BHP";
-            if (AssetType == AssetType.UtilityToken) return "BhpGas";
+            if (AssetType == AssetType.UtilityToken) return "BHPGas";
             if (_names == null)
             {
                 JObject name_obj;

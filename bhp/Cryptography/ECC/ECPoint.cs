@@ -20,7 +20,7 @@ namespace Bhp.Cryptography.ECC
         public int Size => IsInfinity ? 1 : 33;
 
         public ECPoint()
-            : this(null, null, ECCurve.Secp256r1)
+            : this(null, null, ECCurve.Secp256)
         {
         }
 

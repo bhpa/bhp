@@ -23,7 +23,7 @@ namespace Bhp.Network.P2P.Payloads
             {
                 Version = LocalNode.ProtocolVersion,
                 Services = NetworkAddressWithTime.NODE_NETWORK,
-                Timestamp = DateTime.Now.ToTimestamp(),
+                Timestamp = DateTime.UtcNow.ToTimestamp(),
                 Port = (ushort)port,
                 Nonce = nonce,
                 UserAgent = userAgent,

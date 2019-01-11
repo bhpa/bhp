@@ -135,10 +135,10 @@ namespace Bhp.Wallets.BRC6
 
         public override WalletAccount CreateAccount(Contract contract, KeyPair key = null)
         {
-            BRC6Contract nep6contract = contract as BRC6Contract;
-            if (nep6contract == null)
+            BRC6Contract brc6contract = contract as BRC6Contract;
+            if (brc6contract == null)
             {
-                nep6contract = new BRC6Contract
+                brc6contract = new BRC6Contract
                 {
                     Script = contract.Script,
                     ParameterList = contract.ParameterList,
@@ -148,10 +148,10 @@ namespace Bhp.Wallets.BRC6
             }
             BRC6Account account;
             if (key == null)
-                account = new BRC6Account(this, nep6contract.ScriptHash);
+                account = new BRC6Account(this, brc6contract.ScriptHash);
             else
-                account = new BRC6Account(this, nep6contract.ScriptHash, key, password);
-            account.Contract = nep6contract;
+                account = new BRC6Account(this, brc6contract.ScriptHash, key, password);
+            account.Contract = brc6contract;
             AddAccount(account, false);
             return account;
         }
@@ -163,9 +163,9 @@ namespace Bhp.Wallets.BRC6
             return account;
         }
 
-        public KeyPair DecryptKey(string nep2key)
+        public KeyPair DecryptKey(string brc2key)
         {
-            return new KeyPair(GetPrivateKeyFromNEP2(nep2key, password, Scrypt.N, Scrypt.R, Scrypt.P));
+            return new KeyPair(GetPrivateKeyFromBRC2(brc2key, password, Scrypt.N, Scrypt.R, Scrypt.P));
         }
 
         public override bool DeleteAccount(UInt160 scriptHash)
@@ -314,9 +314,9 @@ namespace Bhp.Wallets.BRC6
             return account;
         }
 
-        public override WalletAccount Import(string nep2, string passphrase)
+        public override WalletAccount Import(string brc2, string passphrase)
         {
-            KeyPair key = new KeyPair(GetPrivateKeyFromNEP2(nep2, passphrase));
+            KeyPair key = new KeyPair(GetPrivateKeyFromBRC2(brc2, passphrase));
             BRC6Contract contract = new BRC6Contract
             {
                 Script = Contract.CreateSignatureRedeemScript(key.PublicKey),
@@ -326,7 +326,7 @@ namespace Bhp.Wallets.BRC6
             };
             BRC6Account account;
             if (Scrypt.N == 16384 && Scrypt.R == 8 && Scrypt.P == 8)
-                account = new BRC6Account(this, contract.ScriptHash, nep2);
+                account = new BRC6Account(this, contract.ScriptHash, brc2);
             else
                 account = new BRC6Account(this, contract.ScriptHash, key, passphrase);
             account.Contract = contract;

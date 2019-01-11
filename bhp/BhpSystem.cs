@@ -14,6 +14,9 @@ namespace Bhp
 {
     public class BhpSystem : IDisposable
     {
+        private Peer.Start start_message = null;
+        private bool suspend = false;
+
         public ActorSystem ActorSystem { get; } = ActorSystem.Create(nameof(BhpSystem),
             $"akka {{ log-dead-letters = off }}" +
             $"blockchain-mailbox {{ mailbox-type: \"{typeof(BlockchainMailbox).AssemblyQualifiedName}\" }}" +
@@ -25,7 +28,7 @@ namespace Bhp
         public IActorRef LocalNode { get; }
         internal IActorRef TaskManager { get; }
         public IActorRef Consensus { get; private set; }
-        public RpcServer rpcServer { get; private set; }
+        public RpcServer RpcServer { get; private set; }
 
         public BhpSystem(Store store)
         {
@@ -37,20 +40,42 @@ namespace Bhp
 
         public void Dispose()
         {
-            rpcServer?.Dispose();
+            RpcServer?.Dispose();
             ActorSystem.Stop(LocalNode);
             ActorSystem.Dispose();
         }
 
+        internal void ResumeNodeStartup()
+        {
+            suspend = false;
+            if (start_message != null)
+            {
+                LocalNode.Tell(start_message);
+                start_message = null;
+            }
+        }
+
+        /*
+        public void StartConsensus(Wallet wallet)
+        {
+            Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, wallet));
+            Consensus.Tell(new ConsensusService.Start());
+        }
+        */
+
+        /// <summary>
+        /// By BHP
+        /// </summary>
+        /// <param name="wallet"></param>
         public void StartConsensus(Wallet wallet)
         {
             bool found = false;
             foreach (WalletAccount account in wallet.GetAccounts())
             {
                 string publicKey = account.GetKey().PublicKey.EncodePoint(true).ToHexString();
-                foreach(ECPoint point in Ledger.Blockchain.StandbyValidators)
+                foreach (ECPoint point in Ledger.Blockchain.StandbyValidators)
                 {
-                    string validator=point.EncodePoint(true).ToHexString();
+                    string validator = point.EncodePoint(true).ToHexString();
                     if (validator.Equals(publicKey))
                     {
                         found = true;
@@ -62,45 +87,38 @@ namespace Bhp
             //只有共识节点才能开启共识
             if (found)
             {
-                Consensus = ActorSystem.ActorOf(ConsensusService.Props(this, wallet));
+                Consensus = ActorSystem.ActorOf(ConsensusService.Props(LocalNode, TaskManager, wallet));
                 Consensus.Tell(new ConsensusService.Start());
             }
         }
 
         public void StartNode(int port = 0, int wsPort = 0, int minDesiredConnections = Peer.DefaultMinDesiredConnections,
-                     int maxConnections = Peer.DefaultMaxConnections)
+            int maxConnections = Peer.DefaultMaxConnections)
         {
-            LocalNode.Tell(new Peer.Start
+            start_message = new Peer.Start
             {
                 Port = port,
                 WsPort = wsPort,
                 MinDesiredConnections = minDesiredConnections,
                 MaxConnections = maxConnections
-            });
-        }
-
-        public void StartRpc(IPAddress bindAddress, int port, Wallet wallet = null, bool isAutoLock = false, string sslCert = null, string password = null,
-            string getutxourl = null, string[] trustedAuthorities = null, Fixed8 maxGasInvoke = default(Fixed8))
-        {
-            rpcServer = new RpcServer(this, wallet, isAutoLock, maxGasInvoke, getutxourl);
-            rpcServer.Start(bindAddress, port, sslCert, password, trustedAuthorities);
-        }
-
-        public void OpenWallet(Wallet wallet, bool isAutoLock,string getutxourl)
-        {
-            if (rpcServer == null)
+            };
+            if (!suspend)
             {
-                rpcServer = new RpcServer(this, wallet, isAutoLock, Fixed8.Zero, getutxourl);
+                LocalNode.Tell(start_message);
+                start_message = null;
             }
-            rpcServer.SetWallet(wallet, isAutoLock);
         }
 
-        public void SetWalletConfig(string Path, string Index, WalletIndexer indexer, bool IsAutoLock)
+        public void StartRpc(IPAddress bindAddress, int port, Wallet wallet = null, string sslCert = null, string password = null,
+            string[] trustedAuthorities = null, Fixed8 maxGasInvoke = default(Fixed8))
         {
-            if (rpcServer != null)
-            {
-                rpcServer.SetWalletConfig(Path, Index, indexer, IsAutoLock);
-            }
+            RpcServer = new RpcServer(this, wallet, maxGasInvoke);
+            RpcServer.Start(bindAddress, port, sslCert, password, trustedAuthorities);
+        }
+
+        internal void SuspendNodeStartup()
+        {
+            suspend = true;
         }
     }
 }

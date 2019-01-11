@@ -8,7 +8,7 @@
         ECDH03 = 0x03,
 
         Script = 0x20,
-        
+
         Vote = 0x30,
 
         DescriptionUrl = 0x81,

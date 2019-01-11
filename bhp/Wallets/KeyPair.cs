@@ -21,11 +21,11 @@ namespace Bhp.Wallets
             Buffer.BlockCopy(privateKey, privateKey.Length - 32, PrivateKey, 0, 32);
             if (privateKey.Length == 32)
             {
-                this.PublicKey = Cryptography.ECC.ECCurve.Secp256r1.G * privateKey;
+                this.PublicKey = Cryptography.ECC.ECCurve.Secp256.G * privateKey;
             }
             else
             {
-                this.PublicKey = Cryptography.ECC.ECPoint.FromBytes(privateKey, Cryptography.ECC.ECCurve.Secp256r1);
+                this.PublicKey = Cryptography.ECC.ECPoint.FromBytes(privateKey, Cryptography.ECC.ECCurve.Secp256);
             }
         }
 

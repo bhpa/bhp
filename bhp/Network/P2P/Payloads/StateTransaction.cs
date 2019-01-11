@@ -64,7 +64,7 @@ namespace Bhp.Network.P2P.Payloads
             switch (descriptor.Field)
             {
                 case "Registered":
-                    yield return Contract.CreateSignatureRedeemScript(ECPoint.DecodePoint(descriptor.Key, ECCurve.Secp256r1)).ToScriptHash();
+                    yield return Contract.CreateSignatureRedeemScript(ECPoint.DecodePoint(descriptor.Key, ECCurve.Secp256)).ToScriptHash();
                     break;
                 default:
                     throw new InvalidOperationException();

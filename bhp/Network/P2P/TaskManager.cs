@@ -29,7 +29,8 @@ namespace Bhp.Network.P2P
         private readonly Dictionary<IActorRef, TaskSession> sessions = new Dictionary<IActorRef, TaskSession>();
         private readonly ICancelable timer = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(TimerInterval, TimerInterval, Context.Self, new Timer(), ActorRefs.NoSender);
 
-        private bool HeaderTask => sessions.Values.Any(p => p.HeaderTask);
+        private readonly UInt256 HeaderTaskHash = UInt256.Zero;
+        private bool HasHeaderTask => globalTasks.ContainsKey(HeaderTaskHash);
 
         public TaskManager(BhpSystem system)
         {
@@ -40,7 +41,8 @@ namespace Bhp.Network.P2P
         {
             if (!sessions.TryGetValue(Sender, out TaskSession session))
                 return;
-            session.Tasks.Remove(UInt256.Zero);
+            session.Tasks.Remove(HeaderTaskHash);
+            DecrementGlobalTask(HeaderTaskHash);
             RequestTasks(session);
         }
 
@@ -57,19 +59,20 @@ namespace Bhp.Network.P2P
             hashes.ExceptWith(knownHashes);
             if (payload.Type == InventoryType.Block)
                 session.AvailableTasks.UnionWith(hashes.Where(p => globalTasks.ContainsKey(p)));
+
             hashes.ExceptWith(globalTasks.Keys);
             if (hashes.Count == 0)
             {
                 RequestTasks(session);
                 return;
             }
+
             foreach (UInt256 hash in hashes)
             {
                 IncrementGlobalTask(hash);
                 session.Tasks[hash] = DateTime.UtcNow;
             }
-            foreach (UInt256 hash in hashes)
-                session.Tasks[hash] = DateTime.UtcNow;
+
             foreach (InvPayload group in InvPayload.CreateGroup(payload.Type, hashes.ToArray()))
                 Sender.Tell(Message.Create("getdata", group));
         }
@@ -154,7 +157,9 @@ namespace Bhp.Network.P2P
             }
             if (globalTasks[hash] >= MaxConncurrentTasks)
                 return false;
+
             globalTasks[hash]++;
+
             return true;
         }
 
@@ -173,7 +178,7 @@ namespace Bhp.Network.P2P
                 foreach (var task in session.Tasks.ToArray())
                     if (DateTime.UtcNow - task.Value > TaskTimeout)
                     {
-                        if (session.Tasks.Remove(task.Key) && task.Key != UInt256.Zero)
+                        if (session.Tasks.Remove(task.Key))
                             DecrementGlobalTask(task.Key);
                     }
             foreach (TaskSession session in sessions.Values)
@@ -198,7 +203,7 @@ namespace Bhp.Network.P2P
             {
                 session.AvailableTasks.ExceptWith(knownHashes);
                 session.AvailableTasks.RemoveWhere(p => Blockchain.Singleton.ContainsBlock(p));
-                HashSet<UInt256> hashes = new HashSet<UInt256>(session.AvailableTasks);               
+                HashSet<UInt256> hashes = new HashSet<UInt256>(session.AvailableTasks);
                 if (hashes.Count > 0)
                 {
                     foreach (UInt256 hash in hashes.ToArray())
@@ -206,7 +211,7 @@ namespace Bhp.Network.P2P
                         if (!IncrementGlobalTask(hash))
                             hashes.Remove(hash);
                     }
-                    session.AvailableTasks.ExceptWith(hashes);                    
+                    session.AvailableTasks.ExceptWith(hashes);
                     foreach (UInt256 hash in hashes)
                         session.Tasks[hash] = DateTime.UtcNow;
                     foreach (InvPayload group in InvPayload.CreateGroup(InventoryType.Block, hashes.ToArray()))
@@ -214,9 +219,10 @@ namespace Bhp.Network.P2P
                     return;
                 }
             }
-            if (!HeaderTask && Blockchain.Singleton.HeaderHeight < session.Version.StartHeight)
+            if ((!HasHeaderTask || globalTasks[HeaderTaskHash] < MaxConncurrentTasks) && Blockchain.Singleton.HeaderHeight < session.Version.StartHeight)
             {
-                session.Tasks[UInt256.Zero] = DateTime.UtcNow;
+                session.Tasks[HeaderTaskHash] = DateTime.UtcNow;
+                IncrementGlobalTask(HeaderTaskHash);
                 session.RemoteNode.Tell(Message.Create("getheaders", GetBlocksPayload.Create(Blockchain.Singleton.CurrentHeaderHash)));
             }
             else if (Blockchain.Singleton.Height < session.Version.StartHeight)

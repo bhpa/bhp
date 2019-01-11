@@ -1,6 +1,5 @@
 ﻿using Bhp.IO;
 using Bhp.IO.Json;
-using Bhp.VM;
 using Bhp.Wallets;
 using System;
 using System.IO;

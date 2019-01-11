@@ -1,4 +1,4 @@
-﻿using Bhp.Ledger;
+using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.VM;
@@ -155,7 +155,7 @@ namespace Bhp.SmartContract
 
         /// <summary>
         /// Check if the BigInteger is allowed for numeric operations
-        /// </summary> 
+        /// </summary>
         private bool CheckBigIntegers(OpCode nextInstruction)
         {
             switch (nextInstruction)
@@ -317,6 +317,7 @@ namespace Bhp.SmartContract
                     case OpCode.CALL_EDT:
                         stackitem_count -= 1;
                         break;
+                    case OpCode.RET:
                     case OpCode.APPCALL:
                     case OpCode.TAILCALL:
                     case OpCode.NOT:
@@ -460,11 +461,9 @@ namespace Bhp.SmartContract
 
         protected virtual long GetPrice(OpCode nextInstruction)
         {
-            if (nextInstruction <= OpCode.PUSH16) return 0;
+            if (nextInstruction <= OpCode.NOP) return 0;
             switch (nextInstruction)
             {
-                case OpCode.NOP:
-                    return 0;
                 case OpCode.APPCALL:
                 case OpCode.TAILCALL:
                     return 10;
@@ -503,75 +502,37 @@ namespace Bhp.SmartContract
             byte length = CurrentContext.Script[CurrentContext.InstructionPointer + 1];
             if (CurrentContext.InstructionPointer > CurrentContext.Script.Length - length - 2)
                 return 1;
-            string api_name = Encoding.ASCII.GetString(CurrentContext.Script, CurrentContext.InstructionPointer + 2, length);
-            switch (api_name)
+            uint api_hash = length == 4
+                ? System.BitConverter.ToUInt32(CurrentContext.Script, CurrentContext.InstructionPointer + 2)
+                : Encoding.ASCII.GetString(CurrentContext.Script, CurrentContext.InstructionPointer + 2, length).ToInteropMethodHash();
+            long price = Service.GetPrice(api_hash);
+            if (price > 0) return price;
+            if (api_hash == "Bhp.Asset.Create".ToInteropMethodHash())
+                return 5000L * 100000000L / ratio;
+            if (api_hash == "Bhp.Asset.Renew".ToInteropMethodHash())
+                return (byte)CurrentContext.EvaluationStack.Peek(1).GetBigInteger() * 5000L * 100000000L / ratio;
+            if (api_hash == "Bhp.Contract.Create".ToInteropMethodHash() ||
+                api_hash == "Bhp.Contract.Migrate".ToInteropMethodHash())
             {
-                case "System.Runtime.CheckWitness":
-                case "Bhp.Runtime.CheckWitness":             
-                    return 200;
-                case "System.Blockchain.GetHeader":
-                case "Bhp.Blockchain.GetHeader":                
-                    return 100;
-                case "System.Blockchain.GetBlock":
-                case "Bhp.Blockchain.GetBlock":                
-                    return 200;
-                case "System.Blockchain.GetTransaction":
-                case "Bhp.Blockchain.GetTransaction":                
-                    return 100;
-                case "System.Blockchain.GetTransactionHeight":
-                case "Bhp.Blockchain.GetTransactionHeight":
-                    return 100;
-                case "Bhp.Blockchain.GetAccount":                
-                    return 100;
-                case "Bhp.Blockchain.GetValidators":                
-                    return 200;
-                case "Bhp.Blockchain.GetAsset":                
-                    return 100;
-                case "System.Blockchain.GetContract":
-                case "Bhp.Blockchain.GetContract":                
-                    return 100;
-                case "Bhp.Transaction.GetReferences":                
-                    return 200;
-                case "Bhp.Transaction.GetUnspentCoins":
-                    return 200;
-                case "Bhp.Transaction.GetWitnesses":
-                    return 200;
-                case "Bhp.Witness.GetVerificationScript":
-                    return 100;
-                case "Bhp.Account.IsStandard":
-                    return 100;
-                case "Bhp.Asset.Create":                
-                    return 5000L * 100000000L / ratio;
-                case "Bhp.Asset.Renew":                
-                    return (byte)CurrentContext.EvaluationStack.Peek(1).GetBigInteger() * 5000L * 100000000L / ratio;
-                case "Bhp.Contract.Create":
-                case "Bhp.Contract.Migrate":                
-                    long fee = 100L;
+                long fee = 100L;
 
-                    ContractPropertyState contract_properties = (ContractPropertyState)(byte)CurrentContext.EvaluationStack.Peek(3).GetBigInteger();
+                ContractPropertyState contract_properties = (ContractPropertyState)(byte)CurrentContext.EvaluationStack.Peek(3).GetBigInteger();
 
-                    if (contract_properties.HasFlag(ContractPropertyState.HasStorage))
-                    {
-                        fee += 400L;
-                    }
-                    if (contract_properties.HasFlag(ContractPropertyState.HasDynamicInvoke))
-                    {
-                        fee += 500L;
-                    }
-                    return fee * 100000000L / ratio;
-                case "System.Storage.Get":
-                case "Bhp.Storage.Get":                
-                    return 100;
-                case "System.Storage.Put":
-                case "System.Storage.PutEx":
-                case "Bhp.Storage.Put":                
-                    return ((CurrentContext.EvaluationStack.Peek(1).GetByteArray().Length + CurrentContext.EvaluationStack.Peek(2).GetByteArray().Length - 1) / 1024 + 1) * 1000;
-                case "System.Storage.Delete":
-                case "Bhp.Storage.Delete":                
-                    return 100;
-                default:
-                    return 1;
+                if (contract_properties.HasFlag(ContractPropertyState.HasStorage))
+                {
+                    fee += 400L;
+                }
+                if (contract_properties.HasFlag(ContractPropertyState.HasDynamicInvoke))
+                {
+                    fee += 500L;
+                }
+                return fee * 100000000L / ratio;
             }
+            if (api_hash == "System.Storage.Put".ToInteropMethodHash() ||
+                api_hash == "System.Storage.PutEx".ToInteropMethodHash() ||
+                api_hash == "Bhp.Storage.Put".ToInteropMethodHash())
+                return ((CurrentContext.EvaluationStack.Peek(1).GetByteArray().Length + CurrentContext.EvaluationStack.Peek(2).GetByteArray().Length - 1) / 1024 + 1) * 1000;
+            return 1;
         }
 
         private bool PostStepInto(OpCode nextOpcode)
@@ -618,7 +579,7 @@ namespace Bhp.SmartContract
             engine.Execute();
             return engine;
         }
-        
+
         public static ApplicationEngine Run(byte[] script, IScriptContainer container = null, Block persistingBlock = null, bool testMode = false, Fixed8 extraGAS = default(Fixed8))
         {
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())

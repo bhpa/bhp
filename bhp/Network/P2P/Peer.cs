@@ -39,9 +39,8 @@ namespace Bhp.Network.P2P
         protected readonly ConcurrentDictionary<IActorRef, IPEndPoint> ConnectedPeers = new ConcurrentDictionary<IActorRef, IPEndPoint>();
         protected ImmutableHashSet<IPEndPoint> UnconnectedPeers = ImmutableHashSet<IPEndPoint>.Empty;
         protected ImmutableHashSet<IPEndPoint> ConnectingPeers = ImmutableHashSet<IPEndPoint>.Empty;
-
         protected HashSet<IPAddress> TrustedIpAddresses { get; } = new HashSet<IPAddress>();
-
+        
         public int ListenerPort { get; private set; }
         public int MinDesiredConnections { get; private set; } = DefaultMinDesiredConnections;
         public int MaxConnections { get; private set; } = DefaultMaxConnections;
@@ -51,8 +50,8 @@ namespace Bhp.Network.P2P
             get
             {
                 var allowedConnecting = MinDesiredConnections * 4;
-                allowedConnecting = MaxConnections != -1 && allowedConnecting > MaxConnections
-                    ? MaxConnections : allowedConnecting;
+                allowedConnecting = MaxConnections != -1 && allowedConnecting > MaxConnections 
+                    ? MaxConnections : allowedConnecting; 
                 return allowedConnecting - ConnectedPeers.Count;
             }
         }
@@ -171,6 +170,7 @@ namespace Bhp.Network.P2P
                 Sender.Tell(Tcp.Abort.Instance);
                 return;
             }
+            
             ConnectedAddresses.TryGetValue(remote.Address, out int count);
             if (count >= MaxConnectionsPerAddress)
             {
@@ -210,7 +210,7 @@ namespace Bhp.Network.P2P
         }
 
         private void OnTimer()
-        { 
+        {
             if (ConnectedPeers.Count >= MinDesiredConnections) return;
             if (UnconnectedPeers.Count == 0)
                 NeedMorePeers(MinDesiredConnections - ConnectedPeers.Count);

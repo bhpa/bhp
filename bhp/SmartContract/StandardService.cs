@@ -173,7 +173,7 @@ namespace Bhp.SmartContract
             if (hashOrPubkey.Length == 20)
                 result = CheckWitness(engine, new UInt160(hashOrPubkey));
             else if (hashOrPubkey.Length == 33)
-                result = CheckWitness(engine, ECPoint.DecodePoint(hashOrPubkey, ECCurve.Secp256r1));
+                result = CheckWitness(engine, ECPoint.DecodePoint(hashOrPubkey, ECCurve.Secp256));
             else
                 return false;
             engine.CurrentContext.EvaluationStack.Push(result);

@@ -18,7 +18,7 @@ namespace Bhp.IO.Caching
             {
                 this.Key = key;
                 this.Value = value;
-                this.Time = DateTime.Now;
+                this.Time = DateTime.UtcNow;
             }
         }
 

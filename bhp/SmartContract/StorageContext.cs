@@ -1,6 +1,4 @@
-﻿using Bhp.VM;
-
-namespace Bhp.SmartContract
+﻿namespace Bhp.SmartContract
 {
     internal class StorageContext
     {

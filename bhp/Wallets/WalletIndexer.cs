@@ -43,7 +43,7 @@ namespace Bhp.Wallets
             path = Path.GetFullPath(path);
             Directory.CreateDirectory(path);
             db = DB.Open(path, new Options { CreateIfMissing = true });
-            if (db.TryGet(ReadOptions.Default, SliceBuilder.Begin(DataEntryPrefix.SYS_Version), out Slice value) && Version.TryParse(value.ToString(), out Version version) && version >= Version.Parse("1.0.0"))
+            if (db.TryGet(ReadOptions.Default, SliceBuilder.Begin(DataEntryPrefix.SYS_Version), out Slice value) && Version.TryParse(value.ToString(), out Version version) && version >= Version.Parse("2.5.4"))
             {
                 ReadOptions options = new ReadOptions { FillCache = false };
                 foreach (var group in db.Find(options, SliceBuilder.Begin(DataEntryPrefix.IX_Group), (k, v) => new
@@ -127,8 +127,9 @@ namespace Bhp.Wallets
                 yield return hash;
         }
 
-        private void ProcessBlock(Block block, HashSet<UInt160> accounts, WriteBatch batch)
+        private (Transaction, UInt160[])[] ProcessBlock(Block block, HashSet<UInt160> accounts, WriteBatch batch)
         {
+            var change_set = new List<(Transaction, UInt160[])>();
             foreach (Transaction tx in block.Transactions)
             {
                 HashSet<UInt160> accounts_changed = new HashSet<UInt160>();
@@ -218,15 +219,10 @@ namespace Bhp.Wallets
                 {
                     foreach (UInt160 account in accounts_changed)
                         batch.Put(SliceBuilder.Begin(DataEntryPrefix.ST_Transaction).Add(account).Add(tx.Hash), false);
-                    WalletTransaction?.Invoke(null, new WalletTransactionEventArgs
-                    {
-                        Transaction = tx,
-                        RelatedAccounts = accounts_changed.ToArray(),
-                        Height = block.Index,
-                        Time = block.Timestamp
-                    });
+                    change_set.Add((tx, accounts_changed.ToArray()));
                 }
             }
+            return change_set.ToArray();
         }
 
         private void ProcessBlocks()
@@ -234,15 +230,18 @@ namespace Bhp.Wallets
             while (!disposed)
             {
                 while (!disposed)
+                {
+                    Block block;
+                    (Transaction, UInt160[])[] change_set;
                     lock (SyncRoot)
                     {
                         if (indexes.Count == 0) break;
                         uint height = indexes.Keys.Min();
-                        Block block = Blockchain.Singleton.Store.GetBlock(height);
+                        block = Blockchain.Singleton.Store.GetBlock(height);
                         if (block == null) break;
                         WriteBatch batch = new WriteBatch();
                         HashSet<UInt160> accounts = indexes[height];
-                        ProcessBlock(block, accounts, batch);
+                        change_set = ProcessBlock(block, accounts, batch);
                         ReadOptions options = ReadOptions.Default;
                         byte[] groupId = db.Get(options, SliceBuilder.Begin(DataEntryPrefix.IX_Group).Add(height)).ToArray();
                         indexes.Remove(height);
@@ -261,6 +260,17 @@ namespace Bhp.Wallets
                         }
                         db.Write(WriteOptions.Default, batch);
                     }
+                    foreach (var (tx, accounts) in change_set)
+                    {
+                        WalletTransaction?.Invoke(null, new WalletTransactionEventArgs
+                        {
+                            Transaction = tx,
+                            RelatedAccounts = accounts,
+                            Height = block.Index,
+                            Time = block.Timestamp
+                        });
+                    }
+                }
                 for (int i = 0; i < 20 && !disposed; i++)
                     Thread.Sleep(100);
             }

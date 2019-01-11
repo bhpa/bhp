@@ -59,7 +59,7 @@ namespace Bhp.Network.P2P.Payloads
             Name = reader.ReadVarString(1024);
             Amount = reader.ReadSerializable<Fixed8>();
             Precision = reader.ReadByte();
-            Owner = ECPoint.DeserializeFrom(reader, ECCurve.Secp256r1);
+            Owner = ECPoint.DeserializeFrom(reader, ECCurve.Secp256);
             if (Owner.IsInfinity && AssetType != AssetType.GoverningToken && AssetType != AssetType.UtilityToken)
                 throw new FormatException();
             Admin = reader.ReadSerializable<UInt160>();

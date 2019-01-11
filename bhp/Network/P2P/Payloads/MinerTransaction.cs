@@ -41,7 +41,6 @@ namespace Bhp.Network.P2P.Payloads
             base.OnDeserialized();
             if (Inputs.Length != 0)
                 throw new FormatException();
-
             if (Outputs.Any(p => p.AssetId != Blockchain.GoverningToken.Hash && p.AssetId != Blockchain.UtilityToken.Hash))
                 throw new FormatException();
         }

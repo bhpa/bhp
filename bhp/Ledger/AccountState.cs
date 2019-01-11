@@ -46,7 +46,7 @@ namespace Bhp.Ledger
             IsFrozen = reader.ReadBoolean();
             Votes = new ECPoint[reader.ReadVarInt()];
             for (int i = 0; i < Votes.Length; i++)
-                Votes[i] = ECPoint.DeserializeFrom(reader, ECCurve.Secp256r1);
+                Votes[i] = ECPoint.DeserializeFrom(reader, ECCurve.Secp256);
             int count = (int)reader.ReadVarInt();
             Balances = new Dictionary<UInt256, Fixed8>(count);
             for (int i = 0; i < count; i++)

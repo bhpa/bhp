@@ -113,24 +113,5 @@ namespace Bhp.Persistence
             }
             return false;
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="persistence"></param>
-        /// <param name="tx"></param>
-        /// <returns></returns>
-        public static string IsDoubleSpendByBhp(this IPersistence persistence, Transaction tx)
-        {
-            if (tx.Inputs.Length == 0) return "Input is empty.";
-            foreach (var group in tx.Inputs.GroupBy(p => p.PrevHash))
-            {
-                UnspentCoinState state = persistence.UnspentCoins.TryGet(group.Key);
-                if (state == null) return "utxo is not exists.";
-                if (group.Any(p => p.PrevIndex >= state.Items.Length || state.Items[p.PrevIndex].HasFlag(CoinState.Spent)))
-                    return "utox was spent.";
-            }
-            return "success";
-        }
     }
 }

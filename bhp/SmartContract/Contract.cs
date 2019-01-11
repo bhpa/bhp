@@ -37,11 +37,6 @@ namespace Bhp.SmartContract
             }
         }
 
-        public bool IsStandardContract()
-        {
-            return Script.IsStandardContract();
-        }
-
         public static Contract Create(ContractParameterType[] parameterList, byte[] redeemScript)
         {
             return new Contract

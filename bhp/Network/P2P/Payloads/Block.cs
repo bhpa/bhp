@@ -47,27 +47,6 @@ namespace Bhp.Network.P2P.Payloads
             Fixed8 amount_sysfee = ts.Sum(p => p.SystemFee);
             return amount_in - amount_out - amount_sysfee;
         }
-        
-        /*
-        public static Fixed8 CalculateTransactionFee(IEnumerable<Transaction> transactions)
-        {
-            Transaction[] ts = transactions.Where(p => p.Type == TransactionType.ContractTransaction).ToArray();
-            Fixed8 inputsum = Fixed8.Zero;
-            Fixed8 outputsum = Fixed8.Zero;
-            foreach (Transaction tr in ts)
-            {
-                foreach (CoinReference coin in tr.Inputs)
-                {
-                    inputsum += Blockchain.Singleton.GetTransaction(coin.PrevHash).Outputs[coin.PrevIndex].Value;
-                }
-                foreach (TransactionOutput output in tr.Outputs)
-                {
-                    outputsum += output.Value;
-                }
-            }
-            return inputsum - outputsum;
-        }
-        */
 
         public override void Deserialize(BinaryReader reader)
         {

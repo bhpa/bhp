@@ -1,4 +1,5 @@
-﻿using Bhp.Cryptography;
+﻿using Bhp.BhpExtensions.Transactions;
+using Bhp.Cryptography;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.SmartContract;
@@ -11,7 +12,6 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using ECPoint = Bhp.Cryptography.ECC.ECPoint;
-using VMArray = Bhp.VM.Types.Array;
 
 namespace Bhp.Wallets
 {
@@ -20,6 +20,9 @@ namespace Bhp.Wallets
         public abstract event EventHandler<WalletTransactionEventArgs> WalletTransaction;
 
         private static readonly Random rand = new Random();
+
+        //By BHP
+        TransactionContract transactionContract = new TransactionContract();
 
         public abstract string Name { get; }
         public abstract Version Version { get; }
@@ -72,7 +75,7 @@ namespace Bhp.Wallets
         protected static Coin[] FindUnspentCoins(IEnumerable<Coin> unspents, UInt256 asset_id, Fixed8 amount)
         {
             Coin[] unspents_asset = unspents.Where(p => p.Output.AssetId == asset_id).ToArray();
-            unspents_asset = VerifyAttribute(unspents_asset);//by bhp smart contract verify
+            unspents_asset = VerifyTransactionContract.checkUtxo(unspents_asset);//By BHP
             Fixed8 sum = unspents_asset.Sum(p => p.Output.Value);
             if (sum < amount) return null;
             if (sum == amount) return unspents_asset;
@@ -149,11 +152,11 @@ namespace Bhp.Wallets
             return GetCoins(GetAccounts().Select(p => p.ScriptHash));
         }
 
-        public static byte[] GetPrivateKeyFromNEP2(string nep2, string passphrase, int N = 16384, int r = 8, int p = 8)
+        public static byte[] GetPrivateKeyFromBRC2(string brc2, string passphrase, int N = 16384, int r = 8, int p = 8)
         {
-            if (nep2 == null) throw new ArgumentNullException(nameof(nep2));
+            if (brc2 == null) throw new ArgumentNullException(nameof(brc2));
             if (passphrase == null) throw new ArgumentNullException(nameof(passphrase));
-            byte[] data = nep2.Base58CheckDecode();
+            byte[] data = brc2.Base58CheckDecode();
             if (data.Length != 39 || data[0] != 0x01 || data[1] != 0x42 || data[2] != 0xe0)
                 throw new FormatException();
             byte[] addresshash = new byte[4];
@@ -164,7 +167,7 @@ namespace Bhp.Wallets
             byte[] encryptedkey = new byte[32];
             Buffer.BlockCopy(data, 7, encryptedkey, 0, 32);
             byte[] prikey = XOR(encryptedkey.AES256Decrypt(derivedhalf2), derivedhalf1);
-            Cryptography.ECC.ECPoint pubkey = Cryptography.ECC.ECCurve.Secp256r1.G * prikey;
+            Cryptography.ECC.ECPoint pubkey = Cryptography.ECC.ECCurve.Secp256.G * prikey;
             UInt160 script_hash = Contract.CreateSignatureRedeemScript(pubkey).ToScriptHash();
             string address = script_hash.ToAddress();
             if (!Encoding.ASCII.GetBytes(address).Sha256().Sha256().Take(4).SequenceEqual(addresshash))
@@ -205,7 +208,7 @@ namespace Bhp.Wallets
             Array.Clear(privateKey, 0, privateKey.Length);
             return account;
         }
-         
+
         public virtual WalletAccount Import(string wif)
         {
             byte[] privateKey = GetPrivateKeyFromWIF(wif);
@@ -214,114 +217,13 @@ namespace Bhp.Wallets
             return account;
         }
 
-        public virtual WalletAccount Import(string nep2, string passphrase)
+        public virtual WalletAccount Import(string brc2, string passphrase)
         {
-            byte[] privateKey = GetPrivateKeyFromNEP2(nep2, passphrase);
+            byte[] privateKey = GetPrivateKeyFromBRC2(brc2, passphrase);
             WalletAccount account = CreateAccount(privateKey);
             Array.Clear(privateKey, 0, privateKey.Length);
             return account;
-        } 
-    
-        /*
-        public T MakeTransaction<T>(T tx, UInt160 from = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8), Fixed8 transaction_fee = default(Fixed8)) where T : Transaction
-        {
-            if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
-            if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
-            fee += tx.SystemFee;
-            var pay_total = (typeof(T) == typeof(IssueTransaction) ? new TransactionOutput[0] : tx.Outputs).GroupBy(p => p.AssetId, (k, g) => new
-            {
-                AssetId = k,
-                Value = g.Sum(p => p.Value)
-            }).ToDictionary(p => p.AssetId);
-            if (fee > Fixed8.Zero)
-            {
-                if (pay_total.ContainsKey(Blockchain.UtilityToken.Hash))
-                {
-                    pay_total[Blockchain.UtilityToken.Hash] = new
-                    {
-                        AssetId = Blockchain.UtilityToken.Hash,
-                        Value = pay_total[Blockchain.UtilityToken.Hash].Value + fee
-                    };
-                }
-                else
-                {
-                    pay_total.Add(Blockchain.UtilityToken.Hash, new
-                    {
-                        AssetId = Blockchain.UtilityToken.Hash,
-                        Value = fee
-                    });
-                }
-            }
-            var pay_coins = pay_total.Select(p => new
-            {
-                AssetId = p.Key,
-                Unspents = from == null ? FindUnspentCoins(p.Key, p.Value.Value) : FindUnspentCoins(p.Key, p.Value.Value, from)
-            }).ToDictionary(p => p.AssetId);
-            if (pay_coins.Any(p => p.Value.Unspents == null)) return null;
-            var input_sum = pay_coins.Values.ToDictionary(p => p.AssetId, p => new
-            {
-                p.AssetId,
-                Value = p.Unspents.Sum(q => q.Output.Value)
-            });
-            if (change_address == null) change_address = GetChangeAddress();
-            List<TransactionOutput> outputs_new = new List<TransactionOutput>(tx.Outputs);
-            foreach (UInt256 asset_id in input_sum.Keys)
-            {
-                bool isChange = false;
-                if (input_sum[asset_id].Value > pay_total[asset_id].Value)
-                {
-                    isChange = true;
-                    outputs_new.Add(new TransactionOutput
-                    {
-                        AssetId = asset_id,
-                        Value = input_sum[asset_id].Value - pay_total[asset_id].Value,
-                        ScriptHash = change_address
-                    });
-                }
-
-                //By BHP
-                if (tx.Attributes.Length > 0)
-                {
-                    for (int i = 0; i < tx.Attributes.Length; i++)
-                    {
-                        if (tx.Attributes[i].Usage == TransactionAttributeUsage.SmartContractScript)
-                        {
-                            int n = -1;
-                            if (isChange)
-                            {
-                                n = outputs_new.Count - 1;
-                            }
-                            using (ScriptBuilder sb = new ScriptBuilder())
-                            {
-                                sb.EmitPush(n);
-                                sb.EmitPush(tx.Attributes[i].Data);
-                                tx.Attributes[i].Data = sb.ToArray();
-                            }
-                        }
-                    }
-                }
-            }
-            tx.Inputs = pay_coins.Values.SelectMany(p => p.Unspents).Select(p => p.Reference).ToArray();
-            tx.Outputs = outputs_new.ToArray();
-
-            decimal Rate = 0.0001m;
-            if (tx.Type == TransactionType.ContractTransaction)
-            {
-                foreach (TransactionOutput txo in tx.Outputs)
-                {
-                    if ((decimal)txo.Value < 0.0001m)
-                    {
-                        throw new Exception("-500, TransactionFee not Enough");
-                    }
-                    else
-                    {
-                        txo.Value = Fixed8.FromDecimal((decimal)txo.Value - ((decimal)txo.Value * Rate));
-                    }
-                }
-            }
-            return tx;
         }
-        */
 
         public T MakeTransaction<T>(T tx, UInt160 from = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8)) where T : Transaction
         {
@@ -482,7 +384,8 @@ namespace Bhp.Wallets
                     Outputs = itx.Outputs
                 };
             }
-            tx = MakeTransaction(tx, from, change_address, fee);
+            //tx = MakeTransaction(tx, from, change_address, fee);
+            tx = transactionContract.MakeTransaction(this, tx, from, change_address, fee);//By BHP
             return tx;
         }
 
@@ -507,78 +410,5 @@ namespace Bhp.Wallets
             if (x.Length != y.Length) throw new ArgumentException();
             return x.Zip(y, (a, b) => (byte)(a ^ b)).ToArray();
         }
-
-        /// <summary>
-        /// Verify inputs are available
-        /// </summary>
-        /// <param name="unspentsAsset"></param>
-        /// <returns></returns>
-        private static Coin[] VerifyAttribute(Coin[] unspentsAsset)
-        {
-            List<Coin> unspents = unspentsAsset.ToList();
-            foreach (var item in unspentsAsset)
-            {
-                Transaction preTx = Blockchain.Singleton.GetTransaction(item.Reference.PrevHash);
-                TransactionAttribute[] attribute = preTx.Attributes;
-                using (Persistence.Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
-                {
-                    foreach (TransactionAttribute att in attribute)
-                    {
-                        if (att.Usage == TransactionAttributeUsage.SmartContractScript)
-                        {
-                            int n = -1;
-                            System.IO.BinaryReader OpReader = new System.IO.BinaryReader(new System.IO.MemoryStream(att.Data, false));
-                            OpCode opcode = (OpCode)OpReader.ReadByte();
-                            switch (opcode)
-                            {
-                                case OpCode.PUSH0:
-                                    break;
-                                case OpCode.PUSHDATA1:
-                                    n = BitConverter.ToInt16(OpReader.ReadBytes(OpReader.ReadByte()), 0);
-                                    break;
-                                case OpCode.PUSHDATA2:
-                                    n = BitConverter.ToInt16(OpReader.ReadBytes(OpReader.ReadUInt16()), 0);
-                                    break;
-                                case OpCode.PUSHDATA4:
-                                    n = BitConverter.ToInt32(OpReader.ReadBytes((int)OpReader.ReadUInt32()), 0);
-                                    break;
-                                case OpCode.PUSHM1:
-                                case OpCode.PUSH1:
-                                case OpCode.PUSH2:
-                                case OpCode.PUSH3:
-                                case OpCode.PUSH4:
-                                case OpCode.PUSH5:
-                                case OpCode.PUSH6:
-                                case OpCode.PUSH7:
-                                case OpCode.PUSH8:
-                                case OpCode.PUSH9:
-                                case OpCode.PUSH10:
-                                case OpCode.PUSH11:
-                                case OpCode.PUSH12:
-                                case OpCode.PUSH13:
-                                case OpCode.PUSH14:
-                                case OpCode.PUSH15:
-                                case OpCode.PUSH16:
-                                    n = (int)opcode - (int)OpCode.PUSH1 + 1;
-                                    break;
-                            }
-                            if (item.Reference.PrevIndex != n)
-                            {
-                                using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
-                                {
-                                    engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
-                                    if (!engine.Execute() || engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean())
-                                    {
-                                        unspents.Remove(item);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return unspents.ToArray();
-        }
-
     }
 }

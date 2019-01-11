@@ -6,18 +6,18 @@ namespace Bhp.Wallets.BRC6
     internal class BRC6Account : WalletAccount
     {
         private readonly BRC6Wallet wallet;
-        private readonly string nep2key;
+        private readonly string brc2key;
         private KeyPair key;
         public JObject Extra;
 
-        public bool Decrypted => nep2key == null || key != null;
-        public override bool HasKey => nep2key != null;
+        public bool Decrypted => brc2key == null || key != null;
+        public override bool HasKey => brc2key != null;
 
-        public BRC6Account(BRC6Wallet wallet, UInt160 scriptHash, string nep2key = null)
+        public BRC6Account(BRC6Wallet wallet, UInt160 scriptHash, string brc2key = null)
             : base(scriptHash)
         {
             this.wallet = wallet;
-            this.nep2key = nep2key;
+            this.brc2key = brc2key;
         }
 
         public BRC6Account(BRC6Wallet wallet, UInt160 scriptHash, KeyPair key, string password)
@@ -40,20 +40,20 @@ namespace Bhp.Wallets.BRC6
 
         public override KeyPair GetKey()
         {
-            if (nep2key == null) return null;
+            if (brc2key == null) return null;
             if (key == null)
             {
-                key = wallet.DecryptKey(nep2key);
+                key = wallet.DecryptKey(brc2key);
             }
             return key;
         }
 
         public KeyPair GetKey(string password)
         {
-            if (nep2key == null) return null;
+            if (brc2key == null) return null;
             if (key == null)
             {
-                key = new KeyPair(Wallet.GetPrivateKeyFromNEP2(nep2key, password, wallet.Scrypt.N, wallet.Scrypt.R, wallet.Scrypt.P));
+                key = new KeyPair(Wallet.GetPrivateKeyFromBRC2(brc2key, password, wallet.Scrypt.N, wallet.Scrypt.R, wallet.Scrypt.P));
             }
             return key;
         }
@@ -65,7 +65,7 @@ namespace Bhp.Wallets.BRC6
             account["label"] = Label;
             account["isDefault"] = IsDefault;
             account["lock"] = Lock;
-            account["key"] = nep2key;
+            account["key"] = brc2key;
             account["contract"] = ((BRC6Contract)Contract)?.ToJson();
             account["extra"] = Extra;
             return account;
@@ -75,7 +75,7 @@ namespace Bhp.Wallets.BRC6
         {
             try
             {
-                Wallet.GetPrivateKeyFromNEP2(nep2key, password, wallet.Scrypt.N, wallet.Scrypt.R, wallet.Scrypt.P);
+                Wallet.GetPrivateKeyFromBRC2(brc2key, password, wallet.Scrypt.N, wallet.Scrypt.R, wallet.Scrypt.P);
                 return true;
             }
             catch (FormatException)

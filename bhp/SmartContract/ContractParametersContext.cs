@@ -37,7 +37,7 @@ namespace Bhp.SmartContract
                     Parameters = ((JArray)json["parameters"]).Select(p => ContractParameter.FromJson(p)).ToArray(),
                     Signatures = json["signatures"]?.Properties.Select(p => new
                     {
-                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256r1),
+                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256),
                         Signature = p.Value.AsString().HexToBytes()
                     }).ToDictionary(p => p.PublicKey, p => p.Signature)
                 };
@@ -125,7 +125,7 @@ namespace Bhp.SmartContract
                     }
                     while (contract.Script[i++] == 33)
                     {
-                        points.Add(ECPoint.DecodePoint(contract.Script.Skip(i).Take(33).ToArray(), ECCurve.Secp256r1));
+                        points.Add(ECPoint.DecodePoint(contract.Script.Skip(i).Take(33).ToArray(), ECCurve.Secp256));
                         i += 33;
                     }
                 }
@@ -213,7 +213,6 @@ namespace Bhp.SmartContract
         public Witness[] GetWitnesses()
         {
             if (!Completed) throw new InvalidOperationException();
-            // 脚本哈希数量== 见证人数量
             Witness[] witnesses = new Witness[ScriptHashes.Count];
             for (int i = 0; i < ScriptHashes.Count; i++)
             {
@@ -224,7 +223,6 @@ namespace Bhp.SmartContract
                     {
                         sb.EmitPush(parameter);
                     }
-                    //添加新的见证人
                     witnesses[i] = new Witness
                     {
                         InvocationScript = sb.ToArray(),

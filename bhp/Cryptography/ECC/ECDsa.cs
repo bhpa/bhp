@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 
 namespace Bhp.Cryptography.ECC
 {
-    public class ECDsa
+    public class ECDsa : IDisposable
     {
         private readonly byte[] privateKey;
         private readonly ECPoint publicKey;
@@ -103,6 +103,10 @@ namespace Bhp.Cryptography.ECC
             ECPoint point = SumOfTwoMultiplies(curve.G, u1, publicKey, u2);
             BigInteger v = point.X.Value.Mod(curve.N);
             return v.Equals(r);
+        }
+
+        public void Dispose()
+        { 
         }
     }
 }

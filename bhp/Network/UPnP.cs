@@ -28,11 +28,18 @@ namespace Bhp.Network
                 byte[] data = Encoding.ASCII.GetBytes(req);
                 IPEndPoint ipe = new IPEndPoint(IPAddress.Broadcast, 1900);
 
-                DateTime start = DateTime.Now;
+                DateTime start = DateTime.UtcNow;
 
-                s.SendTo(data, ipe);
-                s.SendTo(data, ipe);
-                s.SendTo(data, ipe);
+                try
+                {
+                    s.SendTo(data, ipe);
+                    s.SendTo(data, ipe);
+                    s.SendTo(data, ipe);
+                }
+                catch
+                {
+                    return false;
+                }
 
                 byte[] buffer = new byte[0x1000];
 
@@ -59,7 +66,7 @@ namespace Bhp.Network
                         continue;
                     }
                 }
-                while (DateTime.Now - start < TimeOut);
+                while (DateTime.UtcNow - start < TimeOut);
 
                 return false;
             }

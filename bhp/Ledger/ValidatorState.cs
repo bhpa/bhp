@@ -34,7 +34,7 @@ namespace Bhp.Ledger
         public override void Deserialize(BinaryReader reader)
         {
             base.Deserialize(reader);
-            PublicKey = ECPoint.DeserializeFrom(reader, ECCurve.Secp256r1);
+            PublicKey = ECPoint.DeserializeFrom(reader, ECCurve.Secp256);
             Registered = reader.ReadBoolean();
             Votes = reader.ReadSerializable<Fixed8>();
         }

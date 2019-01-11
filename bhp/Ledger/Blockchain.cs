@@ -28,13 +28,14 @@ namespace Bhp.Ledger
         public class Import { public IEnumerable<Block> Blocks; }
         public class ImportCompleted { }
 
-        public static readonly uint SecondsPerBlock = Settings.Default.SecondsPerBlock;
+        public static readonly uint SecondsPerBlock = ProtocolSettings.Default.SecondsPerBlock;
         public const uint DecrementInterval = 2000000;
         public const uint MaxValidators = 1024;
         public static readonly uint[] GenerationAmount = { 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
         public static readonly TimeSpan TimePerBlock = TimeSpan.FromSeconds(SecondsPerBlock);
-        public static readonly ECPoint[] StandbyValidators = Settings.Default.StandbyValidators.OfType<string>().Select(p => ECPoint.DecodePoint(p.HexToBytes(), ECCurve.Secp256r1)).ToArray();
+        public static readonly ECPoint[] StandbyValidators = ProtocolSettings.Default.StandbyValidators.OfType<string>().Select(p => ECPoint.DecodePoint(p.HexToBytes(), ECCurve.Secp256)).ToArray();
 
+        //By BHP
         public const uint AmountOfGoverningToken = 100000000;//BHP 总量
         public const uint AmountOfCreation = 45000000; //创世区块
         public const uint AmountOfMining = AmountOfGoverningToken - AmountOfCreation; //挖矿总量
@@ -46,7 +47,7 @@ namespace Bhp.Ledger
             Name = "[{\"lang\":\"zh-CN\",\"name\":\"算力币\"},{\"lang\":\"en\",\"name\":\"BHP\"}]",
             Amount = Fixed8.FromDecimal(AmountOfCreation),
             Precision = 8,
-            Owner = ECCurve.Secp256r1.Infinity,
+            Owner = ECCurve.Secp256.Infinity,
             Admin = (new[] { (byte)OpCode.PUSHT }).ToScriptHash(),
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
@@ -60,7 +61,7 @@ namespace Bhp.Ledger
             Name = "[{\"lang\":\"zh-CN\",\"name\":\"BHPGas\"},{\"lang\":\"en\",\"name\":\"BHPGas\"}]",
             Amount = Fixed8.FromDecimal(GenerationAmount.Sum(p => p) * DecrementInterval),
             Precision = 8,
-            Owner = ECCurve.Secp256r1.Infinity,
+            Owner = ECCurve.Secp256.Infinity,
             Admin = (new[] { (byte)OpCode.PUSHF }).ToScriptHash(),
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
@@ -74,7 +75,7 @@ namespace Bhp.Ledger
             PrevHash = UInt256.Zero,
             Timestamp = (new DateTime(2018, 8, 8, 8, 8, 8, DateTimeKind.Utc)).ToTimestamp(),
             Index = 0,
-            ConsensusData = 2083236893, //Bitcoin
+            ConsensusData = 2083236893, //向比特币致敬
             NextConsensus = GetConsensusAddress(StandbyValidators),
             Witness = new Witness
             {
@@ -118,6 +119,7 @@ namespace Bhp.Ledger
             }
         };
 
+        private static readonly object lockObj = new object();
         private readonly BhpSystem system;
         private readonly List<UInt256> header_index = new List<UInt256>();
         private uint stored_header_count = 0;
@@ -154,7 +156,7 @@ namespace Bhp.Ledger
         {
             this.system = system;
             this.Store = store;
-            lock (GetType())
+            lock (lockObj)
             {
                 if (singleton != null)
                     throw new InvalidOperationException();
@@ -264,9 +266,10 @@ namespace Bhp.Ledger
                 blocks = new LinkedList<Block>();
                 block_cache_unverified.Add(block.Index, blocks);
             }
+
             blocks.AddLast(block);
         }
-
+        
         private RelayResultReason OnNewBlock(Block block)
         {
             if (block.Index <= Height)
@@ -274,7 +277,7 @@ namespace Bhp.Ledger
             if (block_cache.ContainsKey(block.Hash))
                 return RelayResultReason.AlreadyExists;
             if (block.Index - 1 >= header_index.Count)
-            { 
+            {
                 AddUnverifiedBlockToCache(block);
                 return RelayResultReason.UnableToVerify;
             }
@@ -291,7 +294,7 @@ namespace Bhp.Ledger
             if (block.Index == Height + 1)
             {
                 Block block_persist = block;
-                List<Block> blocksToPersistList = new List<Block>();
+                List<Block> blocksToPersistList = new List<Block>();                                
                 while (true)
                 {
                     blocksToPersistList.Add(block_persist);
@@ -308,15 +311,17 @@ namespace Bhp.Ledger
 
                     if (blocksPersisted++ < blocksToPersistList.Count - 2) continue;
                     // Relay most recent 2 blocks persisted
-                    if (blockToPersist.Index + 100 >= header_index.Count)
-                        system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = block });
-                }
 
+                    if (blockToPersist.Index + 100 >= header_index.Count)
+                        system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = blockToPersist });
+                }
                 SaveHeaderHashList();
+
                 if (block_cache_unverified.TryGetValue(Height + 1, out LinkedList<Block> unverifiedBlocks))
                 {
                     foreach (var unverifiedBlock in unverifiedBlocks)
-                        Self.Tell(unverifiedBlock, ActorRefs.NoSender);
+                        Self.Tell(unverifiedBlock, ActorRefs.NoSender);   
+                    block_cache_unverified.Remove(Height + 1);
                 }
             }
             else
@@ -388,7 +393,7 @@ namespace Bhp.Ledger
             if (!transaction.Verify(currentSnapshot, GetMemoryPool()))
                 return RelayResultReason.Invalid;
             if (!Plugin.CheckPolicy(transaction))
-                return RelayResultReason.Unknown;
+                return RelayResultReason.PolicyFail;
 
             if (!mem_pool.TryAdd(transaction.Hash, transaction))
                 return RelayResultReason.OutOfMemory;
@@ -455,6 +460,7 @@ namespace Bhp.Ledger
         {
             using (Snapshot snapshot = GetSnapshot())
             {
+                List<ApplicationExecuted> all_application_executed = new List<ApplicationExecuted>();
                 snapshot.PersistingBlock = block;
                 snapshot.Blocks.Add(block.Hash, new BlockState
                 {
@@ -605,11 +611,15 @@ namespace Bhp.Ledger
                             break;
                     }
                     if (execution_results.Count > 0)
-                        Distribute(new ApplicationExecuted
+                    {
+                        ApplicationExecuted application_executed = new ApplicationExecuted
                         {
                             Transaction = tx,
                             ExecutionResults = execution_results.ToArray()
-                        });
+                        };
+                        Distribute(application_executed);
+                        all_application_executed.Add(application_executed);
+                    }
                 }
                 snapshot.BlockHashIndex.GetAndChange().Hash = block.Hash;
                 snapshot.BlockHashIndex.GetAndChange().Index = block.Index;
@@ -620,7 +630,7 @@ namespace Bhp.Ledger
                     snapshot.HeaderHashIndex.GetAndChange().Index = block.Index;
                 }
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
-                    plugin.OnPersist(snapshot);
+                    plugin.OnPersist(snapshot, all_application_executed);
                 snapshot.Commit();
             }
             UpdateCurrentSnapshot();
@@ -666,7 +676,7 @@ namespace Bhp.Ledger
 
         internal static void ProcessValidatorStateDescriptor(StateDescriptor descriptor, Snapshot snapshot)
         {
-            ECPoint pubkey = ECPoint.DecodePoint(descriptor.Key, ECCurve.Secp256r1);
+            ECPoint pubkey = ECPoint.DecodePoint(descriptor.Key, ECCurve.Secp256);
             ValidatorState validator = snapshot.Validators.GetAndChange(pubkey, () => new ValidatorState(pubkey));
             switch (descriptor.Field)
             {
