@@ -48,7 +48,6 @@ namespace Bhp.UnitTests
             ((decimal)actual).Should().Be(expected);
         }
 
-
         [TestMethod]
         public void Sort()
         {

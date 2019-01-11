@@ -35,7 +35,7 @@ namespace Bhp.UnitTests
         [TestMethod]
         public void Size_Get()
         {
-            ECPoint val = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256r1);
+            ECPoint val = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256);
             uut.PublicKey = val;
 
             uut.Size.Should().Be(43); // 1 + 33 + 1 + 8
@@ -66,8 +66,8 @@ namespace Bhp.UnitTests
         public void Equals_DifferentKey()
         {
             ValidatorState newVs = new ValidatorState();
-            newVs.PublicKey = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70b".HexToBytes(), ECCurve.Secp256r1);
-            uut.PublicKey = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256r1);
+            newVs.PublicKey = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70b".HexToBytes(), ECCurve.Secp256);
+            uut.PublicKey = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256);
             uut.Equals(newVs).Should().BeFalse();
         }
 
@@ -80,7 +80,7 @@ namespace Bhp.UnitTests
         [TestMethod]
         public void Serialize()
         {
-            ECPoint val = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256r1);
+            ECPoint val = ECPoint.DecodePoint("03b209fd4f53a7170ea4444e0cb0a6bb6a53c2bd016926989cf85f9b0fba17a70c".HexToBytes(), ECCurve.Secp256);
             uut.PublicKey = val;
             uut.Registered = true;
             uut.Votes = Fixed8.Zero;
