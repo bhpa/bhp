@@ -12,7 +12,7 @@ namespace Bhp.Mining
     /// </summary>
     public class MiningTransaction
     {   
-        public MinerTransaction MakeMinerTransaction(Wallet wallet, uint blockIndex, ulong nonce, Fixed8 amount_servicefee,Fixed8 amount_netfee )
+        public MinerTransaction MakeMinerTransaction(Wallet wallet, uint blockIndex, ulong nonce, Fixed8 amount_txfee, Fixed8 amount_netfee )
         {
             List<TransactionOutput> outputs = new List<TransactionOutput>();
             List<TransactionAttribute> attributes = new List<TransactionAttribute>();
@@ -20,7 +20,7 @@ namespace Bhp.Mining
             if (blockIndex > 0)
             {
                 AddMiningTransaction(wallet, blockIndex, outputs, attributes);
-                AddServiceFee(outputs, amount_servicefee, blockIndex);
+                AddTxFee(outputs, amount_txfee, blockIndex);
                 AddNetFee(wallet, outputs, amount_netfee);
             } 
 
@@ -74,11 +74,11 @@ namespace Bhp.Mining
             }
         }
 
-        private void AddServiceFee(List<TransactionOutput> outputs, Fixed8 amount_servicefee, uint blockIndex)
+        private void AddTxFee(List<TransactionOutput> outputs, Fixed8 amount_txfee, uint blockIndex)
         { 
-            if (amount_servicefee != Fixed8.Zero)
+            if (amount_txfee != Fixed8.Zero)
             {
-                outputs.Add(TransactionFeeOutput(amount_servicefee, blockIndex));
+                outputs.Add(TransactionFeeOutput(amount_txfee, blockIndex));
             }
         }
 
@@ -106,12 +106,12 @@ namespace Bhp.Mining
             };
         }
          
-        private TransactionOutput TransactionFeeOutput(Fixed8 service_netfee, uint blockIndex)
+        private TransactionOutput TransactionFeeOutput(Fixed8 amount_txfee, uint blockIndex)
         {
             return new TransactionOutput
             {
                 AssetId = Blockchain.GoverningToken.Hash,
-                Value = service_netfee,
+                Value = amount_txfee,
                 ScriptHash = MiningParams.PoSAddress[blockIndex % (uint)MiningParams.PoSAddress.Length].ToScriptHash()
             };
         }

@@ -28,6 +28,7 @@ namespace Bhp.BhpExtensions.RPC
         public WalletTimeLock walletTimeLock;
         private bool Unlocking;
         private BhpSystem system;
+        private RpcServer rpcServer;
 
         public RpcExtension()
         {
@@ -35,12 +36,13 @@ namespace Bhp.BhpExtensions.RPC
             Unlocking = false;
         }
 
-        public RpcExtension(BhpSystem system,Wallet wallet)
+        public RpcExtension(BhpSystem system,Wallet wallet, RpcServer rpcServer)
         {
             this.system = system;
             this.wallet = wallet;
             walletTimeLock = new WalletTimeLock();
-            Unlocking = false;                        
+            Unlocking = false;
+            this.rpcServer = rpcServer;
         }
 
         public void SetWallet(Wallet wallet)
@@ -90,6 +92,7 @@ namespace Bhp.BhpExtensions.RPC
                         {
                             wallet = OpenWallet(ExtensionSettings.Default.WalletConfig.Indexer, ExtensionSettings.Default.WalletConfig.Path, password);
                             walletTimeLock.SetDuration(wallet == null ? 0 : duration);
+                            rpcServer.SetWallet(wallet);
                             return $"success";
                         }
                         else
@@ -203,6 +206,7 @@ namespace Bhp.BhpExtensions.RPC
                         json["utxo"] = new JArray(jsons.Select(p =>
                         {
                             JObject peerJson = new JObject();
+                            peerJson["asset"] = p["asset"].ToString();
                             peerJson["txid"] = p["txid"].ToString();
                             peerJson["n"] = (int)p["n"];
                             peerJson["value"] = (double)p["value"];
@@ -219,6 +223,40 @@ namespace Bhp.BhpExtensions.RPC
                         string position = _params[1].AsString() != "" ? _params[1].AsString() :"1";
                         string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
                         string jsonRes = RequestRpc("findTxVout", $"address={from}&position={position}&offset={offset}");
+
+                        Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
+
+                        json["transaction"] = new JArray(jsons.Select(p =>
+                        {
+                            JObject peerJson = new JObject();
+                            peerJson["blockHeight"] = p["blockHeight"].ToString();
+                            peerJson["txid"] = p["txid"].ToString();
+                            peerJson["type"] = p["type"].ToString();
+                            Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
+                            JArray j_inaddress = new JArray();
+                            foreach (Newtonsoft.Json.Linq.JToken i in jt)
+                            {
+                                string s = i.ToString();
+                                j_inaddress.Add(s);
+                            }
+                            peerJson["inputaddress"] = j_inaddress;
+                            peerJson["asset"] = p["asset"].ToString();
+                            peerJson["n"] = (int)p["n"];
+                            peerJson["value"] = (double)p["value"];
+                            peerJson["outputaddress"] = p["address"].ToString();
+                            peerJson["time"] = p["time"].ToString();
+                            peerJson["utctime"] = (int)p["utcTime"];
+                            peerJson["confirmations"] = p["confirmations"].ToString();
+                            return peerJson;
+                        }));
+                        return json;
+                    }
+                case "getdeposits":
+                    {
+                        string from = _params[0].AsString();
+                        string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
+                        string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
+                        string jsonRes = RequestRpc("getDeposit", $"address={from}&position={position}&offset={offset}");
 
                         Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
 

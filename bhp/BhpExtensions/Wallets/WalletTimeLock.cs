@@ -70,8 +70,9 @@ namespace Bhp.BhpExtensions.Wallets
             try
             {
                 rwlock.EnterReadLock();
-                TimeSpan span = new TimeSpan(DateTime.UtcNow.Ticks) - new TimeSpan(UnLockTime.Ticks);
-                locked = ((int)span.TotalSeconds >= Duration);
+                locked = (DateTime.UtcNow - UnLockTime).TotalSeconds >= Duration;
+
+                //Console.WriteLine($"differ: {(DateTime.UtcNow - UnLockTime).TotalSeconds},Duration:{Duration}");
             }
             finally
             {

@@ -250,13 +250,13 @@ namespace Bhp.Consensus
             Fixed8 amount_netfee = Block.CalculateNetFee(transactions);
 
             //By BHP 
-            Fixed8 amount_servicefee = ServiceFee.CalcuServiceFee(transactions);
+            Fixed8 amount_txfee = BhpTxFee.CalcuTxFee(transactions);
 
             while (true)
             {
                 ulong nonce = GetNonce();
                 //By BHP
-                MinerTransaction tx = new MiningTransaction().MakeMinerTransaction(wallet, BlockIndex, nonce, amount_servicefee, amount_netfee);
+                MinerTransaction tx = new MiningTransaction().MakeMinerTransaction(wallet, BlockIndex, nonce, amount_txfee, amount_netfee);
                 if (!snapshot.ContainsTransaction(tx.Hash))
                 {
                     Nonce = nonce;
@@ -307,9 +307,9 @@ namespace Bhp.Consensus
             Fixed8 amount_netfee = Block.CalculateNetFee(Transactions.Values);
             if (tx_gen?.Outputs.Where(p => p.AssetId == Blockchain.UtilityToken.Hash).Sum(p => p.Value) != amount_netfee) return false;
 
-            // 手续费单独计算
-            Fixed8 amount_servicefee = ServiceFee.CalcuServiceFee(Transactions.Values.ToList());
-            if (tx_gen?.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(p => p.Value) - MiningSubsidy.GetMiningSubsidy(BlockIndex) != amount_servicefee) return false;
+            // 交易手续费单独计算
+            Fixed8 amount_txfee = BhpTxFee.CalcuTxFee(Transactions.Values.ToList());
+            if (tx_gen?.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(p => p.Value) - MiningSubsidy.GetMiningSubsidy(BlockIndex) != amount_txfee) return false;
 
             return true;
         }

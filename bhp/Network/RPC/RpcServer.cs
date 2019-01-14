@@ -45,7 +45,12 @@ namespace Bhp.Network.RPC
             this.wallet = wallet;
             this.maxGasInvoke = maxGasInvoke;
 
-            rpcExtension = new RpcExtension(system, wallet);
+            rpcExtension = new RpcExtension(system, wallet,this);
+        }
+
+        public void SetWallet(Wallet wallet)
+        {
+            this.wallet = wallet;
         }
 
         private static JObject CreateErrorResponse(JObject id, int code, string message, JObject data = null)
@@ -487,6 +492,7 @@ namespace Bhp.Network.RPC
                             tx.Witnesses = context.GetWitnesses();
                             wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
+                            //Console.WriteLine(tx.ToArray().ToHexString());
                             return tx.ToJson();
                         }
                         else
