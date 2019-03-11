@@ -119,19 +119,20 @@ namespace Bhp.Ledger
             }
         };
 
+        private const int MemoryPoolMaxTransactions = 50_000;
+        private const int MaxTxToReverifyPerIdle = 10;
         private static readonly object lockObj = new object();
         private readonly BhpSystem system;
         private readonly List<UInt256> header_index = new List<UInt256>();
         private uint stored_header_count = 0;
         private readonly Dictionary<UInt256, Block> block_cache = new Dictionary<UInt256, Block>();
         private readonly Dictionary<uint, LinkedList<Block>> block_cache_unverified = new Dictionary<uint, LinkedList<Block>>();
-        private readonly MemoryPool mem_pool = new MemoryPool(50_000);
-        private readonly ConcurrentDictionary<UInt256, Transaction> mem_pool_unverified = new ConcurrentDictionary<UInt256, Transaction>();
-        internal readonly RelayCache RelayCache = new RelayCache(100);
+         internal readonly RelayCache RelayCache = new RelayCache(100);
         private readonly HashSet<IActorRef> subscribers = new HashSet<IActorRef>();
         private Snapshot currentSnapshot;
 
         public Store Store { get; }
+        public MemoryPool MemPool { get; }
         public uint Height => currentSnapshot.Height;
         public uint HeaderHeight => (uint)header_index.Count - 1;
         public UInt256 CurrentBlockHash => currentSnapshot.CurrentBlockHash;
@@ -155,6 +156,7 @@ namespace Bhp.Ledger
         public Blockchain(BhpSystem system, Store store)
         {
             this.system = system;
+            this.MemPool = new MemoryPool(system, MemoryPoolMaxTransactions);
             this.Store = store;
             lock (lockObj)
             {
@@ -195,7 +197,7 @@ namespace Bhp.Ledger
 
         public bool ContainsTransaction(UInt256 hash)
         {
-            if (mem_pool.ContainsKey(hash)) return true;
+            if (MemPool.ContainsKey(hash)) return true;
             return Store.ContainsTransaction(hash);
         }
 
@@ -221,12 +223,7 @@ namespace Bhp.Ledger
         public static UInt160 GetConsensusAddress(ECPoint[] validators)
         {
             return Contract.CreateMultiSigRedeemScript(validators.Length - (validators.Length - 1) / 3, validators).ToScriptHash();
-        }
-
-        public IEnumerable<Transaction> GetMemoryPool()
-        {
-            return mem_pool;
-        }
+        } 
 
         public Snapshot GetSnapshot()
         {
@@ -235,16 +232,10 @@ namespace Bhp.Ledger
 
         public Transaction GetTransaction(UInt256 hash)
         {
-            if (mem_pool.TryGetValue(hash, out Transaction transaction))
+            if (MemPool.TryGetValue(hash, out Transaction transaction))
                 return transaction;
             return Store.GetTransaction(hash);
-        }
-
-        internal Transaction GetUnverifiedTransaction(UInt256 hash)
-        {
-            mem_pool_unverified.TryGetValue(hash, out Transaction transaction);
-            return transaction;
-        }
+        } 
 
         private void OnImport(IEnumerable<Block> blocks)
         {
@@ -294,7 +285,7 @@ namespace Bhp.Ledger
             if (block.Index == Height + 1)
             {
                 Block block_persist = block;
-                List<Block> blocksToPersistList = new List<Block>();                                
+                List<Block> blocksToPersistList = new List<Block>();
                 while (true)
                 {
                     blocksToPersistList.Add(block_persist);
@@ -320,7 +311,7 @@ namespace Bhp.Ledger
                 if (block_cache_unverified.TryGetValue(Height + 1, out LinkedList<Block> unverifiedBlocks))
                 {
                     foreach (var unverifiedBlock in unverifiedBlocks)
-                        Self.Tell(unverifiedBlock, ActorRefs.NoSender);   
+                        Self.Tell(unverifiedBlock, ActorRefs.NoSender);
                     block_cache_unverified.Remove(Height + 1);
                 }
             }
@@ -390,12 +381,14 @@ namespace Bhp.Ledger
                 return RelayResultReason.Invalid;
             if (ContainsTransaction(transaction.Hash))
                 return RelayResultReason.AlreadyExists;
-            if (!transaction.Verify(currentSnapshot, GetMemoryPool()))
+            if (!MemPool.CanTransactionFitInPool(transaction))
+                return RelayResultReason.OutOfMemory;
+            if (!transaction.Verify(currentSnapshot, MemPool.GetVerifiedTransactions()))
                 return RelayResultReason.Invalid;
             if (!Plugin.CheckPolicy(transaction))
                 return RelayResultReason.PolicyFail;
 
-            if (!mem_pool.TryAdd(transaction.Hash, transaction))
+            if (!MemPool.TryAdd(transaction.Hash, transaction))
                 return RelayResultReason.OutOfMemory;
 
             system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = transaction });
@@ -405,18 +398,7 @@ namespace Bhp.Ledger
         private void OnPersistCompleted(Block block)
         {
             block_cache.Remove(block.Hash);
-            foreach (Transaction tx in block.Transactions)
-                mem_pool.TryRemove(tx.Hash, out _);
-            mem_pool_unverified.Clear();
-            foreach (Transaction tx in mem_pool
-                .OrderByDescending(p => p.NetworkFee / p.Size)
-                .ThenByDescending(p => p.NetworkFee)
-                .ThenByDescending(p => new BigInteger(p.Hash.ToArray())))
-            {
-                mem_pool_unverified.TryAdd(tx.Hash, tx);
-                Self.Tell(tx, ActorRefs.NoSender);
-            }
-            mem_pool.Clear();
+            MemPool.UpdatePoolForBlockPersisted(block, currentSnapshot);
             PersistCompleted completed = new PersistCompleted { Block = block };
             system.Consensus?.Tell(completed);
             Distribute(completed);
@@ -443,6 +425,10 @@ namespace Bhp.Ledger
                     break;
                 case ConsensusPayload payload:
                     Sender.Tell(OnNewConsensus(payload));
+                    break;
+                case Idle _:
+                    if (MemPool.ReVerifyTopUnverifiedTransactionsIfNeeded(MaxTxToReverifyPerIdle, currentSnapshot))
+                        Self.Tell(Idle.Instance, ActorRefs.NoSender);
                     break;
                 case Terminated terminated:
                     subscribers.Remove(terminated.ActorRef);
@@ -632,6 +618,26 @@ namespace Bhp.Ledger
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
                     plugin.OnPersist(snapshot, all_application_executed);
                 snapshot.Commit();
+
+                List<Exception> commitExceptions = null;
+                foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
+                {
+                    try
+                    {
+                        plugin.OnCommit(snapshot);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (plugin.ShouldThrowExceptionFromCommit(ex))
+                        {
+                            if (commitExceptions == null)
+                                commitExceptions = new List<Exception>();
+
+                            commitExceptions.Add(ex);
+                        }
+                    }
+                }
+                if (commitExceptions != null) throw new AggregateException(commitExceptions);
             }
             UpdateCurrentSnapshot();
             OnPersistCompleted(block);
