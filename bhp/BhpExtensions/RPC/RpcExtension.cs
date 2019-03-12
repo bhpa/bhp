@@ -1,9 +1,12 @@
-﻿using Bhp.BhpExtensions.Transactions;
+﻿using Akka.Actor;
+using Bhp.BhpExtensions.Transactions;
 using Bhp.BhpExtensions.Wallets;
 using Bhp.IO.Json;
 using Bhp.Ledger;
+using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Network.RPC;
+using Bhp.SmartContract;
 using Bhp.Wallets;
 using Bhp.Wallets.BRC6;
 using Bhp.Wallets.SQLite;
@@ -320,6 +323,47 @@ namespace Bhp.BhpExtensions.RPC
                             return peerJson;
                         }));
                         return json;
+                    }
+				case "sendissuetransaction":
+                    if (wallet == null || walletTimeLock.IsLocked())
+                        throw new RpcException(-400, "Access denied");
+                    else
+                    {
+                        UInt256 asset_id = UInt256.Parse(_params[0].AsString());
+                        JArray to = (JArray)_params[1];
+                        if (to.Count == 0)
+                            throw new RpcException(-32602, "Invalid params");
+                        TransactionOutput[] outputs = new TransactionOutput[to.Count];
+                        for (int i = 0; i < to.Count; i++)
+                        {                            
+                            AssetDescriptor descriptor = new AssetDescriptor(asset_id);
+                            outputs[i] = new TransactionOutput
+                            {
+                                AssetId = asset_id,
+                                Value = Fixed8.Parse(to[i]["value"].AsString()),
+                                ScriptHash = to[i]["address"].AsString().ToScriptHash()
+                            };                           
+                        }
+                        IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
+                        {
+                            Version = 1,
+                            Outputs = outputs                            
+                        }, fee: Fixed8.One);
+                        if (tx == null)
+                            throw new RpcException(-300, "Insufficient funds");
+                        ContractParametersContext context = new ContractParametersContext(tx);
+                        wallet.Sign(context);
+                        if (context.Completed)
+                        {
+                            tx.Witnesses = context.GetWitnesses();
+                            wallet.ApplyTransaction(tx);
+                            system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
+                            return tx.ToJson();
+                        }
+                        else
+                        {
+                            return context.ToJson();
+                        }
                     }
                 default:
                     throw new RpcException(-32601, "Method not found");
