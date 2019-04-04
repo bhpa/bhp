@@ -117,6 +117,10 @@ namespace Bhp.Network.RPC
                     else
                         tx = null;
                 }
+
+                if (tx?.Size > Transaction.MaxTransactionSize)
+                    throw new RpcException(-301, "The transaction is too big, please reduce the amount of transfer!");
+
                 json["tx"] = tx?.ToArray().ToHexString();
             }
             return json;
@@ -469,6 +473,10 @@ namespace Bhp.Network.RPC
                         if (context.Completed)
                         {
                             tx.Witnesses = context.GetWitnesses();
+
+                            if (tx.Size > Transaction.MaxTransactionSize)
+                                throw new RpcException(-301, "The transaction is too big, please reduce the amount of transfer!");
+
                             Wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
                             return tx.ToJson();
@@ -512,6 +520,10 @@ namespace Bhp.Network.RPC
                         if (context.Completed)
                         {
                             tx.Witnesses = context.GetWitnesses();
+
+                            if (tx.Size > Transaction.MaxTransactionSize)
+                                throw new RpcException(-301, "The transaction is too big, please reduce the amount of transfer!");
+
                             Wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
                             //Console.WriteLine(tx.ToArray().ToHexString());
@@ -559,6 +571,10 @@ namespace Bhp.Network.RPC
                         if (context.Completed)
                         {
                             tx.Witnesses = context.GetWitnesses();
+
+                            if (tx.Size > Transaction.MaxTransactionSize)
+                                throw new RpcException(-301, "The transaction is too big, please reduce the amount of transfer!");
+
                             Wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
                             return tx.ToJson();
