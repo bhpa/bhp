@@ -358,7 +358,7 @@ namespace Bhp.BhpExtensions.RPC
                             tx.Witnesses = context.GetWitnesses();
 
                             if (tx.Size > Transaction.MaxTransactionSize)
-                                throw new RpcException(-301, "The data is too long.");
+                                throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
 
                             wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
@@ -402,7 +402,7 @@ namespace Bhp.BhpExtensions.RPC
                             tx.Witnesses = context.GetWitnesses();
 
                             if (tx.Size > Transaction.MaxTransactionSize)
-                                throw new RpcException(-301, "The data is too long.");
+                                throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
 
                             return Bhp.IO.Helper.ToArray(tx).ToHexString();                                                    
                         }

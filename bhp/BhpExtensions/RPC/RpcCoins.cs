@@ -172,7 +172,7 @@ namespace Bhp.BhpExtensions.RPC
 
                 if (tx.Size > Transaction.MaxTransactionSize)
                 {
-                    Console.WriteLine("The data is too long.");
+                    Console.WriteLine("The size of the free transaction must be less than 102400 bytes");
                     return null;
                 }
 
