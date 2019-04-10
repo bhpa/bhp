@@ -172,7 +172,7 @@ namespace Bhp.BhpExtensions.RPC
 
                 if (tx.Size > Transaction.MaxTransactionSize)
                 {
-                    Console.WriteLine("The transaction is too big, please reduce the amount of transfer!");
+                    Console.WriteLine("The data is too long.");
                     return null;
                 }
 

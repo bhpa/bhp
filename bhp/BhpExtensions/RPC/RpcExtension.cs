@@ -358,7 +358,7 @@ namespace Bhp.BhpExtensions.RPC
                             tx.Witnesses = context.GetWitnesses();
 
                             if (tx.Size > Transaction.MaxTransactionSize)
-                                throw new RpcException(-301, "The transaction is too big, please reduce the amount of transfer!");
+                                throw new RpcException(-301, "The data is too long.");
 
                             wallet.ApplyTransaction(tx);
                             system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
