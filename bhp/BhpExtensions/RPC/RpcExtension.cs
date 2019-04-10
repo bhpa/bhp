@@ -369,6 +369,48 @@ namespace Bhp.BhpExtensions.RPC
                             return context.ToJson();
                         }
                     }
+                case "gettransactiondata":
+                    if (wallet == null || walletTimeLock.IsLocked())
+                        throw new RpcException(-400, "Access denied");
+                    else
+                    {
+                        UIntBase assetId = UIntBase.Parse(_params[0].AsString());
+                        AssetDescriptor descriptor = new AssetDescriptor(assetId);
+                        UInt160 scriptHash = _params[1].AsString().ToScriptHash();
+                        BigDecimal value = BigDecimal.Parse(_params[2].AsString(), descriptor.Decimals);
+                        if (value.Sign <= 0)
+                            throw new RpcException(-32602, "Invalid params");
+                        Fixed8 fee = _params.Count >= 4 ? Fixed8.Parse(_params[3].AsString()) : Fixed8.Zero;
+                        if (fee < Fixed8.Zero)
+                            throw new RpcException(-32602, "Invalid params");
+                        UInt160 change_address = _params.Count >= 5 ? _params[4].AsString().ToScriptHash() : null;
+                        Transaction tx = wallet.MakeTransaction(null, new[]
+                        {
+                            new TransferOutput
+                            {
+                                AssetId = assetId,
+                                Value = value,
+                                ScriptHash = scriptHash
+                            }
+                        }, change_address: change_address, fee: fee);
+                        if (tx == null)
+                            throw new RpcException(-300, "Insufficient funds");
+                        ContractParametersContext context = new ContractParametersContext(tx);
+                        wallet.Sign(context);
+                        if (context.Completed)
+                        {
+                            tx.Witnesses = context.GetWitnesses();
+
+                            if (tx.Size > Transaction.MaxTransactionSize)
+                                throw new RpcException(-301, "The data is too long.");
+
+                            return Bhp.IO.Helper.ToArray(tx).ToHexString();                                                    
+                        }
+                        else
+                        {
+                            return context.ToJson();
+                        }
+                    }
                 default:
                     throw new RpcException(-32601, "Method not found");
             } 
