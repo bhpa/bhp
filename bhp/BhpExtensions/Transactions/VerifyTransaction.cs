@@ -41,7 +41,7 @@ namespace Bhp.BhpExtensions.Transactions
         public static string Verify(Snapshot snapshot, IEnumerable<Transaction> mempool,
              Transaction tx)
         {
-            if (tx.Size > Transaction.MaxTransactionSize) return "The data is too long.";
+            if (tx.Size > Transaction.MaxTransactionSize) return "The size of the free transaction must be less than 102400 bytes";
             for (int i = 1; i < tx.Inputs.Length; i++)
                 for (int j = 0; j < i; j++)
                     if (tx.Inputs[i].PrevHash == tx.Inputs[j].PrevHash
