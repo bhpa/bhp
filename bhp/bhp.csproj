@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Copyright>2018-2019 The Bhp Project</Copyright>
     <AssemblyTitle>Bhp</AssemblyTitle>
-    <Version>1.2.0.2</Version>
+    <Version>1.2.0.5</Version>
     <Authors>The Bhp Project</Authors>
     <TargetFrameworks>netstandard2.0;net47</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -16,6 +16,7 @@
     <RootNamespace>Bhp</RootNamespace>
     <Company>The Bhp Project</Company>
     <Description>Bhp</Description>
+    <AssemblyVersion>1.2.0.5</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
