@@ -606,6 +606,10 @@ namespace Bhp.Network.RPC
                         json["isvalid"] = scriptHash != null;
                         return json;
                     }
+                case "listplugins":
+                    {
+                        return ListPlugins();
+                    }
                 default:
                     return rpcExtension.Process(method, _params);
             }
@@ -750,6 +754,21 @@ namespace Bhp.Network.RPC
             .Build();
 
             host.Start();
+        }
+
+        private JObject ListPlugins()
+        {
+            return new JArray(Plugin.Plugins
+                .OrderBy(u => u.Name)
+                .Select(u => new JObject
+                {
+                    ["name"] = u.Name,
+                    ["version"] = u.Version.ToString(),
+                    ["interfaces"] = new JArray(u.GetType().GetInterfaces()
+                        .Select(p => p.Name)
+                        .Where(p => p.EndsWith("Plugin"))
+                        .Select(p => (JObject)p))
+                }));
         }
     }
 }
