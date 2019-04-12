@@ -112,6 +112,16 @@ namespace Bhp.Plugins
             }
         }
 
+        internal static void NotifyPluginsLoadedAfterSystemConstructed()
+        {
+            foreach (var plugin in Plugins)
+                plugin.OnPluginsLoaded();
+        }
+
+        protected virtual void OnPluginsLoaded()
+        {
+        }
+
         protected void Log(string message, LogLevel level = LogLevel.Info)
         {
             Log($"{nameof(Plugin)}:{Name}", level, message);
