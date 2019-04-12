@@ -35,7 +35,7 @@ namespace Bhp.Network.P2P
 
         protected override void OnReceive(object message)
         {
-            if (!(message is Message msg)) return;
+            if (!(message is Message msg)) return;           
             if (version == null)
             {
                 if (msg.Command != "version")
