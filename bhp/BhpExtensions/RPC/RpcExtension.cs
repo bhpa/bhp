@@ -73,347 +73,310 @@ namespace Bhp.BhpExtensions.RPC
         }
 
         public JObject Process(string method, JArray _params)
-        {
-            JObject json = new JObject();
-             
+        {                        
             switch (method)
             {
                 case "unlock":
-                    //if (wallet == null) return "wallet is null.";
-                    if (ExtensionSettings.Default.WalletConfig.Path.Trim().Length < 1) throw new RpcException(-500, "Wallet file is exists.");
-                                        
-                    if (_params.Count < 2) throw new RpcException(-501, "parameter is error.");
-                    string password = _params[0].AsString();
-                    int duration = (int)_params[1].AsNumber();
-
-                    if (Unlocking) { throw new RpcException(-502, "wallet is unlocking...."); }
-
-                    Unlocking = true;
-                    try
-                    {
-                        if (wallet == null)
-                        {
-                            wallet = OpenWallet(ExtensionSettings.Default.WalletConfig.Indexer, ExtensionSettings.Default.WalletConfig.Path, password);
-                            walletTimeLock.SetDuration(wallet == null ? 0 : duration);
-                            rpcServer.SetWallet(wallet);
-                            return $"success";
-                        }
-                        else
-                        {
-                            bool ok = walletTimeLock.UnLock(wallet, password, duration);
-                            return ok ? "success" : "failure";
-                        }
-                    }
-                    finally
-                    {
-                        Unlocking = false;
-                    }
-
+                    return Unlock(_params);
                 case "getutxos":
-                    {
-                        if (wallet == null || walletTimeLock.IsLocked())
-                            throw new RpcException(-400, "Access denied");
-                        else
-                        {  
-                            //address,assetid
-                            UInt160 scriptHash = _params[0].AsString().ToScriptHash();
-                            IEnumerable<Coin> coins = wallet.FindUnspentCoins();
-                            UInt256 assetId;
-                            if (_params.Count >= 2)
-                            {
-                                switch (_params[1].AsString())
-                                {
-                                    case "bhp":
-                                        assetId = Blockchain.GoverningToken.Hash;
-                                        break;
-                                    case "gas":
-                                        assetId = Blockchain.UtilityToken.Hash;
-                                        break;
-                                    default:
-                                        assetId = UInt256.Parse(_params[1].AsString());
-                                        break;
-                                }
-                            }
-                            else
-                            {
-                                assetId = Blockchain.GoverningToken.Hash;
-                            }
-                            coins = coins.Where(p => p.Output.AssetId.Equals(assetId) && p.Output.ScriptHash.Equals(scriptHash));
-
-                            //json["utxos"] = new JObject();
-                            Coin[] coins_array = coins.ToArray();
-                            //const int MAX_SHOW = 100;
-
-                            json["utxos"] = new JArray(coins_array.Select(p =>
-                            {
-                                return p.Reference.ToJson();
-                            }));
-
-                            return json;
-                        }
-                    }
-
+                    return GetUtxos(_params);                    
                 case "verifytx":
-                    { 
-                        Transaction tx = Transaction.DeserializeFrom(_params[0].AsString().HexToBytes());
-                        string res = VerifyTransaction.Verify(Blockchain.Singleton.GetSnapshot(), new List<Transaction> { tx },tx);
-
-                        json["result"] = res;
-                        if ("success".Equals(res))
-                        {
-                            json["tx"] = tx.ToJson();
-                        }
-                        return json;
-                    }
-
+                    return VerifyTx(_params);                    
                 case "claimgas":
-                    {
-                        if (wallet == null || walletTimeLock.IsLocked())
-                            throw new RpcException(-400, "Access denied");
-                        else
-                        { 
-                            RpcCoins coins = new RpcCoins(wallet, system);
-                            ClaimTransaction[] txs = coins.ClaimAll();
-                            if (txs == null)
-                            {
-                                json["txs"] = new JArray();
-                            }
-                            else
-                            {
-                                json["txs"] = new JArray(txs.Select(p =>
-                                {
-                                    return p.ToJson();
-                                }));
-                            }
-                            return json;
-                        }
-                    }
+                    return ClaimGas();                    
                 case "showgas":
-                    {
-                        if (wallet == null || walletTimeLock.IsLocked())
-                            throw new RpcException(-400, "Access denied");
-                        else
-                        {
-                            RpcCoins coins = new RpcCoins(wallet, system);
-                            json["unavailable"] = coins.UnavailableBonus().ToString();
-                            json["available"] = coins.AvailableBonus().ToString();
-                            return json;
-                        }
-                    }
-                case "getutxoofaddress":                
-                    {
-                        string from = _params[0].AsString();
-                        string jsonRes = RequestRpc("getUtxo",$"address={from}");
-
-                        Newtonsoft.Json.Linq.JArray jsons = (Newtonsoft.Json.Linq.JArray)JsonConvert.DeserializeObject(jsonRes);                        
-                        json["utxo"] = new JArray(jsons.Select(p =>
-                        {
-                            JObject peerJson = new JObject();
-                            peerJson["asset"] = p["asset"].ToString();
-                            peerJson["txid"] = p["txid"].ToString();
-                            peerJson["n"] = (int)p["n"];
-                            peerJson["value"] = (double)p["value"];
-                            peerJson["address"] = p["address"].ToString();
-                            peerJson["blockHeight"] = (int)p["blockHeight"];
-                            return peerJson;
-                        }));
-                        return json;
-                    }
-
+                    return ShowGas();                    
+                case "getutxoofaddress":
+                    return GetUtxoOfAddress(_params);                
                 case "gettransaction":
-                    {
-                        string from = _params[0].AsString();
-                        string position = _params[1].AsString() != "" ? _params[1].AsString() :"1";
-                        string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-                        string jsonRes = RequestRpc("findTxVout", $"address={from}&position={position}&offset={offset}");
-
-                        Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
-
-                        json["transaction"] = new JArray(jsons.Select(p =>
-                        {
-                            JObject peerJson = new JObject();
-                            peerJson["blockHeight"] = p["blockHeight"].ToString();
-                            peerJson["txid"] = p["txid"].ToString();
-                            peerJson["type"] = p["type"].ToString();
-                            Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
-                            JArray j_inaddress = new JArray();
-                            foreach (Newtonsoft.Json.Linq.JToken i in jt)
-                            {
-                                string s = i.ToString();
-                                j_inaddress.Add(s);
-                            }
-                            peerJson["inputaddress"] = j_inaddress;
-                            peerJson["asset"] = p["asset"].ToString();
-                            peerJson["n"] = (int)p["n"];
-                            peerJson["value"] = (double)p["value"];
-                            peerJson["outputaddress"] = p["address"].ToString();
-                            peerJson["time"] = p["time"].ToString();
-                            peerJson["utctime"] = (int)p["utcTime"];
-                            peerJson["confirmations"] = p["confirmations"].ToString();
-                            return peerJson;
-                        }));
-                        return json;
-                    }
+                    return GetTransaction(_params);                    
                 case "getdeposits":
-                    {
-                        string from = _params[0].AsString();
-                        string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
-                        string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-                        string jsonRes = RequestRpc("getDeposit", $"address={from}&position={position}&offset={offset}");
-
-                        Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
-
-                        json["transaction"] = new JArray(jsons.Select(p =>
-                        {
-                            JObject peerJson = new JObject();
-                            peerJson["blockHeight"] = p["blockHeight"].ToString();
-                            peerJson["txid"] = p["txid"].ToString();
-                            peerJson["type"] = p["type"].ToString();
-                            Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
-                            JArray j_inaddress = new JArray();
-                            foreach (Newtonsoft.Json.Linq.JToken i in jt)
-                            {
-                                string s = i.ToString();
-                                j_inaddress.Add(s);
-                            }
-                            peerJson["inputaddress"] = j_inaddress;
-                            peerJson["asset"] = p["asset"].ToString();
-                            peerJson["n"] = (int)p["n"];
-                            peerJson["value"] = (double)p["value"];
-                            peerJson["outputaddress"] = p["address"].ToString();
-                            peerJson["time"] = p["time"].ToString();
-                            peerJson["utctime"] = (int)p["utcTime"];
-                            peerJson["confirmations"] = p["confirmations"].ToString();
-                            return peerJson;
-                        }));
-                        return json;
-                    }
+                    return GetDeposits(_params);                    
                 case "get_tx_list":
-                    {
-                        string from = _params[0].AsString();
-                        string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
-                        string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-                        string jsonRes = RequestRpc("findTxAddressRecord", $"address={from}&position={position}&offset={offset}");
-                        Newtonsoft.Json.Linq.JObject jsons = Newtonsoft.Json.Linq.JObject.Parse(jsonRes);
-                        json["transaction"] = new JArray(jsons["txAddressRecord"].Select(p =>
-                        {
-                            JObject peerJson = new JObject();
-                            peerJson["txid"] = p["txid"].ToString();
-                            peerJson["blockHeight"] = p["blockHeight"].ToString();
-                            peerJson["time"] = p["time"].ToString();
-                            peerJson["type"] = p["type"].ToString();
-                            Newtonsoft.Json.Linq.JToken [] jt = p["inAddressList"].ToArray();
-                            JArray j_inaddress = new JArray();
-                            foreach (Newtonsoft.Json.Linq.JToken i in jt)
-                            {
-                                string s = i.ToString();
-                                j_inaddress.Add(s);
-                            }
-                            peerJson["inputaddress"] = j_inaddress;
-                            peerJson["outputaddress"] = new JArray(p["outAddressList"].OrderBy(g => g["n"]).Select(k =>
-                           {
-                               JObject a = new JObject();
-                               a["n"] = k["n"].ToString();
-                               a["asset"] = k["asset"].ToString();
-                               a["value"] = (double)k["value"];
-                               a["address"] = k["outAddress"].ToString();
-                               a["svalue"] = k["svalue"].ToString();
-                               return a;
-                           }));
-                            return peerJson;
-                        }));
-                        return json;
-                    }
-				case "sendissuetransaction":
-                    if (wallet == null || walletTimeLock.IsLocked())
-                        throw new RpcException(-400, "Access denied");
-                    else
-                    {
-                        UInt256 asset_id = UInt256.Parse(_params[0].AsString());
-                        JArray to = (JArray)_params[1];
-                        if (to.Count == 0)
-                            throw new RpcException(-32602, "Invalid params");
-                        TransactionOutput[] outputs = new TransactionOutput[to.Count];
-                        for (int i = 0; i < to.Count; i++)
-                        {                            
-                            AssetDescriptor descriptor = new AssetDescriptor(asset_id);
-                            outputs[i] = new TransactionOutput
-                            {
-                                AssetId = asset_id,
-                                Value = Fixed8.Parse(to[i]["value"].AsString()),
-                                ScriptHash = to[i]["address"].AsString().ToScriptHash()
-                            };                           
-                        }
-                        IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
-                        {
-                            Version = 1,
-                            Outputs = outputs                            
-                        }, fee: Fixed8.One);
-                        if (tx == null)
-                            throw new RpcException(-300, "Insufficient funds");
-                        ContractParametersContext context = new ContractParametersContext(tx);
-                        wallet.Sign(context);
-                        if (context.Completed)
-                        {
-                            tx.Witnesses = context.GetWitnesses();
-
-                            if (tx.Size > Transaction.MaxTransactionSize)
-                                throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
-
-                            wallet.ApplyTransaction(tx);
-                            system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
-                            return tx.ToJson();
-                        }
-                        else
-                        {
-                            return context.ToJson();
-                        }
-                    }
+                    return GetTxList(_params);                    
+                case "sendissuetransaction":
+                    return SendIssueTransaction(_params);
                 case "gettransactiondata":
-                    if (wallet == null || walletTimeLock.IsLocked())
-                        throw new RpcException(-400, "Access denied");
-                    else
-                    {
-                        UIntBase assetId = UIntBase.Parse(_params[0].AsString());
-                        AssetDescriptor descriptor = new AssetDescriptor(assetId);
-                        UInt160 scriptHash = _params[1].AsString().ToScriptHash();
-                        BigDecimal value = BigDecimal.Parse(_params[2].AsString(), descriptor.Decimals);
-                        if (value.Sign <= 0)
-                            throw new RpcException(-32602, "Invalid params");
-                        Fixed8 fee = _params.Count >= 4 ? Fixed8.Parse(_params[3].AsString()) : Fixed8.Zero;
-                        if (fee < Fixed8.Zero)
-                            throw new RpcException(-32602, "Invalid params");
-                        UInt160 change_address = _params.Count >= 5 ? _params[4].AsString().ToScriptHash() : null;
-                        Transaction tx = wallet.MakeTransaction(null, new[]
-                        {
-                            new TransferOutput
-                            {
-                                AssetId = assetId,
-                                Value = value,
-                                ScriptHash = scriptHash
-                            }
-                        }, change_address: change_address, fee: fee);
-                        if (tx == null)
-                            throw new RpcException(-300, "Insufficient funds");
-                        ContractParametersContext context = new ContractParametersContext(tx);
-                        wallet.Sign(context);
-                        if (context.Completed)
-                        {
-                            tx.Witnesses = context.GetWitnesses();
-
-                            if (tx.Size > Transaction.MaxTransactionSize)
-                                throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
-
-                            return Bhp.IO.Helper.ToArray(tx).ToHexString();                                                    
-                        }
-                        else
-                        {
-                            return context.ToJson();
-                        }
-                    }
+                    return rpcServer.SendToAddress(_params, true);
                 default:
                     throw new RpcException(-32601, "Method not found");
             } 
+        }
+
+        private JObject Unlock(JArray _params)
+        {
+            //if (wallet == null) return "wallet is null.";
+            if (ExtensionSettings.Default.WalletConfig.Path.Trim().Length < 1) throw new RpcException(-500, "Wallet file is exists.");
+
+            if (_params.Count < 2) throw new RpcException(-501, "parameter is error.");
+            string password = _params[0].AsString();
+            int duration = (int)_params[1].AsNumber();
+
+            if (Unlocking) { throw new RpcException(-502, "wallet is unlocking...."); }
+
+            Unlocking = true;
+            try
+            {
+                if (wallet == null)
+                {
+                    wallet = OpenWallet(ExtensionSettings.Default.WalletConfig.Indexer, ExtensionSettings.Default.WalletConfig.Path, password);
+                    walletTimeLock.SetDuration(wallet == null ? 0 : duration);
+                    rpcServer.SetWallet(wallet);
+                    return $"success";
+                }
+                else
+                {
+                    bool ok = walletTimeLock.UnLock(wallet, password, duration);
+                    return ok ? "success" : "failure";
+                }
+            }
+            finally
+            {
+                Unlocking = false;
+            }
+        }
+
+        private JObject GetUtxos(JArray _params)
+        {
+            rpcServer.WalletVerify();
+            JObject json = new JObject();
+            //address,assetid
+            UInt160 scriptHash = _params[0].AsString().ToScriptHash();
+            IEnumerable<Coin> coins = wallet.FindUnspentCoins();
+            UInt256 assetId;
+            if (_params.Count >= 2)
+            {
+                switch (_params[1].AsString())
+                {
+                    case "bhp":
+                        assetId = Blockchain.GoverningToken.Hash;
+                        break;
+                    case "gas":
+                        assetId = Blockchain.UtilityToken.Hash;
+                        break;
+                    default:
+                        assetId = UInt256.Parse(_params[1].AsString());
+                        break;
+                }
+            }
+            else
+            {
+                assetId = Blockchain.GoverningToken.Hash;
+            }
+            coins = coins.Where(p => p.Output.AssetId.Equals(assetId) && p.Output.ScriptHash.Equals(scriptHash));
+
+            //json["utxos"] = new JObject();
+            Coin[] coins_array = coins.ToArray();
+            //const int MAX_SHOW = 100;
+
+            json["utxos"] = new JArray(coins_array.Select(p =>
+            {
+                return p.Reference.ToJson();
+            }));
+
+            return json;
+        }
+
+        private static JObject VerifyTx(JArray _params)
+        {
+            JObject json = new JObject();
+            Transaction tx = Transaction.DeserializeFrom(_params[0].AsString().HexToBytes());
+            string res = VerifyTransaction.Verify(Blockchain.Singleton.GetSnapshot(), new List<Transaction> { tx }, tx);
+
+            json["result"] = res;
+            if ("success".Equals(res))
+            {
+                json["tx"] = tx.ToJson();
+            }
+            return json;
+        }
+
+        private JObject ClaimGas()
+        {
+            rpcServer.WalletVerify();
+            JObject json = new JObject();
+            RpcCoins coins = new RpcCoins(wallet, system);
+            ClaimTransaction[] txs = coins.ClaimAll();
+            if (txs == null)
+            {
+                json["txs"] = new JArray();
+            }
+            else
+            {
+                json["txs"] = new JArray(txs.Select(p =>
+                {
+                    return p.ToJson();
+                }));
+            }
+            return json;
+        }
+
+        private JObject ShowGas()
+        {
+            rpcServer.WalletVerify();
+            JObject json = new JObject();
+            RpcCoins coins = new RpcCoins(wallet, system);
+            json["unavailable"] = coins.UnavailableBonus().ToString();
+            json["available"] = coins.AvailableBonus().ToString();
+            return json;
+        }
+
+        private JObject GetUtxoOfAddress(JArray _params)
+        {
+            JObject json = new JObject();
+            string from = _params[0].AsString();
+            string jsonRes = RequestRpc("getUtxo", $"address={from}");
+
+            Newtonsoft.Json.Linq.JArray jsons = (Newtonsoft.Json.Linq.JArray)JsonConvert.DeserializeObject(jsonRes);
+            json["utxo"] = new JArray(jsons.Select(p =>
+            {
+                JObject peerJson = new JObject();
+                peerJson["asset"] = p["asset"].ToString();
+                peerJson["txid"] = p["txid"].ToString();
+                peerJson["n"] = (int)p["n"];
+                peerJson["value"] = (double)p["value"];
+                peerJson["address"] = p["address"].ToString();
+                peerJson["blockHeight"] = (int)p["blockHeight"];
+                return peerJson;
+            }));
+            return json;
+        }
+
+        private JObject GetTransaction(JArray _params)
+        {
+            JObject json = new JObject();
+            string from = _params[0].AsString();
+            string position = _params.Count >= 2 ? _params[1].AsString() : "1";
+            string offset = _params.Count >= 3 ? _params[2].AsString() : "20";
+            string jsonRes = RequestRpc("findTxVout", $"address={from}&position={position}&offset={offset}");
+
+            Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
+
+            json["transaction"] = new JArray(jsons.Select(p =>
+            {
+                JObject peerJson = new JObject();
+                peerJson["blockHeight"] = p["blockHeight"].ToString();
+                peerJson["txid"] = p["txid"].ToString();
+                peerJson["type"] = p["type"].ToString();
+                Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
+                JArray j_inaddress = new JArray();
+                foreach (Newtonsoft.Json.Linq.JToken i in jt)
+                {
+                    string s = i.ToString();
+                    j_inaddress.Add(s);
+                }
+                peerJson["inputaddress"] = j_inaddress;
+                peerJson["asset"] = p["asset"].ToString();
+                peerJson["n"] = (int)p["n"];
+                peerJson["value"] = (double)p["value"];
+                peerJson["outputaddress"] = p["address"].ToString();
+                peerJson["time"] = p["time"].ToString();
+                peerJson["utctime"] = (int)p["utcTime"];
+                peerJson["confirmations"] = p["confirmations"].ToString();
+                return peerJson;
+            }));
+            return json;
+        }
+
+        private JObject GetDeposits(JArray _params)
+        {
+            return null;
+            JObject json = new JObject();
+            string from = _params[0].AsString();
+            string position = _params.Count >= 2 ? _params[1].AsString() : "1";
+            string offset = _params.Count >= 3 ? _params[2].AsString() : "20";
+            string jsonRes = RequestRpc("getDeposit", $"address={from}&position={position}&offset={offset}");
+
+            Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
+
+            json["transaction"] = new JArray(jsons.Select(p =>
+            {
+                JObject peerJson = new JObject();
+                peerJson["blockHeight"] = p["blockHeight"].ToString();
+                peerJson["txid"] = p["txid"].ToString();
+                peerJson["type"] = p["type"].ToString();
+                Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
+                JArray j_inaddress = new JArray();
+                foreach (Newtonsoft.Json.Linq.JToken i in jt)
+                {
+                    string s = i.ToString();
+                    j_inaddress.Add(s);
+                }
+                peerJson["inputaddress"] = j_inaddress;
+                peerJson["asset"] = p["asset"].ToString();
+                peerJson["n"] = (int)p["n"];
+                peerJson["value"] = (double)p["value"];
+                peerJson["outputaddress"] = p["address"].ToString();
+                peerJson["time"] = p["time"].ToString();
+                peerJson["utctime"] = (int)p["utcTime"];
+                peerJson["confirmations"] = p["confirmations"].ToString();
+                return peerJson;
+            }));
+            return json;
+        }
+
+        private JObject GetTxList(JArray _params)
+        {
+            JObject json = new JObject();
+            string from = _params[0].AsString();
+            string position = _params.Count >= 2 ? _params[1].AsString() : "1";
+            string offset = _params.Count >= 3 ? _params[2].AsString() : "20";
+            string jsonRes = RequestRpc("findTxAddressRecord", $"address={from}&position={position}&offset={offset}");
+            Newtonsoft.Json.Linq.JObject jsons = Newtonsoft.Json.Linq.JObject.Parse(jsonRes);
+            json["transaction"] = new JArray(jsons["txAddressRecord"].Select(p =>
+            {
+                JObject peerJson = new JObject();
+                peerJson["txid"] = p["txid"].ToString();
+                peerJson["blockHeight"] = p["blockHeight"].ToString();
+                peerJson["time"] = p["time"].ToString();
+                peerJson["type"] = p["type"].ToString();
+                Newtonsoft.Json.Linq.JToken[] jt = p["inAddressList"].ToArray();
+                JArray j_inaddress = new JArray();
+                foreach (Newtonsoft.Json.Linq.JToken i in jt)
+                {
+                    string s = i.ToString();
+                    j_inaddress.Add(s);
+                }
+                peerJson["inputaddress"] = j_inaddress;
+                peerJson["outputaddress"] = new JArray(p["outAddressList"].OrderBy(g => g["n"]).Select(k =>
+                {
+                    JObject a = new JObject();
+                    a["n"] = k["n"].ToString();
+                    a["asset"] = k["asset"].ToString();
+                    a["value"] = (double)k["value"];
+                    a["address"] = k["outAddress"].ToString();
+                    a["svalue"] = k["svalue"].ToString();
+                    return a;
+                }));
+                return peerJson;
+            }));
+            return json;
+        }
+
+        private JObject SendIssueTransaction(JArray _params)
+        {
+            rpcServer.WalletVerify();
+            UInt256 asset_id = UInt256.Parse(_params[0].AsString());
+            JArray to = (JArray)_params[1];
+            if (to.Count == 0)
+                throw new RpcException(-32602, "Invalid params");
+            TransactionOutput[] outputs = new TransactionOutput[to.Count];
+            for (int i = 0; i < to.Count; i++)
+            {
+                AssetDescriptor descriptor = new AssetDescriptor(asset_id);
+                outputs[i] = new TransactionOutput
+                {
+                    AssetId = asset_id,
+                    Value = Fixed8.Parse(to[i]["value"].AsString()),
+                    ScriptHash = to[i]["address"].AsString().ToScriptHash()
+                };
+            }
+            IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
+            {
+                Version = 1,
+                Outputs = outputs
+            }, fee: Fixed8.One);
+            return rpcServer.SignAndShowResult(tx);
         }
 
         private string RequestRpc(string method,string kvs)
