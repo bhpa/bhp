@@ -29,6 +29,7 @@ namespace Bhp.Network.P2P
         public IPEndPoint Listener => new IPEndPoint(Remote.Address, ListenerPort);
         public override int ListenerPort => Version?.Port ?? 0;
         public VersionPayload Version { get; private set; }
+        public uint LastBlockIndex { get; private set; }
 
         public RemoteNode(BhpSystem system, object connection, IPEndPoint remote, IPEndPoint local)
             : base(connection, remote, local)
@@ -124,6 +125,12 @@ namespace Bhp.Network.P2P
                     OnSetFilter(setFilter.Filter);
                     break;
             }
+        }
+
+        private void OnPingPayload(PingPayload payload)
+        {
+            if (payload.LastBlockIndex > LastBlockIndex)
+                LastBlockIndex = payload.LastBlockIndex;
         }
 
         private void OnRelay(IInventory inventory)
