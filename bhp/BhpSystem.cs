@@ -42,8 +42,18 @@ namespace Bhp
         public void Dispose()
         {
             RpcServer?.Dispose();
-            ActorSystem.Stop(LocalNode);
+            EnsureStoped(LocalNode);
+            // Dispose will call ActorSystem.Terminate()
             ActorSystem.Dispose();
+            ActorSystem.WhenTerminated.Wait();
+        }
+
+        public void EnsureStoped(IActorRef actor)
+        {
+            Inbox inbox = Inbox.Create(ActorSystem);
+            inbox.Watch(actor);
+            ActorSystem.Stop(actor);
+            inbox.Receive(TimeSpan.FromMinutes(5));
         }
 
         internal void ResumeNodeStartup()
