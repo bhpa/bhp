@@ -17,6 +17,7 @@
     <Company>The Bhp Project</Company>
     <Description>Bhp</Description>
     <AssemblyVersion>1.2.0.5</AssemblyVersion>
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">

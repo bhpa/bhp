@@ -15,7 +15,7 @@ namespace Bhp.Wallets.BRC6
             return new BRC6Contract
             {
                 Script = json["script"].AsString().HexToBytes(),
-                ParameterList = ((JArray)json["parameters"]).Select(p => p["type"].AsEnum<ContractParameterType>()).ToArray(),
+                ParameterList = ((JArray)json["parameters"]).Select(p => p["type"].TryGetEnum<ContractParameterType>()).ToArray(),
                 ParameterNames = ((JArray)json["parameters"]).Select(p => p["name"].AsString()).ToArray(),
                 Deployed = json["deployed"].AsBoolean()
             };

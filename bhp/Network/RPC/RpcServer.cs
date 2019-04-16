@@ -234,7 +234,7 @@ namespace Bhp.Network.RPC
             }
             if (block == null)
                 throw new RpcException(-100, "Unknown block");
-            bool verbose = _params.Count >= 2 && _params[1].AsBooleanOrDefault(false);
+            bool verbose = _params.Count >= 2 && _params[1].AsBoolean();
             if (verbose)
             {
                 JObject json = block.ToJson();
@@ -273,7 +273,7 @@ namespace Bhp.Network.RPC
             if (header == null)
                 throw new RpcException(-100, "Unknown block");
 
-            bool verbose = _params.Count >= 2 && _params[1].AsBooleanOrDefault(false);
+            bool verbose = _params.Count >= 2 && _params[1].AsBoolean();
             if (verbose)
             {
                 JObject json = header.ToJson();
@@ -336,7 +336,7 @@ namespace Bhp.Network.RPC
 
         private static JObject GetRawMempool(JArray _params)
         {
-            bool shouldGetUnverified = _params.Count >= 1 && _params[0].AsBooleanOrDefault(false);
+            bool shouldGetUnverified = _params.Count >= 1 && _params[0].AsBoolean();
             if (!shouldGetUnverified)
                 return new JArray(Blockchain.Singleton.MemPool.GetVerifiedTransactions().Select(p => (JObject)p.Hash.ToString()));
 
@@ -353,7 +353,7 @@ namespace Bhp.Network.RPC
         private static JObject GetRawTransaction(JArray _params)
         {
             UInt256 hash = UInt256.Parse(_params[0].AsString());
-            bool verbose = _params.Count >= 2 && _params[1].AsBooleanOrDefault(false);
+            bool verbose = _params.Count >= 2 && _params[1].AsBoolean();
             Transaction tx = Blockchain.Singleton.GetTransaction(hash);
             if (tx == null)
                 throw new RpcException(-100, "Unknown transaction");
