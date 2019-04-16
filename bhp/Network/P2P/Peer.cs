@@ -24,7 +24,6 @@ namespace Bhp.Network.P2P
         private class Timer { }
         private class WsConnected { public WebSocket Socket; public IPEndPoint Remote; public IPEndPoint Local; }
 
-        public int MaxConnectionsPerAddress { get; private set; } = 3;
         public const int DefaultMinDesiredConnections = 10;
         public const int DefaultMaxConnections = DefaultMinDesiredConnections * 4;
 
@@ -42,6 +41,7 @@ namespace Bhp.Network.P2P
         protected HashSet<IPAddress> TrustedIpAddresses { get; } = new HashSet<IPAddress>();
         
         public int ListenerPort { get; private set; }
+        public int MaxConnectionsPerAddress { get; private set; } = 3;
         public int MinDesiredConnections { get; private set; } = DefaultMinDesiredConnections;
         public int MaxConnections { get; private set; } = DefaultMaxConnections;
         protected int UnconnectedMax { get; } = 1000;
