@@ -98,6 +98,7 @@ namespace Bhp.SmartContract
             Register("Bhp.Iterator.Key", Iterator_Key, 1);
             Register("Bhp.Iterator.Keys", Iterator_Keys, 1);
             Register("Bhp.Iterator.Values", Iterator_Values, 1);
+            Register("Bhp.Iterator.Concat", Iterator_Concat, 1);
 
             #region Aliases
             Register("Bhp.Iterator.Next", Enumerator_Next, 1);
@@ -844,6 +845,17 @@ namespace Bhp.SmartContract
                 return true;
             }
             return false;
+        }
+
+        private bool Iterator_Concat(ExecutionEngine engine)
+        {
+            if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface1)) return false;
+            if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface2)) return false;
+            IIterator first = _interface1.GetInterface<IIterator>();
+            IIterator second = _interface2.GetInterface<IIterator>();
+            IIterator result = new ConcatenatedIterator(first, second);
+            engine.CurrentContext.EvaluationStack.Push(StackItem.FromInterface(result));
+            return true;
         }
     }
 }
