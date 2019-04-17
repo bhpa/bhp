@@ -22,11 +22,7 @@ namespace Bhp.SmartContract
         /// <summary>
         /// Min value for SHL and SHR
         /// </summary>
-        public const int Min_SHL_SHR = -Max_SHL_SHR;
-        /// <summary>
-        /// Set the max size allowed size for BigInteger
-        /// </summary>
-        public const int MaxSizeForBigInteger = 32;
+        public const int Min_SHL_SHR = -Max_SHL_SHR;        
         /// <summary>
         /// Set the max Stack Size
         /// </summary>
