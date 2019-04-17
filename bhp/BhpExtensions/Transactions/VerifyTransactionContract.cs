@@ -154,7 +154,8 @@ namespace Bhp.BhpExtensions.Transactions
                             using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
                             {
                                 engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
-                                if (!engine.Execute()) return false;
+                                engine.Execute();
+                                if (engine.State.HasFlag(VMState.FAULT)) return false;
                                 if (engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean()) return false;
                             }
                         }
@@ -185,7 +186,8 @@ namespace Bhp.BhpExtensions.Transactions
                                 using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
                                 {
                                     engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
-                                    if (!engine.Execute() || engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean())
+                                    engine.Execute();                                    
+                                    if (engine.State.HasFlag(VMState.FAULT) || engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean())
                                     {
                                         unspents.Remove(item);
                                     }
