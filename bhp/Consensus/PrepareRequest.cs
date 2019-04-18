@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Bhp.Consensus
 {
-    internal class PrepareRequest : ConsensusMessage
+    public class PrepareRequest : ConsensusMessage
     {
         public ulong Nonce;
         public UInt160 NextConsensus;
