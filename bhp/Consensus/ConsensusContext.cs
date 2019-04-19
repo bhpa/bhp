@@ -73,7 +73,7 @@ namespace Bhp.Consensus
                     sc.AddSignature(contract, Validators[i], Signatures[i]);
                     j++;
                 }
-            sc.Verifiable.Witnesses = sc.GetWitnesses();
+            block.Witness = sc.GetWitnesses()[0];
             block.Transactions = TransactionHashes.Select(p => Transactions[p]).ToArray();
             return block;
         }
@@ -151,7 +151,7 @@ namespace Bhp.Consensus
             {
                 return;
             }
-            sc.Verifiable.Witnesses = sc.GetWitnesses();
+            payload.Witness = sc.GetWitnesses()[0];
         }
 
         public ConsensusPayload MakePrepareRequest()
