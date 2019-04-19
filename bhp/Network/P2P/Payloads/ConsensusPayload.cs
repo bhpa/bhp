@@ -1,4 +1,6 @@
-﻿using Bhp.Cryptography;
+﻿#pragma warning disable CS0612
+using Bhp.Consensus;
+using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Persistence;
@@ -19,8 +21,27 @@ namespace Bhp.Network.P2P.Payloads
         public byte[] Data;
         public Witness Witness;
 
+        private ConsensusMessage _deserializedMessage = null;
+        public ConsensusMessage ConsensusMessage
+        {
+            get
+            {
+                if (_deserializedMessage is null)
+                    _deserializedMessage = ConsensusMessage.DeserializeFrom(Data);
+                return _deserializedMessage;
+            }
+            internal set
+            {
+                if (!ReferenceEquals(_deserializedMessage, value))
+                {
+                    _deserializedMessage = value;
+                    Data = value?.ToArray();
+                }
+            }
+        }
+
         private UInt256 _hash = null;
-        UInt256 IInventory.Hash
+        public UInt256 Hash
         {
             get
             {
@@ -39,10 +60,22 @@ namespace Bhp.Network.P2P.Payloads
             get
             {
                 return new[] { Witness };
-            }            
+            }
         }
 
-        public int Size => sizeof(uint) + PrevHash.Size + sizeof(uint) + sizeof(ushort) + sizeof(uint) + Data.GetVarSize() + 1 + Witness.Size;
+        public int Size =>
+            sizeof(uint) +      //Version
+            PrevHash.Size +     //PrevHash
+            sizeof(uint) +      //BlockIndex
+            sizeof(ushort) +    //ValidatorIndex
+            sizeof(uint) +      //Timestamp
+            Data.GetVarSize() + //Data
+            1 + Witness.Size;   //Witness
+
+        public T GetDeserializedMessage<T>() where T : ConsensusMessage
+        {
+            return (T)ConsensusMessage;
+        }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
@@ -98,3 +131,4 @@ namespace Bhp.Network.P2P.Payloads
         }
     }
 }
+#pragma warning restore CS0612
