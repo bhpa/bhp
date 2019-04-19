@@ -1,7 +1,6 @@
 ﻿using Bhp.Cryptography;
 using Bhp.IO;
 using Bhp.IO.Json;
-using Bhp.Ledger;
 using Bhp.Persistence;
 using Bhp.SmartContract;
 using Bhp.VM;
@@ -40,7 +39,7 @@ namespace Bhp.Network.P2P.Payloads
             get
             {
                 return new[] { Witness };
-            }            
+            }
         }
 
         public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + sizeof(ulong) + NextConsensus.Size + 1 + Witness.Size;
