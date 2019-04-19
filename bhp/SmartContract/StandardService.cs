@@ -132,7 +132,7 @@ namespace Bhp.SmartContract
 
         protected bool ExecutionEngine_GetCallingScriptHash(ExecutionEngine engine)
         {
-            engine.CurrentContext.EvaluationStack.Push(engine.CallingContext.ScriptHash);
+            engine.CurrentContext.EvaluationStack.Push(engine.CallingContext?.ScriptHash ?? new byte[0]);
             return true;
         }
 
@@ -276,7 +276,7 @@ namespace Bhp.SmartContract
                     return false;
                 }
                 writer.Flush();
-                if (ms.Length > engine.MaxArraySize)
+                if (ms.Length > engine.MaxItemSize)
                     return false;
                 engine.CurrentContext.EvaluationStack.Push(ms.ToArray());
             }
