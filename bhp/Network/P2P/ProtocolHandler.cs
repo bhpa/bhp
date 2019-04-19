@@ -16,9 +16,7 @@ using System.Net;
 namespace Bhp.Network.P2P
 {
     internal class ProtocolHandler : UntypedActor
-    {
-        public class SetVersion { public VersionPayload Version; }
-        public class SetVerack { }
+    {                
         public class SetFilter { public BloomFilter Filter; }
 
         private readonly BhpSystem system;
@@ -271,13 +269,13 @@ namespace Bhp.Network.P2P
         private void OnVerackMessageReceived()
         {
             verack = true;
-            Context.Parent.Tell(new SetVerack());
+            Context.Parent.Tell("verack");
         }
 
         private void OnVersionMessageReceived(VersionPayload payload)
         {
             version = payload;
-            Context.Parent.Tell(new SetVersion { Version = payload });
+            Context.Parent.Tell(payload);
         }
 
         public static Props Props(BhpSystem system)
