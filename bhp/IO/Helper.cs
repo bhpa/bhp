@@ -9,6 +9,8 @@ namespace Bhp.IO
 {
     public static class Helper
     {
+        public const int GroupingSizeInBytes = 16;
+
         public static T AsSerializable<T>(this byte[] value, int start = 0) where T : ISerializable, new()
         {
             using (MemoryStream ms = new MemoryStream(value, start, value.Length - start, false))
@@ -86,18 +88,17 @@ namespace Bhp.IO
         }
 
         public static byte[] ReadBytesWithGrouping(this BinaryReader reader)
-        {
-            const int GROUP_SIZE = 16;
+        {            
             using (MemoryStream ms = new MemoryStream())
             {
                 int padding = 0;
                 do
                 {
-                    byte[] group = reader.ReadBytes(GROUP_SIZE);
+                    byte[] group = reader.ReadBytes(GroupingSizeInBytes);
                     padding = reader.ReadByte();
-                    if (padding > GROUP_SIZE)
+                    if (padding > GroupingSizeInBytes)
                         throw new FormatException();
-                    int count = GROUP_SIZE - padding;
+                    int count = GroupingSizeInBytes - padding;
                     if (count > 0)
                         ms.Write(group, 0, count);
                 } while (padding == 0);
@@ -192,20 +193,19 @@ namespace Bhp.IO
         }
 
         public static void WriteBytesWithGrouping(this BinaryWriter writer, byte[] value)
-        {
-            const int GROUP_SIZE = 16;
+        {            
             int index = 0;
             int remain = value.Length;
-            while (remain >= GROUP_SIZE)
+            while (remain >= GroupingSizeInBytes)
             {
-                writer.Write(value, index, GROUP_SIZE);
+                writer.Write(value, index, GroupingSizeInBytes);
                 writer.Write((byte)0);
-                index += GROUP_SIZE;
-                remain -= GROUP_SIZE;
+                index += GroupingSizeInBytes;
+                remain -= GroupingSizeInBytes;
             }
             if (remain > 0)
                 writer.Write(value, index, remain);
-            int padding = GROUP_SIZE - remain;
+            int padding = GroupingSizeInBytes - remain;
             for (int i = 0; i < padding; i++)
                 writer.Write((byte)0);
             writer.Write((byte)padding);
