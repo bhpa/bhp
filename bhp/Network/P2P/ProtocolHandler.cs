@@ -91,7 +91,7 @@ namespace Bhp.Network.P2P
                     break;
                 case "tx":
                     if (msg.Payload.Length <= Transaction.MaxTransactionSize)
-                        OnInventoryReceived(Transaction.DeserializeFrom(msg.Payload));
+                        OnInventoryReceived(msg.GetTransaction());
                     break;
                 case "verack":
                 case "version":
