@@ -7,6 +7,7 @@ using Bhp.IO.Caching;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
+using Bhp.Plugins;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -35,7 +36,10 @@ namespace Bhp.Network.P2P
 
         protected override void OnReceive(object message)
         {
-            if (!(message is Message msg)) return;           
+            if (!(message is Message msg)) return;
+            foreach (IP2PPlugin plugin in Plugin.P2PPlugins)
+                if (!plugin.OnP2PMessage(msg))
+                    return;
             if (version == null)
             {
                 if (msg.Command != "version")
