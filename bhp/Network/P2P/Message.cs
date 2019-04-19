@@ -1,5 +1,6 @@
 ﻿using Bhp.Cryptography;
 using Bhp.IO;
+using Bhp.Network.P2P.Payloads;
 using System;
 using System.IO;
 
@@ -57,6 +58,13 @@ namespace Bhp.Network.P2P
             if (_payload_deserialized is null)
                 _payload_deserialized = Payload.AsSerializable<T>();
             return (T)_payload_deserialized;
+        }
+
+        public Transaction GetTransaction()
+        {
+            if (_payload_deserialized is null)
+                _payload_deserialized = Transaction.DeserializeFrom(Payload);
+            return (Transaction)_payload_deserialized;
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
