@@ -114,11 +114,11 @@ namespace Bhp.Network.P2P
                 case Relay relay:
                     OnRelay(relay.Inventory);
                     break;
-                case ProtocolHandler.SetVersion setVersion:
-                    OnSetVersion(setVersion.Version);
+                case VersionPayload payload:
+                    OnVersionPayload(payload);
                     break;
-                case ProtocolHandler.SetVerack _:
-                    OnSetVerack();
+                case "verack":
+                    OnVerack();
                     break;
                 case ProtocolHandler.SetFilter setFilter:
                     OnSetFilter(setFilter.Filter);
@@ -153,14 +153,14 @@ namespace Bhp.Network.P2P
             bloom_filter = filter;
         }
 
-        private void OnSetVerack()
+        private void OnVerack()
         {
             verack = true;
             system.TaskManager.Tell(new TaskManager.Register { Version = Version });
             CheckMessageQueue();
         }
 
-        private void OnSetVersion(VersionPayload version)
+        private void OnVersionPayload(VersionPayload version)
         {
             this.Version = version;
             if (version.Nonce == LocalNode.Nonce)
