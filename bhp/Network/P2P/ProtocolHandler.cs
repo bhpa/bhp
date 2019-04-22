@@ -95,6 +95,12 @@ namespace Bhp.Network.P2P
                 case "mempool":
                     OnMemPoolMessageReceived();
                     break;
+                case "ping":
+                    OnPingMessageReceived(msg.GetPayload<PingPayload>());
+                    break;
+                case "pong":
+                    OnPongMessageReceived(msg.GetPayload<PingPayload>());
+                    break;
                 case "tx":
                     if (msg.Payload.Length <= Transaction.MaxTransactionSize)
                         OnInventoryReceived(msg.GetTransaction());
@@ -104,9 +110,7 @@ namespace Bhp.Network.P2P
                     throw new ProtocolViolationException();
                 case "alert":
                 case "merkleblock":
-                case "notfound":
-                case "ping":
-                case "pong":
+                case "notfound":            
                 case "reject":
                 default:
                     //暂时忽略
@@ -270,6 +274,17 @@ namespace Bhp.Network.P2P
         {
             foreach (InvPayload payload in InvPayload.CreateGroup(InventoryType.TX, Blockchain.Singleton.MemPool.GetVerifiedTransactions().Select(p => p.Hash).ToArray()))
                 Context.Parent.Tell(Message.Create("inv", payload));
+        }
+
+        private void OnPingMessageReceived(PingPayload payload)
+        {
+            Context.Parent.Tell(payload);
+            Context.Parent.Tell(Message.Create("pong", PingPayload.Create(Blockchain.Singleton.Height, payload.Nonce)));
+        }
+
+        private void OnPongMessageReceived(PingPayload payload)
+        {
+            Context.Parent.Tell(payload);
         }
 
         private void OnVerackMessageReceived()

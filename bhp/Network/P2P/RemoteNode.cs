@@ -29,7 +29,8 @@ namespace Bhp.Network.P2P
         public IPEndPoint Listener => new IPEndPoint(Remote.Address, ListenerPort);
         public override int ListenerPort => Version?.Port ?? 0;
         public VersionPayload Version { get; private set; }
-
+        public uint LastBlockIndex { get; private set; }
+        
         public RemoteNode(BhpSystem system, object connection, IPEndPoint remote, IPEndPoint local)
             : base(connection, remote, local)
         {
@@ -63,6 +64,8 @@ namespace Bhp.Network.P2P
                 case "getblocks":
                 case "getheaders":
                 case "mempool":
+                case "ping":
+                case "pong":
                     is_single = true;
                     break;
             }
@@ -123,7 +126,16 @@ namespace Bhp.Network.P2P
                 case ProtocolHandler.SetFilter setFilter:
                     OnSetFilter(setFilter.Filter);
                     break;
+                case PingPayload payload:
+                    OnPingPayload(payload);
+                    break;
             }
+        }
+
+        private void OnPingPayload(PingPayload payload)
+        {
+            if (payload.LastBlockIndex > LastBlockIndex)
+                LastBlockIndex = payload.LastBlockIndex;
         }
 
         private void OnRelay(IInventory inventory)
@@ -163,6 +175,7 @@ namespace Bhp.Network.P2P
         private void OnVersionPayload(VersionPayload version)
         {
             this.Version = version;
+            this.LastBlockIndex = Version.StartHeight;
             if (version.Nonce == LocalNode.Nonce)
             {
                 Disconnect(true);
