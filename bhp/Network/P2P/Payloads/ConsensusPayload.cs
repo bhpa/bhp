@@ -17,7 +17,8 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 PrevHash;
         public uint BlockIndex;
         public ushort ValidatorIndex;
-        public uint Timestamp;
+        [Obsolete] //This field will be removed from future version and should not be used.
+        private uint Timestamp;        
         public byte[] Data;
         public Witness Witness;
 
