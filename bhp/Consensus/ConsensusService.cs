@@ -30,7 +30,13 @@ namespace Bhp.Consensus
         private ICancelable timer_token;
         private DateTime block_received_time;
         private bool started = false;
-
+        
+        /// <summary>
+        /// This will record the information from last scheduled timer
+        /// </summary>
+        private DateTime clock_started = TimeProvider.Current.UtcNow;
+        private TimeSpan expected_delay = TimeSpan.Zero;
+        
         /// <summary>
         /// This will be cleared every block (so it will not grow out of control, but is used to prevent repeatedly
         /// responding to the same message.
@@ -77,6 +83,10 @@ namespace Bhp.Consensus
                     // previously sent prepare request, then we don't want to send a prepare response.
                     if (context.IsPrimary() || context.WatchOnly()) return true;
 
+                    // Timeout extension due to prepare response sent
+                    // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
+                    ExtendTimerByFactor(2);
+
                     Log($"send prepare response");
                     localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakePrepareResponse() });
                     CheckPreparations();
@@ -92,6 +102,8 @@ namespace Bhp.Consensus
 
         private void ChangeTimer(TimeSpan delay)
         {
+            clock_started = TimeProvider.Current.UtcNow;
+            expected_delay = delay;
             timer_token.CancelIfNotNull();
             timer_token = Context.System.Scheduler.ScheduleTellOnceCancelable(delay, Self, new Timer
             {
@@ -229,6 +241,10 @@ namespace Bhp.Consensus
                 return;
             }
 
+            // Timeout extension: commit has been received with success
+            // around 4*15s/M=60.0s/5=12.0s ~ 80% block time (for M=5)
+            ExtendTimerByFactor(4);
+
             if (commit.ViewNumber == context.ViewNumber)
             {
                 Log($"{nameof(OnCommitReceived)}: height={payload.BlockIndex} view={commit.ViewNumber} index={payload.ValidatorIndex} nc={context.CountCommitted()} nf={context.CountFailed()}");
@@ -249,6 +265,14 @@ namespace Bhp.Consensus
             // Receiving commit from another view
             Log($"{nameof(OnCommitReceived)}: record commit for different view={commit.ViewNumber} index={payload.ValidatorIndex} height={payload.BlockIndex}");
             existingCommitPayload = payload;
+        }
+
+        // this function increases existing timer (never decreases) with a value proportional to `maxDelayInBlockTimes`*`Blockchain.SecondsPerBlock`
+        private void ExtendTimerByFactor(int maxDelayInBlockTimes)
+        {
+            TimeSpan nextDelay = expected_delay - (TimeProvider.Current.UtcNow - clock_started) + TimeSpan.FromMilliseconds(maxDelayInBlockTimes * Blockchain.SecondsPerBlock * 1000.0 / context.M());
+            if (!context.WatchOnly() && !context.ViewChanging() && !context.CommitSent() && (nextDelay > TimeSpan.Zero))
+                ChangeTimer(nextDelay);
         }
 
         private void OnConsensusPayload(ConsensusPayload payload)
@@ -380,6 +404,11 @@ namespace Bhp.Consensus
                 Log($"Invalid request: transaction already exists", LogLevel.Warning);
                 return;
             }
+
+            // Timeout extension: prepare request has been received with success
+            // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
+            ExtendTimerByFactor(2);
+
             context.Timestamp = message.Timestamp;
             context.Nonce = message.Nonce;
             context.NextConsensus = message.NextConsensus;
@@ -430,6 +459,11 @@ namespace Bhp.Consensus
             if (context.PreparationPayloads[payload.ValidatorIndex] != null || context.NotAcceptingPayloadsDueToViewChanging()) return;
             if (context.PreparationPayloads[context.PrimaryIndex] != null && !message.PreparationHash.Equals(context.PreparationPayloads[context.PrimaryIndex].Hash))
                 return;
+
+            // Timeout extension: prepare response has been received with success
+            // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
+            ExtendTimerByFactor(2);
+
             Log($"{nameof(OnPrepareResponseReceived)}: height={payload.BlockIndex} view={message.ViewNumber} index={payload.ValidatorIndex}");
             context.PreparationPayloads[payload.ValidatorIndex] = payload;
             if (context.WatchOnly() || context.CommitSent()) return;
