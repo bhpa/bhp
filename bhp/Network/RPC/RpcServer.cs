@@ -187,14 +187,14 @@ namespace Bhp.Network.RPC
             return account?.GetKey().Export();
         }
 
-        private static JObject GetAccountState(JArray _params)
+        private JObject GetAccountState(JArray _params)
         {
             UInt160 script_hash = _params[0].AsString().ToScriptHash();
             AccountState account = Blockchain.Singleton.Store.GetAccounts().TryGet(script_hash) ?? new AccountState(script_hash);
             return account?.ToJson();
         }
 
-        private static JObject GetAssetState(JArray _params)
+        private JObject GetAssetState(JArray _params)
         {
             UInt256 asset_id = UInt256.Parse(_params[0].AsString());
             AssetState asset = Blockchain.Singleton.Store.GetAssets().TryGet(asset_id);
@@ -219,12 +219,12 @@ namespace Bhp.Network.RPC
             return json;
         }
 
-        private static JObject GetBlock(JArray _params)
+        private JObject GetBlock(JArray _params)
         {
             Block block;
             if (_params[0] is JNumber)
             {
-                uint index = (uint)_params[0].AsNumber();
+                uint index = uint.Parse(_params[0].AsString());
                 block = Blockchain.Singleton.Store.GetBlock(index);
             }
             else
@@ -247,9 +247,9 @@ namespace Bhp.Network.RPC
             return block.ToArray().ToHexString();
         }
 
-        private static JObject GetBlockHash(JArray _params)
+        private JObject GetBlockHash(JArray _params)
         {
-            uint height = (uint)_params[0].AsNumber();
+            uint height = uint.Parse(_params[0].AsString());
             if (height <= Blockchain.Singleton.Height)
             {
                 return Blockchain.Singleton.GetBlockHash(height).ToString();
@@ -257,12 +257,12 @@ namespace Bhp.Network.RPC
             throw new RpcException(-100, "Invalid Height");
         }
 
-        private static JObject GetBlockHeader(JArray _params)
+        private JObject GetBlockHeader(JArray _params)
         {
             Header header;
             if (_params[0] is JNumber)
             {
-                uint height = (uint)_params[0].AsNumber();
+                uint height = uint.Parse(_params[0].AsString());
                 header = Blockchain.Singleton.Store.GetHeader(height);
             }
             else
@@ -287,9 +287,9 @@ namespace Bhp.Network.RPC
             return header.ToArray().ToHexString();
         }
 
-        private static JObject GetBlockSysFee(JArray _params)
+        private JObject GetBlockSysFee(JArray _params)
         {
-            uint height = (uint)_params[0].AsNumber();
+            uint height = uint.Parse(_params[0].AsString());
             if (height <= Blockchain.Singleton.Height)
             {
                 return Blockchain.Singleton.Store.GetSysFeeAmount(height).ToString();
@@ -297,7 +297,7 @@ namespace Bhp.Network.RPC
             throw new RpcException(-100, "Invalid Height");
         }
 
-        private static JObject GetContractState(JArray _params)
+        private JObject GetContractState(JArray _params)
         {
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
             ContractState contract = Blockchain.Singleton.Store.GetContracts().TryGet(script_hash);
@@ -313,7 +313,7 @@ namespace Bhp.Network.RPC
             return account.Address;
         }
 
-        private static JObject GetPeers()
+        private JObject GetPeers()
         {
             JObject json = new JObject();
             json["unconnected"] = new JArray(LocalNode.Singleton.GetUnconnectedPeers().Select(p =>
@@ -334,7 +334,7 @@ namespace Bhp.Network.RPC
             return json;
         }
 
-        private static JObject GetRawMempool(JArray _params)
+        private JObject GetRawMempool(JArray _params)
         {
             bool shouldGetUnverified = _params.Count >= 1 && _params[0].AsBoolean();
             if (!shouldGetUnverified)
@@ -350,7 +350,7 @@ namespace Bhp.Network.RPC
             return json;
         }
 
-        private static JObject GetRawTransaction(JArray _params)
+        private JObject GetRawTransaction(JArray _params)
         {
             UInt256 hash = UInt256.Parse(_params[0].AsString());
             bool verbose = _params.Count >= 2 && _params[1].AsBoolean();
@@ -373,7 +373,7 @@ namespace Bhp.Network.RPC
             return tx.ToArray().ToHexString();
         }
 
-        private static JObject GetStorage(JArray _params)
+        private JObject GetStorage(JArray _params)
         {
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
             byte[] key = _params[1].AsString().HexToBytes();
@@ -385,7 +385,7 @@ namespace Bhp.Network.RPC
             return item.Value?.ToHexString();
         }
 
-        private static JObject GetTransactionHeight(JArray _params)
+        private JObject GetTransactionHeight(JArray _params)
         {
             UInt256 hash = UInt256.Parse(_params[0].AsString());
             uint? height = Blockchain.Singleton.Store.GetTransactions().TryGet(hash)?.BlockIndex;
@@ -393,14 +393,14 @@ namespace Bhp.Network.RPC
             throw new RpcException(-100, "Unknown transaction");
         }
 
-        private static JObject GetTxOut(JArray _params)
+        private JObject GetTxOut(JArray _params)
         {
             UInt256 hash = UInt256.Parse(_params[0].AsString());
-            ushort index = (ushort)_params[1].AsNumber();
+            ushort index = ushort.Parse(_params[1].AsString());
             return Blockchain.Singleton.Store.GetUnspent(hash, index)?.ToJson(index);
         }
 
-        private static JObject GetValidators()
+        private JObject GetValidators()
         {
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
@@ -416,7 +416,7 @@ namespace Bhp.Network.RPC
             }
         }
 
-        private static JObject GetVersion()
+        private JObject GetVersion()
         {
             JObject json = new JObject();
             json["port"] = LocalNode.Singleton.ListenerPort;
@@ -614,7 +614,7 @@ namespace Bhp.Network.RPC
             return GetRelayResult(reason);
         }
 
-        private static JObject ValidateAddress(JArray _params)
+        private JObject ValidateAddress(JArray _params)
         {
             JObject json = new JObject();
             UInt160 scriptHash;
@@ -745,12 +745,22 @@ namespace Bhp.Network.RPC
                 string method = request["method"].AsString();
                 JArray _params = (JArray)request["params"];
                 foreach (IRpcPlugin plugin in Plugin.RpcPlugins)
+                    plugin.PreProcess(context, method, _params);
+                foreach (IRpcPlugin plugin in Plugin.RpcPlugins)
                 {
                     result = plugin.OnProcess(context, method, _params);
                     if (result != null) break;
                 }
                 if (result == null)
                     result = Process(method, _params);
+            }
+            catch (FormatException)
+            {
+                return CreateErrorResponse(request["id"], -32602, "Invalid params");
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return CreateErrorResponse(request["id"], -32602, "Invalid params");
             }
             catch (Exception ex)
             {
