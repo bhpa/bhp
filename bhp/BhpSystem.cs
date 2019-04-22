@@ -29,9 +29,11 @@ namespace Bhp
         internal IActorRef TaskManager { get; }
         public IActorRef Consensus { get; private set; }
         public RpcServer RpcServer { get; private set; }
+        private readonly Store store;
 
         public BhpSystem(Store store)
         {
+            this.store = store;
             Plugin.LoadPlugins(this);
             this.Blockchain = ActorSystem.ActorOf(Ledger.Blockchain.Props(this, store));
             this.LocalNode = ActorSystem.ActorOf(Network.P2P.LocalNode.Props(this));
@@ -69,7 +71,7 @@ namespace Bhp
         /*
         public void StartConsensus(Wallet wallet)
         {
-            Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, wallet));
+            Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
             Consensus.Tell(new ConsensusService.Start());
         }
         */
@@ -78,7 +80,7 @@ namespace Bhp
         /// By BHP
         /// </summary>
         /// <param name="wallet"></param>
-        public void StartConsensus(Wallet wallet)
+        public void StartConsensus(Wallet wallet, Store consensus_store = null, bool ignoreRecoveryLogs = false)
         {
             bool found = false;
             foreach (WalletAccount account in wallet.GetAccounts())
@@ -98,7 +100,7 @@ namespace Bhp
             //只有共识节点才能开启共识
             if (found)
             {
-                Consensus = ActorSystem.ActorOf(ConsensusService.Props(LocalNode, TaskManager, wallet));
+                Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
                 Consensus.Tell(new ConsensusService.Start());
             }
         }

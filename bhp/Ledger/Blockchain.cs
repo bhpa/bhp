@@ -200,7 +200,7 @@ namespace Bhp.Ledger
         {
             if (MemPool.ContainsKey(hash)) return true;
             return Store.ContainsTransaction(hash);
-        }        
+        }
 
         public Block GetBlock(UInt256 hash)
         {
@@ -218,7 +218,7 @@ namespace Bhp.Ledger
         public static UInt160 GetConsensusAddress(ECPoint[] validators)
         {
             return Contract.CreateMultiSigRedeemScript(validators.Length - (validators.Length - 1) / 3, validators).ToScriptHash();
-        } 
+        }
 
         public Snapshot GetSnapshot()
         {
@@ -230,7 +230,7 @@ namespace Bhp.Ledger
             if (MemPool.TryGetValue(hash, out Transaction transaction))
                 return transaction;
             return Store.GetTransaction(hash);
-        } 
+        }
 
         private void OnImport(IEnumerable<Block> blocks)
         {
@@ -592,7 +592,7 @@ namespace Bhp.Ledger
                             using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx_invocation, snapshot.Clone(), tx_invocation.Gas))
                             {
                                 engine.LoadScript(tx_invocation.Script);
-                                engine.Execute();                               
+                                engine.Execute();
                                 if (!engine.State.HasFlag(VMState.FAULT))
                                 {
                                     engine.Service.Commit();
