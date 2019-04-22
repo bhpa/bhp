@@ -188,8 +188,7 @@ namespace Bhp.Consensus
                 PrevHash = PrevHash,
                 BlockIndex = BlockIndex,
                 ValidatorIndex = (ushort)MyIndex,
-                Timestamp = Timestamp,
-                Data = message.ToArray()
+                ConsensusMessage = message
             };
             SignPayload(payload);
             return payload;
