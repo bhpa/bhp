@@ -77,15 +77,9 @@ namespace Bhp.BhpExtensions.RPC
             switch (method)
             {
                 case "unlock":
-                    return Unlock(_params);
-                case "getutxos":
-                    return GetUtxos(_params);                    
+                    return Unlock(_params);                                
                 case "verifytx":
-                    return VerifyTx(_params);                    
-                case "claimgas":
-                    return ClaimGas();                    
-                case "showgas":
-                    return ShowGas();                    
+                    return VerifyTx(_params);                                                    
                 case "getutxoofaddress":
                     return GetUtxoOfAddress(_params);                
                 case "gettransaction":
@@ -93,11 +87,7 @@ namespace Bhp.BhpExtensions.RPC
                 case "getdeposits":
                     return GetDeposits(_params);                    
                 case "get_tx_list":
-                    return GetTxList(_params);                    
-                case "sendissuetransaction":
-                    return SendIssueTransaction(_params);
-                case "gettransactiondata":
-                    return rpcServer.SendToAddress(_params, true);
+                    return GetTxList(_params);                                                 
                 default:
                     throw new RpcException(-32601, "Method not found");
             } 
@@ -136,47 +126,6 @@ namespace Bhp.BhpExtensions.RPC
             }
         }
 
-        private JObject GetUtxos(JArray _params)
-        {
-            rpcServer.WalletVerify();
-            JObject json = new JObject();
-            //address,assetid
-            UInt160 scriptHash = _params[0].AsString().ToScriptHash();
-            IEnumerable<Coin> coins = wallet.FindUnspentCoins();
-            UInt256 assetId;
-            if (_params.Count >= 2)
-            {
-                switch (_params[1].AsString())
-                {
-                    case "bhp":
-                        assetId = Blockchain.GoverningToken.Hash;
-                        break;
-                    case "gas":
-                        assetId = Blockchain.UtilityToken.Hash;
-                        break;
-                    default:
-                        assetId = UInt256.Parse(_params[1].AsString());
-                        break;
-                }
-            }
-            else
-            {
-                assetId = Blockchain.GoverningToken.Hash;
-            }
-            coins = coins.Where(p => p.Output.AssetId.Equals(assetId) && p.Output.ScriptHash.Equals(scriptHash));
-
-            //json["utxos"] = new JObject();
-            Coin[] coins_array = coins.ToArray();
-            //const int MAX_SHOW = 100;
-
-            json["utxos"] = new JArray(coins_array.Select(p =>
-            {
-                return p.Reference.ToJson();
-            }));
-
-            return json;
-        }
-
         private static JObject VerifyTx(JArray _params)
         {
             JObject json = new JObject();
@@ -188,36 +137,6 @@ namespace Bhp.BhpExtensions.RPC
             {
                 json["tx"] = tx.ToJson();
             }
-            return json;
-        }
-
-        private JObject ClaimGas()
-        {
-            rpcServer.WalletVerify();
-            JObject json = new JObject();
-            RpcCoins coins = new RpcCoins(wallet, system);
-            ClaimTransaction[] txs = coins.ClaimAll();
-            if (txs == null)
-            {
-                json["txs"] = new JArray();
-            }
-            else
-            {
-                json["txs"] = new JArray(txs.Select(p =>
-                {
-                    return p.ToJson();
-                }));
-            }
-            return json;
-        }
-
-        private JObject ShowGas()
-        {
-            rpcServer.WalletVerify();
-            JObject json = new JObject();
-            RpcCoins coins = new RpcCoins(wallet, system);
-            json["unavailable"] = coins.UnavailableBonus().ToString();
-            json["available"] = coins.AvailableBonus().ToString();
             return json;
         }
 
@@ -351,32 +270,6 @@ namespace Bhp.BhpExtensions.RPC
                 return peerJson;
             }));
             return json;
-        }
-
-        private JObject SendIssueTransaction(JArray _params)
-        {
-            rpcServer.WalletVerify();
-            UInt256 asset_id = UInt256.Parse(_params[0].AsString());
-            JArray to = (JArray)_params[1];
-            if (to.Count == 0)
-                throw new RpcException(-32602, "Invalid params");
-            TransactionOutput[] outputs = new TransactionOutput[to.Count];
-            for (int i = 0; i < to.Count; i++)
-            {
-                AssetDescriptor descriptor = new AssetDescriptor(asset_id);
-                outputs[i] = new TransactionOutput
-                {
-                    AssetId = asset_id,
-                    Value = Fixed8.Parse(to[i]["value"].AsString()),
-                    ScriptHash = to[i]["address"].AsString().ToScriptHash()
-                };
-            }
-            IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
-            {
-                Version = 1,
-                Outputs = outputs
-            }, fee: Fixed8.One);
-            return rpcServer.SignAndShowResult(tx);
         }
 
         private string RequestRpc(string method,string kvs)

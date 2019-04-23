@@ -36,8 +36,8 @@ namespace Bhp.Network.RPC
 
         private IWebHost host;
         private Fixed8 maxGasInvoke;
-        private readonly BhpSystem system;
-        private RpcExtension rpcExtension;
+        public readonly BhpSystem system;
+        public RpcExtension rpcExtension;
 
         public RpcServer(BhpSystem system, Wallet wallet = null, Fixed8 maxGasInvoke = default(Fixed8))
         {
@@ -90,15 +90,11 @@ namespace Bhp.Network.RPC
         private JObject Process(string method, JArray _params)
         {
             switch (method)
-            {
-                case "dumpprivkey":                    
-                    return DumpPrivKey(_params);                    
+            {                                 
                 case "getaccountstate":
                     return GetAccountState(_params);                    
                 case "getassetstate":
-                    return GetAssetState(_params);                    
-                case "getbalance":                    
-                    return GetBalance(_params);                    
+                    return GetAssetState(_params);                                                     
                 case "getbestblockhash":
                     return Blockchain.Singleton.CurrentBlockHash.ToString();
                 case "getblock":
@@ -114,9 +110,7 @@ namespace Bhp.Network.RPC
                 case "getconnectioncount":
                     return LocalNode.Singleton.ConnectedCount;
                 case "getcontractstate":
-                    return GetContractState(_params);                    
-                case "getnewaddress":                    
-                    return GetNewAddress();                    
+                    return GetContractState(_params);                                                     
                 case "getpeers":
                     return GetPeers();                    
                 case "getrawmempool":
@@ -132,34 +126,14 @@ namespace Bhp.Network.RPC
                 case "getvalidators":
                     return GetValidators();
                 case "getversion":
-                    return GetVersion();                    
-                case "getwalletheight":
-                    WalletVerify();
-                    return (Wallet.WalletHeight > 0) ? Wallet.WalletHeight - 1 : 0;
+                    return GetVersion();                                   
                 case "invoke":
                     return GetInvoke(_params);                    
                 case "invokefunction":
                     return InvokeFunction(_params);                    
                 case "invokescript":
                     byte[] script = _params[0].AsString().HexToBytes();
-                    return GetInvokeResult(script);                    
-                case "listaddress":
-                    WalletVerify();
-                    return Wallet.GetAccounts().Select(p =>
-                    {
-                        JObject account = new JObject();
-                        account["address"] = p.Address;
-                        account["haskey"] = p.HasKey;
-                        account["label"] = p.Label;
-                        account["watchonly"] = p.WatchOnly;
-                        return account;
-                    }).ToArray();
-                case "sendfrom":                    
-                    return SendFrom(_params);                    
-                case "sendmany":                    
-                    return SendMany(_params);                    
-                case "sendtoaddress":                    
-                    return SendToAddress(_params);                    
+                    return GetInvokeResult(script);                                                                                                                    
                 case "sendrawtransaction":
                     return SendRawTransaction(_params);                    
                 case "submitblock":
@@ -171,20 +145,6 @@ namespace Bhp.Network.RPC
                 default:
                     return rpcExtension.Process(method, _params);
             }
-        }
-
-        public void WalletVerify()
-        {
-            if (Wallet == null || rpcExtension.walletTimeLock.IsLocked())
-                throw new RpcException(-400, "Access denied");
-        }
-
-        private JObject DumpPrivKey(JArray _params)
-        {
-            WalletVerify();
-            UInt160 scriptHash = _params[0].AsString().ToScriptHash();
-            WalletAccount account = Wallet.GetAccount(scriptHash);
-            return account?.GetKey().Export();
         }
 
         private JObject GetAccountState(JArray _params)
@@ -199,24 +159,6 @@ namespace Bhp.Network.RPC
             UInt256 asset_id = UInt256.Parse(_params[0].AsString());
             AssetState asset = Blockchain.Singleton.Store.GetAssets().TryGet(asset_id);
             return asset?.ToJson() ?? throw new RpcException(-100, "Unknown asset");
-        }
-
-        private JObject GetBalance(JArray _params)
-        {
-            WalletVerify();
-            JObject json = new JObject();
-            switch (UIntBase.Parse(_params[0].AsString()))
-            {
-                case UInt160 asset_id_160: //BRC-5 balance
-                    json["balance"] = Wallet.GetAvailable(asset_id_160).ToString();
-                    break;
-                case UInt256 asset_id_256: //Global Assets balance
-                    IEnumerable<Coin> coins = Wallet.GetCoins().Where(p => !p.State.HasFlag(CoinState.Spent) && p.Output.AssetId.Equals(asset_id_256));
-                    json["balance"] = coins.Sum(p => p.Output.Value).ToString();
-                    json["confirmed"] = coins.Where(p => p.State.HasFlag(CoinState.Confirmed)).Sum(p => p.Output.Value).ToString();
-                    break;
-            }
-            return json;
         }
 
         private JObject GetBlock(JArray _params)
@@ -302,15 +244,6 @@ namespace Bhp.Network.RPC
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
             ContractState contract = Blockchain.Singleton.Store.GetContracts().TryGet(script_hash);
             return contract?.ToJson() ?? throw new RpcException(-100, "Unknown contract");
-        }
-
-        private JObject GetNewAddress()
-        {
-            WalletVerify();
-            WalletAccount account = Wallet.CreateAccount();
-            if (Wallet is BRC6Wallet brc6)
-                brc6.Save();
-            return account.Address;
         }
 
         private JObject GetPeers()
@@ -493,85 +426,6 @@ namespace Bhp.Network.RPC
                 json["tx"] = tx?.ToArray().ToHexString();
             }
             return json;
-        }
-
-        private JObject SendFrom(JArray _params)
-        {
-            WalletVerify();
-            UIntBase assetId = UIntBase.Parse(_params[0].AsString());
-            AssetDescriptor descriptor = new AssetDescriptor(assetId);
-            UInt160 from = _params[1].AsString().ToScriptHash();
-            UInt160 to = _params[2].AsString().ToScriptHash();
-            BigDecimal value = BigDecimal.Parse(_params[3].AsString(), descriptor.Decimals);
-            if (value.Sign <= 0)
-                throw new RpcException(-32602, "Invalid params");
-            Fixed8 fee = _params.Count >= 5 ? Fixed8.Parse(_params[4].AsString()) : Fixed8.Zero;
-            if (fee < Fixed8.Zero)
-                throw new RpcException(-32602, "Invalid params");
-            UInt160 change_address = _params.Count >= 6 ? _params[5].AsString().ToScriptHash() : null;
-            Transaction tx = Wallet.MakeTransaction(null, new[]
-            {
-                            new TransferOutput
-                            {
-                                AssetId = assetId,
-                                Value = value,
-                                ScriptHash = to
-                            }
-                        }, from: from, change_address: change_address, fee: fee);
-            return SignAndShowResult(tx);
-        }
-
-        private JObject SendMany(JArray _params)
-        {
-            WalletVerify();
-            JArray to = (JArray)_params[0];
-            if (to.Count == 0)
-                throw new RpcException(-32602, "Invalid params");
-            TransferOutput[] outputs = new TransferOutput[to.Count];
-            for (int i = 0; i < to.Count; i++)
-            {
-                UIntBase asset_id = UIntBase.Parse(to[i]["asset"].AsString());
-                AssetDescriptor descriptor = new AssetDescriptor(asset_id);
-                outputs[i] = new TransferOutput
-                {
-                    AssetId = asset_id,
-                    Value = BigDecimal.Parse(to[i]["value"].AsString(), descriptor.Decimals),
-                    ScriptHash = to[i]["address"].AsString().ToScriptHash()
-                };
-                if (outputs[i].Value.Sign <= 0)
-                    throw new RpcException(-32602, "Invalid params");
-            }
-            Fixed8 fee = _params.Count >= 2 ? Fixed8.Parse(_params[1].AsString()) : Fixed8.Zero;
-            if (fee < Fixed8.Zero)
-                throw new RpcException(-32602, "Invalid params");
-            UInt160 change_address = _params.Count >= 3 ? _params[2].AsString().ToScriptHash() : null;
-            Transaction tx = Wallet.MakeTransaction(null, outputs, change_address: change_address, fee: fee);
-            return SignAndShowResult(tx);
-        }
-
-        public JObject SendToAddress(JArray _params, bool isHexString = false)
-        {
-            WalletVerify();
-            UIntBase assetId = UIntBase.Parse(_params[0].AsString());
-            AssetDescriptor descriptor = new AssetDescriptor(assetId);
-            UInt160 scriptHash = _params[1].AsString().ToScriptHash();
-            BigDecimal value = BigDecimal.Parse(_params[2].AsString(), descriptor.Decimals);
-            if (value.Sign <= 0)
-                throw new RpcException(-32602, "Invalid params");
-            Fixed8 fee = _params.Count >= 4 ? Fixed8.Parse(_params[3].AsString()) : Fixed8.Zero;
-            if (fee < Fixed8.Zero)
-                throw new RpcException(-32602, "Invalid params");
-            UInt160 change_address = _params.Count >= 5 ? _params[4].AsString().ToScriptHash() : null;
-            Transaction tx = Wallet.MakeTransaction(null, new[]
-            {
-                            new TransferOutput
-                            {
-                                AssetId = assetId,
-                                Value = value,
-                                ScriptHash = scriptHash
-                            }
-                        }, change_address: change_address, fee: fee);
-            return SignAndShowResult(tx, isHexString);
         }
 
         public JObject SignAndShowResult(Transaction tx, bool isHexString = false)
