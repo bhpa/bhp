@@ -103,16 +103,12 @@ namespace Bhp.SmartContract
                 : instruction.TokenString.ToInteropMethodHash();
             long price = Service.GetPrice(api_hash);
             if (price > 0) return price;
-            if (api_hash == "Neo.Asset.Create".ToInteropMethodHash() ||
-               api_hash == "AntShares.Asset.Create".ToInteropMethodHash())
+            if (api_hash == "Bhp.Asset.Create".ToInteropMethodHash())
                 return 5000L * 100000000L / ratio;
-            if (api_hash == "Neo.Asset.Renew".ToInteropMethodHash() ||
-                api_hash == "AntShares.Asset.Renew".ToInteropMethodHash())
+            if (api_hash == "Bhp.Asset.Renew".ToInteropMethodHash())
                 return (byte)CurrentContext.EvaluationStack.Peek(1).GetBigInteger() * 5000L * 100000000L / ratio;
-            if (api_hash == "Neo.Contract.Create".ToInteropMethodHash() ||
-                api_hash == "Neo.Contract.Migrate".ToInteropMethodHash() ||
-                api_hash == "AntShares.Contract.Create".ToInteropMethodHash() ||
-                api_hash == "AntShares.Contract.Migrate".ToInteropMethodHash())
+            if (api_hash == "Bhp.Contract.Create".ToInteropMethodHash() ||
+                api_hash == "Bhp.Contract.Migrate".ToInteropMethodHash())
             {
                 long fee = 100L;
 
@@ -130,8 +126,7 @@ namespace Bhp.SmartContract
             }
             if (api_hash == "System.Storage.Put".ToInteropMethodHash() ||
                 api_hash == "System.Storage.PutEx".ToInteropMethodHash() ||
-                api_hash == "Neo.Storage.Put".ToInteropMethodHash() ||
-                api_hash == "AntShares.Storage.Put".ToInteropMethodHash())
+                api_hash == "Bhp.Storage.Put".ToInteropMethodHash())
                 return ((CurrentContext.EvaluationStack.Peek(1).GetByteArray().Length + CurrentContext.EvaluationStack.Peek(2).GetByteArray().Length - 1) / 1024 + 1) * 1000;
             return 1;
         }
