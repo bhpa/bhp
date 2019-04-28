@@ -511,7 +511,7 @@ namespace Bhp.Consensus
         private void RequestRecovery()
         {
             if (context.BlockIndex == Blockchain.Singleton.HeaderHeight + 1)
-                localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakePrepareRequest() });
+                localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeRecoveryRequest() });
         }
 
         private void OnStart(Start options)

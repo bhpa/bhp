@@ -23,9 +23,9 @@ namespace Bhp.Consensus
         /// </summary>
         public const byte CN_Context = 0xf4;
 
-        public const uint Version = 0;        
-        public UInt256 PrevHash { get; set; }
+        public const uint Version = 0;
         public uint BlockIndex { get; set; }
+        public UInt256 PrevHash { get; set; }
         public byte ViewNumber { get; set; }
         public ECPoint[] Validators { get; set; }
         public int MyIndex { get; set; }
@@ -44,8 +44,6 @@ namespace Bhp.Consensus
         public int[] LastSeenMessage { get; set; }
         public Block Block { get; set; }
         public Snapshot Snapshot { get; private set; }
-        public byte[][] Signatures { get; set; }
-        public byte[] ExpectedView { get; set; }
         private KeyPair keyPair;
         private readonly Wallet wallet;
         private readonly Store store;
@@ -57,7 +55,7 @@ namespace Bhp.Consensus
             this.wallet = wallet;
             this.store = store;
         }
-        
+
         public Block CreateBlock()
         {
             if (Block is null)
@@ -192,11 +190,6 @@ namespace Bhp.Consensus
             };
             SignPayload(payload);
             return payload;
-        }
-
-        public void SignHeader()
-        {
-            Signatures[MyIndex] = MakeHeader()?.Sign(keyPair);
         }
 
         private void SignPayload(ConsensusPayload payload)
@@ -413,8 +406,8 @@ namespace Bhp.Consensus
             foreach (IPolicyPlugin plugin in Plugin.Policies)
                 memoryPoolTransactions = plugin.FilterForBlock(memoryPoolTransactions);
             List<Transaction> transactions = memoryPoolTransactions.ToList();
-            Fixed8 amountNetFee = Block.CalculateNetFee(transactions);            
-            
+            Fixed8 amountNetFee = Block.CalculateNetFee(transactions);
+
             //By BHP 
             Fixed8 amount_txfee = BhpTxFee.CalcuTxFee(transactions);
 
@@ -433,7 +426,7 @@ namespace Bhp.Consensus
             TransactionHashes = transactions.Select(p => p.Hash).ToArray();
             Transactions = transactions.ToDictionary(p => p.Hash);
             NextConsensus = Blockchain.GetConsensusAddress(Snapshot.GetValidators(transactions).ToArray());
-            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), this.PrevHeader().Timestamp + 1);            
+            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), this.PrevHeader().Timestamp + 1);
         }
 
         private static ulong GetNonce()
