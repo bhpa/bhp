@@ -142,7 +142,7 @@ namespace Bhp.Consensus
             }
         }
 
-        public ConsensusPayload MakeChangeView(byte newViewNumber)
+        public ConsensusPayload MakeChangeView()
         {
             return ChangeViewPayloads[MyIndex] = MakeSignedPayload(new ChangeView
             {
@@ -224,6 +224,14 @@ namespace Bhp.Consensus
                 NextConsensus = NextConsensus,
                 TransactionHashes = TransactionHashes,
                 MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]]
+            });
+        }
+
+        public ConsensusPayload MakeRecoveryRequest()
+        {
+            return MakeSignedPayload(new RecoveryRequest
+            {
+                Timestamp = TimeProvider.Current.UtcNow.ToTimestamp()
             });
         }
 
