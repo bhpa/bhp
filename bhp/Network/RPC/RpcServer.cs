@@ -15,7 +15,6 @@ using Bhp.Plugins;
 using Bhp.SmartContract;
 using Bhp.VM;
 using Bhp.Wallets;
-using Bhp.Wallets.BRC6;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -45,7 +44,7 @@ namespace Bhp.Network.RPC
             this.Wallet = wallet;
             this.maxGasInvoke = maxGasInvoke;
 
-            rpcExtension = new RpcExtension(system, wallet,this);
+            rpcExtension = new RpcExtension(system, wallet, this);
         }
 
         public void SetWallet(Wallet wallet)
@@ -90,58 +89,56 @@ namespace Bhp.Network.RPC
         private JObject Process(string method, JArray _params)
         {
             switch (method)
-            {                                 
+            {
                 case "getaccountstate":
-                    return GetAccountState(_params);                    
+                    return GetAccountState(_params);
                 case "getassetstate":
-                    return GetAssetState(_params);                                                     
+                    return GetAssetState(_params);
                 case "getbestblockhash":
                     return Blockchain.Singleton.CurrentBlockHash.ToString();
                 case "getblock":
-                    return GetBlock(_params);                    
+                    return GetBlock(_params);
                 case "getblockcount":
                     return Blockchain.Singleton.Height + 1;
                 case "getblockhash":
-                    return GetBlockHash(_params);                    
+                    return GetBlockHash(_params);
                 case "getblockheader":
-                    return GetBlockHeader(_params);                    
+                    return GetBlockHeader(_params);
                 case "getblocksysfee":
-                    return GetBlockSysFee(_params);                    
+                    return GetBlockSysFee(_params);
                 case "getconnectioncount":
                     return LocalNode.Singleton.ConnectedCount;
                 case "getcontractstate":
-                    return GetContractState(_params);                                                     
+                    return GetContractState(_params);
                 case "getpeers":
-                    return GetPeers();                    
+                    return GetPeers();
                 case "getrawmempool":
-                    return GetRawMempool(_params);                    
+                    return GetRawMempool(_params);
                 case "getrawtransaction":
-                    return GetRawTransaction(_params);                    
+                    return GetRawTransaction(_params);
                 case "getstorage":
-                    return GetStorage(_params);                    
+                    return GetStorage(_params);
                 case "gettransactionheight":
-                    return GetTransactionHeight(_params);                    
+                    return GetTransactionHeight(_params);
                 case "gettxout":
                     return GetTxOut(_params);
                 case "getvalidators":
                     return GetValidators();
                 case "getversion":
-                    return GetVersion();                                   
-                case "invoke":
-                    return GetInvoke(_params);                    
+                    return GetVersion();
                 case "invokefunction":
-                    return InvokeFunction(_params);                    
+                    return InvokeFunction(_params);
                 case "invokescript":
                     byte[] script = _params[0].AsString().HexToBytes();
-                    return GetInvokeResult(script);                                                                                                                    
+                    return GetInvokeResult(script);
                 case "sendrawtransaction":
-                    return SendRawTransaction(_params);                    
+                    return SendRawTransaction(_params);
                 case "submitblock":
-                    return SubmitBlock(_params);                    
+                    return SubmitBlock(_params);
                 case "validateaddress":
-                    return ValidateAddress(_params);                    
+                    return ValidateAddress(_params);
                 case "listplugins":
-                    return ListPlugins();                    
+                    return ListPlugins();
                 default:
                     return rpcExtension.Process(method, _params);
             }
@@ -358,18 +355,6 @@ namespace Bhp.Network.RPC
             return json;
         }
 
-        private JObject GetInvoke(JArray _params)
-        {
-            UInt160 script_hash = UInt160.Parse(_params[0].AsString());
-            ContractParameter[] parameters = ((JArray)_params[1]).Select(p => ContractParameter.FromJson(p)).ToArray();
-            byte[] script;
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                script = sb.EmitAppCall(script_hash, parameters).ToArray();
-            }
-            return GetInvokeResult(script);
-        }
-
         private JObject InvokeFunction(JArray _params)
         {
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
@@ -499,7 +484,7 @@ namespace Bhp.Network.RPC
                         .Select(p => (JObject)p))
                 }));
         }
-        
+
         private static JObject GetRelayResult(RelayResultReason reason)
         {
             switch (reason)

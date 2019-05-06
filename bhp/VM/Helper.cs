@@ -19,24 +19,14 @@ namespace Bhp.VM
                 sb.Emit(op);
             return sb;
         }
-
-        public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, bool useTailCall = false)
-        {
-            return sb.EmitAppCall(scriptHash.ToArray(), useTailCall);
-        }
-
-        public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, params ContractParameter[] parameters)
-        {
-            for (int i = parameters.Length - 1; i >= 0; i--)
-                sb.EmitPush(parameters[i]);
-            return sb.EmitAppCall(scriptHash);
-        }
-
+        
         public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, string operation)
         {
-            sb.EmitPush(false);
+            sb.EmitPush(0);
+            sb.Emit(OpCode.NEWARRAY);
             sb.EmitPush(operation);
-            sb.EmitAppCall(scriptHash);
+            sb.EmitPush(scriptHash);
+            sb.EmitSysCall("System.Contract.Call");
             return sb;
         }
 
@@ -47,7 +37,8 @@ namespace Bhp.VM
             sb.EmitPush(args.Length);
             sb.Emit(OpCode.PACK);
             sb.EmitPush(operation);
-            sb.EmitAppCall(scriptHash);
+            sb.EmitPush(scriptHash);
+            sb.EmitSysCall("System.Contract.Call");
             return sb;
         }
 
@@ -58,7 +49,8 @@ namespace Bhp.VM
             sb.EmitPush(args.Length);
             sb.Emit(OpCode.PACK);
             sb.EmitPush(operation);
-            sb.EmitAppCall(scriptHash);
+            sb.EmitPush(scriptHash);
+            sb.EmitSysCall("System.Contract.Call");
             return sb;
         }
 

@@ -3,14 +3,13 @@ using Bhp.IO.Caching;
 using Bhp.IO.Wrappers;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
-using Bhp.VM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Bhp.Persistence
 {
-    public abstract class Snapshot : IDisposable, IPersistence, IScriptTable
+    public abstract class Snapshot : IDisposable, IPersistence
     {
         public Block PersistingBlock { get; internal set; }
         public abstract DataCache<UInt256, BlockState> Blocks { get; }
@@ -142,11 +141,6 @@ namespace Bhp.Persistence
 
         public virtual void Dispose()
         {
-        }
-
-        byte[] IScriptTable.GetScript(byte[] script_hash)
-        {
-            return Contracts[new UInt160(script_hash)].Script;
         }
 
         public Dictionary<ushort, SpentCoin> GetUnclaimed(UInt256 hash)

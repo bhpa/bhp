@@ -3,12 +3,6 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.VM;
 using Bhp.VM.Types;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Bhp.SmartContract
 {
@@ -19,37 +13,15 @@ namespace Bhp.SmartContract
         private readonly long gas_amount;
         private long gas_consumed = 0;
         private readonly bool testMode;
-        private readonly Snapshot snapshot;
 
         public Fixed8 GasConsumed => new Fixed8(gas_consumed);
         public new BhpService Service => (BhpService)base.Service;
 
         public ApplicationEngine(TriggerType trigger, IScriptContainer container, Snapshot snapshot, Fixed8 gas, bool testMode = false)
-            : base(container, Cryptography.Crypto.Default, snapshot, new BhpService(trigger, snapshot))
+            : base(container, Cryptography.Crypto.Default, new BhpService(trigger, snapshot))
         {
             this.gas_amount = gas_free + gas.GetData();
             this.testMode = testMode;
-            this.snapshot = snapshot;
-        }
-
-        private bool CheckDynamicInvoke()
-        {
-            Instruction instruction = CurrentContext.CurrentInstruction;
-            switch (instruction.OpCode)
-            {
-                case OpCode.APPCALL:
-                case OpCode.TAILCALL:
-                    if (instruction.Operand.NotZero()) return true;
-                    // if we get this far it is a dynamic call
-                    // now look at the current executing script
-                    // to determine if it can do dynamic calls
-                    return snapshot.Contracts[new UInt160(CurrentContext.ScriptHash)].HasDynamicInvoke;
-                case OpCode.CALL_ED:
-                case OpCode.CALL_EDT:
-                    return snapshot.Contracts[new UInt160(CurrentContext.ScriptHash)].HasDynamicInvoke;
-                default:
-                    return true;
-            }
         }
 
         public override void Dispose()
@@ -64,9 +36,6 @@ namespace Bhp.SmartContract
             if (instruction.OpCode <= OpCode.NOP) return 0;
             switch (instruction.OpCode)
             {
-                case OpCode.APPCALL:
-                case OpCode.TAILCALL:
-                    return 10;
                 case OpCode.SYSCALL:
                     return GetPriceForSysCall();
                 case OpCode.SHA1:
@@ -137,7 +106,6 @@ namespace Bhp.SmartContract
                 return true;
             gas_consumed = checked(gas_consumed + GetPrice() * ratio);
             if (!testMode && gas_consumed > gas_amount) return false;
-            if (!CheckDynamicInvoke()) return false;
             return true;
         }
 
