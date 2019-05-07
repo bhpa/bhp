@@ -30,13 +30,13 @@ namespace Bhp.Consensus
         private ICancelable timer_token;
         private DateTime block_received_time;
         private bool started = false;
-        
+
         /// <summary>
         /// This will record the information from last scheduled timer
         /// </summary>
         private DateTime clock_started = TimeProvider.Current.UtcNow;
         private TimeSpan expected_delay = TimeSpan.Zero;
-        
+
         /// <summary>
         /// This will be cleared every block (so it will not grow out of control, but is used to prevent repeatedly
         /// responding to the same message.
@@ -626,7 +626,7 @@ namespace Bhp.Consensus
             if (context.TransactionHashes.Length > 1)
             {
                 foreach (InvPayload payload in InvPayload.CreateGroup(InventoryType.TX, context.TransactionHashes.Skip(1).ToArray()))
-                    localNode.Tell(Message.Create("inv", payload));
+                    localNode.Tell(Message.Create(MessageCommand.Inv, payload));
             }
             ChangeTimer(TimeSpan.FromSeconds((Blockchain.SecondsPerBlock << (context.ViewNumber + 1)) - (context.ViewNumber == 0 ? Blockchain.SecondsPerBlock : 0)));
         }
