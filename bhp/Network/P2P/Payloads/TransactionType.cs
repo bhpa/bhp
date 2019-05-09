@@ -15,12 +15,7 @@ namespace Bhp.Network.P2P.Payloads
         [ReflectionCache(typeof(ContractTransaction))]
         ContractTransaction = 0x80,
         [ReflectionCache(typeof(StateTransaction))]
-        StateTransaction = 0x90,
-        /// <summary>
-        /// Publish scripts to the blockchain for being invoked later.
-        /// </summary>
-        [ReflectionCache(typeof(PublishTransaction))]
-        PublishTransaction = 0xd0,
+        StateTransaction = 0x90,        
         [ReflectionCache(typeof(InvocationTransaction))]
         InvocationTransaction = 0xd1
     }
