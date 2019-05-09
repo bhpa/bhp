@@ -372,11 +372,7 @@ namespace Bhp.Network.P2P.Payloads
                 case TransactionType.MinerTransaction:
                     if (VerifyMiningTransaction.Verify(Outputs, Attributes) == false)
                         return false;
-                    break;
-                case TransactionType.ClaimTransaction:
-                    if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
-                        return false;
-                    break;
+                    break;                
                 case TransactionType.IssueTransaction:
                     if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
                         return false;
