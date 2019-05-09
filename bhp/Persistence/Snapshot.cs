@@ -29,7 +29,7 @@ namespace Bhp.Persistence
         public uint HeaderHeight => HeaderHashIndex.Get().Index;
         public UInt256 CurrentBlockHash => BlockHashIndex.Get().Hash;
         public UInt256 CurrentHeaderHash => HeaderHashIndex.Get().Hash;
-        
+
         public Snapshot Clone()
         {
             return new CloneSnapshot(this);

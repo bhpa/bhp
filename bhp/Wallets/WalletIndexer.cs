@@ -182,9 +182,8 @@ namespace Bhp.Wallets
                 switch (tx)
                 {
                     case MinerTransaction _:
-                    case ContractTransaction _:
-                        break;                    
-#pragma warning disable CS0612                   
+                        break;
+#pragma warning disable CS0612
                     case RegisterTransaction tx_register:
                         if (accounts_tracked.ContainsKey(tx_register.OwnerScriptHash))
                             accounts_changed.Add(tx_register.OwnerScriptHash);

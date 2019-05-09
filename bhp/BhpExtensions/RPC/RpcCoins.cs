@@ -1,12 +1,9 @@
 using Akka.Actor;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
-using Bhp.Persistence;
 using Bhp.SmartContract;
 using Bhp.Wallets;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Bhp.BhpExtensions.RPC
 {
@@ -24,6 +21,8 @@ namespace Bhp.BhpExtensions.RPC
 
         public Fixed8 UnavailableBonus()
         {
+            return Fixed8.Zero;
+            /*
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 uint height = snapshot.Height + 1;
@@ -40,17 +39,21 @@ namespace Bhp.BhpExtensions.RPC
 
                 return unavailable;
             }
+            */
         }
 
 
         public Fixed8 AvailableBonus()
         {
+            return Fixed8.Zero;
+            /*
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 return snapshot.CalculateBonus(current_wallet.GetUnclaimedCoins().Select(p => p.Reference));
             }
+            */
         }
-
+        /*
         public ClaimTransaction Claim(UInt160 change_address = null)
         {
 
@@ -88,8 +91,7 @@ namespace Bhp.BhpExtensions.RPC
 
 
         public ClaimTransaction[] ClaimAll(UInt160 change_address = null)
-        {
-
+        {            
             if (this.AvailableBonus() == Fixed8.Zero)
             {
                 Console.WriteLine($"no gas to claim");
@@ -142,7 +144,7 @@ namespace Bhp.BhpExtensions.RPC
                 return txs.ToArray();
             }
         }
-
+        */
 
         private Transaction SignTransaction(Transaction tx)
         {

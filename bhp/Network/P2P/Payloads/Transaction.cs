@@ -122,7 +122,8 @@ namespace Bhp.Network.P2P.Payloads
         {
             get
             {
-                return Type == TransactionType.ContractTransaction ? BhpTxFee.CalcuTxFee(this) : Fixed8.Zero;
+                return Fixed8.Zero;
+                //return Type == TransactionType.ContractTransaction ? BhpTxFee.CalcuTxFee(this) : Fixed8.Zero;
             }
         }
 
@@ -361,7 +362,7 @@ namespace Bhp.Network.P2P.Payloads
             TransactionResult[] results = GetTransactionResults()?.ToArray();
             if (results == null) return false;
             TransactionResult[] results_destroy = results.Where(p => p.Amount > Fixed8.Zero).ToArray();
-            
+
             //By BHP
             if (BhpTxFee.Verify(this, results_destroy, SystemFee) == false) return false;
 
@@ -372,7 +373,7 @@ namespace Bhp.Network.P2P.Payloads
                 case TransactionType.MinerTransaction:
                     if (VerifyMiningTransaction.Verify(Outputs, Attributes) == false)
                         return false;
-                    break;                
+                    break;
                 case TransactionType.IssueTransaction:
                     if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
                         return false;

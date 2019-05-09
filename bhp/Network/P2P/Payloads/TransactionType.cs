@@ -9,13 +9,11 @@ namespace Bhp.Network.P2P.Payloads
         [ReflectionCache(typeof(MinerTransaction))]
         MinerTransaction = 0x00,
         [ReflectionCache(typeof(IssueTransaction))]
-        IssueTransaction = 0x01,        
+        IssueTransaction = 0x01,
         [ReflectionCache(typeof(RegisterTransaction))]
         RegisterTransaction = 0x40,
-        [ReflectionCache(typeof(ContractTransaction))]
-        ContractTransaction = 0x80,
         [ReflectionCache(typeof(StateTransaction))]
-        StateTransaction = 0x90,        
+        StateTransaction = 0x90,
         [ReflectionCache(typeof(InvocationTransaction))]
         InvocationTransaction = 0xd1
     }

@@ -35,7 +35,7 @@ namespace Bhp.Ledger
 
         public int CompareTo(Transaction otherTx)
         {
-            if (otherTx == null) return 1;            
+            if (otherTx == null) return 1;
             // Fees sorted ascending
             int ret = Tx.FeePerByte.CompareTo(otherTx.FeePerByte);
             if (ret != 0) return ret;

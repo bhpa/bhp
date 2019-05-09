@@ -12,10 +12,8 @@ using Bhp.Plugins;
 using Bhp.SmartContract;
 using Bhp.VM;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading;
 
 namespace Bhp.Ledger
@@ -499,7 +497,7 @@ namespace Bhp.Ledger
                             TransactionOutput out_prev = tx_prev.Transaction.Outputs[input.PrevIndex];
                             AccountState account = snapshot.Accounts.GetAndChange(out_prev.ScriptHash);
                             if (out_prev.AssetId.Equals(GoverningToken.Hash))
-                            {                               
+                            {
                                 if (account.Votes.Length > 0)
                                 {
                                     foreach (ECPoint pubkey in account.Votes)

@@ -246,7 +246,7 @@ namespace Bhp.Wallets.BRC6
                                 State = coin.State | CoinState.Spent
                             };
                         continue;
-                    }                    
+                    }
                     yield return coin;
                 }
                 HashSet<UInt160> accounts_set = new HashSet<UInt160>(accounts);

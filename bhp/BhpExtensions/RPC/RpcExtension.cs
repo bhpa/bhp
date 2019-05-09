@@ -1,17 +1,13 @@
-﻿using Akka.Actor;
-using Bhp.BhpExtensions.Transactions;
+﻿using Bhp.BhpExtensions.Transactions;
 using Bhp.BhpExtensions.Wallets;
 using Bhp.IO.Json;
 using Bhp.Ledger;
-using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Network.RPC;
-using Bhp.SmartContract;
 using Bhp.Wallets;
 using Bhp.Wallets.BRC6;
 using Bhp.Wallets.SQLite;
 using Newtonsoft.Json;
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,7 +35,7 @@ namespace Bhp.BhpExtensions.RPC
             Unlocking = false;
         }
 
-        public RpcExtension(BhpSystem system,Wallet wallet, RpcServer rpcServer)
+        public RpcExtension(BhpSystem system, Wallet wallet, RpcServer rpcServer)
         {
             this.system = system;
             this.wallet = wallet;
@@ -73,24 +69,24 @@ namespace Bhp.BhpExtensions.RPC
         }
 
         public JObject Process(string method, JArray _params)
-        {                        
+        {
             switch (method)
             {
                 case "unlock":
-                    return Unlock(_params);                                
+                    return Unlock(_params);
                 case "verifytx":
-                    return VerifyTx(_params);                                                    
+                    return VerifyTx(_params);
                 case "getutxoofaddress":
-                    return GetUtxoOfAddress(_params);                
+                    return GetUtxoOfAddress(_params);
                 case "gettransaction":
-                    return GetTransaction(_params);                    
+                    return GetTransaction(_params);
                 case "getdeposits":
-                    return GetDeposits(_params);                    
+                    return GetDeposits(_params);
                 case "get_tx_list":
-                    return GetTxList(_params);                                                 
+                    return GetTxList(_params);
                 default:
                     throw new RpcException(-32601, "Method not found");
-            } 
+            }
         }
 
         private JObject Unlock(JArray _params)
@@ -200,6 +196,7 @@ namespace Bhp.BhpExtensions.RPC
         private JObject GetDeposits(JArray _params)
         {
             return null;
+            /*
             JObject json = new JObject();
             string from = _params[0].AsString();
             string position = _params.Count >= 2 ? _params[1].AsString() : "1";
@@ -232,6 +229,7 @@ namespace Bhp.BhpExtensions.RPC
                 return peerJson;
             }));
             return json;
+            */
         }
 
         private JObject GetTxList(JArray _params)
@@ -272,7 +270,7 @@ namespace Bhp.BhpExtensions.RPC
             return json;
         }
 
-        private string RequestRpc(string method,string kvs)
+        private string RequestRpc(string method, string kvs)
         {
             string jsonRes = "";
             using (HttpClient client = new HttpClient())
@@ -290,6 +288,6 @@ namespace Bhp.BhpExtensions.RPC
             }
             return jsonRes;
         }
-         
+
     }
 }

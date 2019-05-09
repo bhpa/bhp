@@ -3,11 +3,9 @@ using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.VM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Bhp.BhpExtensions.Transactions
 {
@@ -92,11 +90,13 @@ namespace Bhp.BhpExtensions.Transactions
                     if (VerifyMiningTransaction.Verify(tx.Outputs, tx.Attributes) == false)
                         return "MinerTransaction is invalid.";
                     break;
+                /*
                 //case TransactionType.MinerTransaction:
                 case TransactionType.ClaimTransaction:
                     if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
                         return "ClaimTransaction is invalid.";
                     break;
+                */
                 case TransactionType.IssueTransaction:
                     if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
                         return "IssueTransaction is invalid.";
@@ -115,6 +115,7 @@ namespace Bhp.BhpExtensions.Transactions
         //By BHP
         public static string Verify(Transaction tx, TransactionResult[] results_destroy, Fixed8 SystemFee)
         {
+            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
                 Fixed8 otherInput = Fixed8.Zero;
@@ -152,6 +153,7 @@ namespace Bhp.BhpExtensions.Transactions
                 }
             }
             else
+            */
             {
                 if (results_destroy.Length > 1) return "Transaction input is not equal to output!";
                 if (results_destroy.Length == 1 && results_destroy[0].AssetId != Blockchain.UtilityToken.Hash)
@@ -181,7 +183,7 @@ namespace Bhp.BhpExtensions.Transactions
                     return "success";
                 }
 
-                if(payFee < BhpTxFee.MinTxFee)
+                if (payFee < BhpTxFee.MinTxFee)
                 {
                     return "TxFee is not enough!";
                 }
