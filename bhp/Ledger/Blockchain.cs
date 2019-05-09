@@ -541,12 +541,7 @@ namespace Bhp.Ledger
                         case IssueTransaction _:
                             foreach (TransactionResult result in tx.GetTransactionResults().Where(p => p.Amount < Fixed8.Zero))
                                 snapshot.Assets.GetAndChange(result.AssetId).Available -= result.Amount;
-                            break;                       
-#pragma warning disable CS0612
-                        case EnrollmentTransaction tx_enrollment:
-                            snapshot.Validators.GetAndChange(tx_enrollment.PublicKey, () => new ValidatorState(tx_enrollment.PublicKey)).Registered = true;
                             break;
-#pragma warning restore CS0612
                         case StateTransaction tx_state:
                             foreach (StateDescriptor descriptor in tx_state.Descriptors)
                                 switch (descriptor.Type)
