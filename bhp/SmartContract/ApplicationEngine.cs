@@ -71,11 +71,7 @@ namespace Bhp.SmartContract
                 ? instruction.TokenU32
                 : instruction.TokenString.ToInteropMethodHash();
             long price = Service.GetPrice(api_hash);
-            if (price > 0) return price;
-            if (api_hash == "Bhp.Asset.Create".ToInteropMethodHash())
-                return 5000L * 100000000L / ratio;
-            if (api_hash == "Bhp.Asset.Renew".ToInteropMethodHash())
-                return (byte)CurrentContext.EvaluationStack.Peek(1).GetBigInteger() * 5000L * 100000000L / ratio;
+            if (price > 0) return price;           
             if (api_hash == "Bhp.Contract.Create".ToInteropMethodHash() ||
                 api_hash == "Bhp.Contract.Migrate".ToInteropMethodHash())
             {
@@ -94,8 +90,7 @@ namespace Bhp.SmartContract
                 return fee * 100000000L / ratio;
             }
             if (api_hash == "System.Storage.Put".ToInteropMethodHash() ||
-                api_hash == "System.Storage.PutEx".ToInteropMethodHash() ||
-                api_hash == "Bhp.Storage.Put".ToInteropMethodHash())
+                api_hash == "System.Storage.PutEx".ToInteropMethodHash())
                 return ((CurrentContext.EvaluationStack.Peek(1).GetByteArray().Length + CurrentContext.EvaluationStack.Peek(2).GetByteArray().Length - 1) / 1024 + 1) * 1000;
             return 1;
         }
