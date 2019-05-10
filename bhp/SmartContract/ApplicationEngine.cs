@@ -82,11 +82,7 @@ namespace Bhp.SmartContract
                 if (contract_properties.HasFlag(ContractPropertyState.HasStorage))
                 {
                     fee += 400L;
-                }
-                if (contract_properties.HasFlag(ContractPropertyState.HasDynamicInvoke))
-                {
-                    fee += 500L;
-                }
+                }               
                 return fee * 100000000L / ratio;
             }
             if (api_hash == "System.Storage.Put".ToInteropMethodHash() ||
