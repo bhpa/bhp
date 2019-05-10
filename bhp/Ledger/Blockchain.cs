@@ -115,7 +115,8 @@ namespace Bhp.Ledger
                             VerificationScript = new[] { (byte)OpCode.PUSHT }
                         }
                     }
-                }
+                },
+                DeployNativeContracts()
             }
         };
 
@@ -198,6 +199,26 @@ namespace Bhp.Ledger
         {
             if (MemPool.ContainsKey(hash)) return true;
             return Store.ContainsTransaction(hash);
+        }
+
+        private static InvocationTransaction DeployNativeContracts()
+        {
+            byte[] script;
+            using (ScriptBuilder sb = new ScriptBuilder())
+            {
+                sb.EmitSysCall("Bhp.Native.Deploy");
+                script = sb.ToArray();
+            }
+            return new InvocationTransaction
+            {
+                Version = 1,
+                Script = script,
+                Gas = Fixed8.Zero,
+                Attributes = new TransactionAttribute[0],
+                Inputs = new CoinReference[0],
+                Outputs = new TransactionOutput[0],
+                Witnesses = new Witness[0]
+            };
         }
 
         public Block GetBlock(UInt256 hash)

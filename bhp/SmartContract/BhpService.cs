@@ -4,6 +4,7 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.SmartContract.Enumerators;
 using Bhp.SmartContract.Iterators;
+using Bhp.SmartContract.Native;
 using Bhp.VM;
 using Bhp.VM.Types;
 using System;
@@ -19,6 +20,9 @@ namespace Bhp.SmartContract
         public BhpService(TriggerType trigger, Snapshot snapshot)
             : base(trigger, snapshot)
         {
+            foreach (NativeContract contract in NativeContract.Contracts)
+                Register(contract.ServiceName, contract.Invoke);
+            Register("Bhp.Native.Deploy", Native_Deploy, 0);
             Register("Bhp.Runtime.GetTrigger", Runtime_GetTrigger, 1);
             Register("Bhp.Runtime.CheckWitness", Runtime_CheckWitness, 200);
             Register("Bhp.Runtime.Notify", Runtime_Notify, 1);
@@ -104,7 +108,22 @@ namespace Bhp.SmartContract
             Register("Bhp.Iterator.Next", Enumerator_Next, 1);
             Register("Bhp.Iterator.Value", Enumerator_Value, 1);
             #endregion
-             
+
+        }
+
+        private bool Native_Deploy(ApplicationEngine engine)
+        {
+            if (Trigger != TriggerType.Application) return false;
+            if (Snapshot.PersistingBlock.Index != 0) return false;
+            foreach (NativeContract contract in NativeContract.Contracts)
+            {
+                Snapshot.Contracts.Add(contract.ScriptHash, new ContractState
+                {
+                    Script = contract.Script,
+                    ContractProperties = contract.Properties
+                });
+            }
+            return true;
         }
 
         private bool Blockchain_GetAccount(ExecutionEngine engine)
@@ -602,15 +621,15 @@ namespace Bhp.SmartContract
         {
             if (Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
-            if (script.Length > 1024 * 1024) return false;           
-            ContractPropertyState contract_properties = (ContractPropertyState)(byte)engine.CurrentContext.EvaluationStack.Pop().GetBigInteger();            
+            if (script.Length > 1024 * 1024) return false;
+            ContractPropertyState contract_properties = (ContractPropertyState)(byte)engine.CurrentContext.EvaluationStack.Pop().GetBigInteger();
             UInt160 hash = script.ToScriptHash();
             ContractState contract = Snapshot.Contracts.TryGet(hash);
             if (contract == null)
             {
                 contract = new ContractState
                 {
-                    Script = script,                   
+                    Script = script,
                     ContractProperties = contract_properties
                 };
                 Snapshot.Contracts.Add(hash, contract);
@@ -624,16 +643,16 @@ namespace Bhp.SmartContract
         {
             if (Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
-            if (script.Length > 1024 * 1024) return false;           
+            if (script.Length > 1024 * 1024) return false;
             ContractPropertyState contract_properties = (ContractPropertyState)(byte)engine.CurrentContext.EvaluationStack.Pop().GetBigInteger();
-            if (engine.CurrentContext.EvaluationStack.Peek().GetByteArray().Length > 252) return false;            
+            if (engine.CurrentContext.EvaluationStack.Peek().GetByteArray().Length > 252) return false;
             UInt160 hash = script.ToScriptHash();
             ContractState contract = Snapshot.Contracts.TryGet(hash);
             if (contract == null)
             {
                 contract = new ContractState
                 {
-                    Script = script,                   
+                    Script = script,
                     ContractProperties = contract_properties
                 };
                 Snapshot.Contracts.Add(hash, contract);

@@ -21,8 +21,8 @@ namespace Bhp.SmartContract
         public static event EventHandler<NotifyEventArgs> Notify;
         public static event EventHandler<LogEventArgs> Log;
 
-        protected readonly TriggerType Trigger;
-        protected readonly Snapshot Snapshot;
+        public readonly TriggerType Trigger;
+        internal readonly Snapshot Snapshot;
         protected readonly List<IDisposable> Disposables = new List<IDisposable>();
         protected readonly Dictionary<UInt160, UInt160> ContractsCreated = new Dictionary<UInt160, UInt160>();
         private readonly List<NotifyEventArgs> notifications = new List<NotifyEventArgs>();
@@ -155,7 +155,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        protected bool CheckWitness(ExecutionEngine engine, UInt160 hash)
+        internal bool CheckWitness(ExecutionEngine engine, UInt160 hash)
         {
             IVerifiable container = (IVerifiable)engine.ScriptContainer;
             UInt160[] _hashes_for_verifying = container.GetScriptHashesForVerifying(Snapshot);
@@ -181,12 +181,16 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        protected bool Runtime_Notify(ExecutionEngine engine)
+        internal void SendNotification(ExecutionEngine engine, UInt160 script_hash, StackItem state)
         {
-            StackItem state = engine.CurrentContext.EvaluationStack.Pop();
-            NotifyEventArgs notification = new NotifyEventArgs(engine.ScriptContainer, new UInt160(engine.CurrentContext.ScriptHash), state);
+            NotifyEventArgs notification = new NotifyEventArgs(engine.ScriptContainer, script_hash, state);
             Notify?.Invoke(this, notification);
             notifications.Add(notification);
+        }
+
+        protected bool Runtime_Notify(ExecutionEngine engine)
+        {
+            SendNotification(engine, new UInt160(engine.CurrentContext.ScriptHash), engine.CurrentContext.EvaluationStack.Pop());
             return true;
         }
 
@@ -265,22 +269,18 @@ namespace Bhp.SmartContract
 
         protected bool Runtime_Serialize(ExecutionEngine engine)
         {
-            using (MemoryStream ms = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(ms))
+            byte[] serialized;
+            try
             {
-                try
-                {
-                    SerializeStackItem(engine.CurrentContext.EvaluationStack.Pop(), writer);
-                }
-                catch (NotSupportedException)
-                {
-                    return false;
-                }
-                writer.Flush();
-                if (ms.Length > engine.MaxItemSize)
-                    return false;
-                engine.CurrentContext.EvaluationStack.Push(ms.ToArray());
+                serialized = engine.CurrentContext.EvaluationStack.Pop().Serialize();
             }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+            if (serialized.Length > engine.MaxItemSize)
+                return false;
+            engine.CurrentContext.EvaluationStack.Push(serialized);
             return true;
         }
 
@@ -368,25 +368,20 @@ namespace Bhp.SmartContract
 
         protected bool Runtime_Deserialize(ExecutionEngine engine)
         {
-            byte[] data = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
-            using (MemoryStream ms = new MemoryStream(data, false))
-            using (BinaryReader reader = new BinaryReader(ms))
+            StackItem item;
+            try
             {
-                StackItem item;
-                try
-                {
-                    item = DeserializeStackItem(reader, engine);
-                }
-                catch (FormatException)
-                {
-                    return false;
-                }
-                catch (IOException)
-                {
-                    return false;
-                }
-                engine.CurrentContext.EvaluationStack.Push(item);
+                item = engine.CurrentContext.EvaluationStack.Pop().GetByteArray().DeserializeStackItem(engine.MaxArraySize);
             }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            engine.CurrentContext.EvaluationStack.Push(item);
             return true;
         }
 
@@ -657,7 +652,7 @@ namespace Bhp.SmartContract
         //    return true;
         //}
 
-        
+
         //by bhp
         private bool Contract_Call(ExecutionEngine engine)
         {
@@ -668,7 +663,7 @@ namespace Bhp.SmartContract
             else
                 contract = Snapshot.Contracts.TryGet(new UInt160(item0.GetByteArray()));
             if (contract is null) return false;
-            
+
             RandomAccessStack<StackItem> stacks = new RandomAccessStack<StackItem>();
             for (int i = 0; i < engine.CurrentContext.EvaluationStack.Count;)
             {
