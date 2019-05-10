@@ -1,5 +1,4 @@
-﻿#pragma warning disable CS0612
-using Bhp.Consensus;
+﻿using Bhp.Consensus;
 using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO;
@@ -17,8 +16,6 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 PrevHash;
         public uint BlockIndex;
         public ushort ValidatorIndex;
-        [Obsolete] //This field will be removed from future version and should not be used.
-        private uint Timestamp;        
         public byte[] Data;
         public Witness Witness;
 
@@ -91,7 +88,6 @@ namespace Bhp.Network.P2P.Payloads
             PrevHash = reader.ReadSerializable<UInt256>();
             BlockIndex = reader.ReadUInt32();
             ValidatorIndex = reader.ReadUInt16();
-            Timestamp = reader.ReadUInt32();
             Data = reader.ReadVarBytes();
         }
 
@@ -120,7 +116,6 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(PrevHash);
             writer.Write(BlockIndex);
             writer.Write(ValidatorIndex);
-            writer.Write(Timestamp);
             writer.WriteVarBytes(Data);
         }
 
@@ -132,4 +127,3 @@ namespace Bhp.Network.P2P.Payloads
         }
     }
 }
-#pragma warning restore CS0612
