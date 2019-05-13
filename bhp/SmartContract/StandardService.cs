@@ -99,11 +99,9 @@ namespace Bhp.SmartContract
             return price;
         }
 
-        bool IInteropService.Invoke(byte[] method, ExecutionEngine engine)
+        bool IInteropService.Invoke(uint method, ExecutionEngine engine)
         {
-            uint hash = method.Length == 4
-                ? BitConverter.ToUInt32(method, 0)
-                : Encoding.ASCII.GetString(method).ToInteropMethodHash();
+            uint hash = method;
             if (!methods.TryGetValue(hash, out Func<ApplicationEngine, bool> func)) return false;
             return func((ApplicationEngine)engine);
         }
