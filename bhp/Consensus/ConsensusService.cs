@@ -633,7 +633,7 @@ namespace Bhp.Consensus
 
         //private bool VerifyRequest()
         //{
-        //    if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators(context.Transactions.Values).ToArray()).Equals(context.NextConsensus))
+        //    if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators().ToArray()).Equals(context.NextConsensus))
         //        return false;
         //    Transaction minerTx = context.Transactions.Values.FirstOrDefault(p => p.Type == TransactionType.MinerTransaction);
         //    Fixed8 amountNetFee = Block.CalculateNetFee(context.Transactions.Values);
@@ -644,7 +644,7 @@ namespace Bhp.Consensus
         //By BHP
         public bool VerifyRequest()
         {
-            if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators(context.Transactions.Values).ToArray()).Equals(context.NextConsensus))
+            if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators().ToArray()).Equals(context.NextConsensus))
                 return false;
 
             Transaction tx_gen = context.Transactions.Values.FirstOrDefault(p => p.Type == TransactionType.MinerTransaction);

@@ -90,8 +90,6 @@ namespace Bhp.Network.RPC
         {
             switch (method)
             {
-                case "getaccountstate":
-                    return GetAccountState(_params);
                 case "getassetstate":
                     return GetAssetState(_params);
                 case "getbestblockhash":
@@ -142,13 +140,6 @@ namespace Bhp.Network.RPC
                 default:
                     return rpcExtension.Process(method, _params);
             }
-        }
-
-        private JObject GetAccountState(JArray _params)
-        {
-            UInt160 script_hash = _params[0].AsString().ToScriptHash();
-            AccountState account = Blockchain.Singleton.Store.GetAccounts().TryGet(script_hash) ?? new AccountState(script_hash);
-            return account?.ToJson();
         }
 
         private JObject GetAssetState(JArray _params)
@@ -335,7 +326,7 @@ namespace Bhp.Network.RPC
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 var validators = snapshot.GetValidators();
-                return snapshot.GetEnrollments().Select(p =>
+                return snapshot.GetRegisteredValidators().Select(p =>
                 {
                     JObject validator = new JObject();
                     validator["publickey"] = p.PublicKey.ToString();

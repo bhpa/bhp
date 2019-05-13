@@ -1,5 +1,4 @@
-﻿using Bhp.Cryptography.ECC;
-using Bhp.Ledger;
+﻿using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,12 +33,6 @@ namespace Bhp.Persistence
             if (state == null) return null;
             if (!state.TrimmedBlock.IsBlock) return null;
             return state.TrimmedBlock.GetBlock(persistence.Transactions);
-        }
-
-        public static IEnumerable<ValidatorState> GetEnrollments(this IPersistence persistence)
-        {
-            HashSet<ECPoint> sv = new HashSet<ECPoint>(Blockchain.StandbyValidators);
-            return persistence.Validators.Find().Select(p => p.Value).Where(p => p.Registered || sv.Contains(p.PublicKey));
         }
 
         public static Header GetHeader(this IPersistence persistence, uint index)

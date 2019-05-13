@@ -35,7 +35,6 @@ namespace Bhp.SmartContract
             Register("Bhp.Blockchain.GetBlock", Blockchain_GetBlock, 200);
             Register("Bhp.Blockchain.GetTransaction", Blockchain_GetTransaction, 100);
             Register("Bhp.Blockchain.GetTransactionHeight", Blockchain_GetTransactionHeight, 100);
-            Register("Bhp.Blockchain.GetAccount", Blockchain_GetAccount, 100);
             Register("Bhp.Blockchain.GetValidators", Blockchain_GetValidators, 200);
             Register("Bhp.Blockchain.GetAsset", Blockchain_GetAsset, 100);
             Register("Bhp.Blockchain.GetContract", Blockchain_GetContract, 100);
@@ -67,9 +66,6 @@ namespace Bhp.SmartContract
             Register("Bhp.Output.GetAssetId", Output_GetAssetId, 1);
             Register("Bhp.Output.GetValue", Output_GetValue, 1);
             Register("Bhp.Output.GetScriptHash", Output_GetScriptHash, 1);
-            Register("Bhp.Account.GetScriptHash", Account_GetScriptHash, 1);
-            Register("Bhp.Account.GetVotes", Account_GetVotes, 1);
-            Register("Bhp.Account.GetBalance", Account_GetBalance, 1);
             Register("Bhp.Account.IsStandard", Account_IsStandard, 100);
             Register("Bhp.Asset.Create", Asset_Create);
             Register("Bhp.Asset.Renew", Asset_Renew);
@@ -123,14 +119,6 @@ namespace Bhp.SmartContract
                     ContractProperties = contract.Properties
                 });
             }
-            return true;
-        }
-
-        private bool Blockchain_GetAccount(ExecutionEngine engine)
-        {
-            UInt160 hash = new UInt160(engine.CurrentContext.EvaluationStack.Pop().GetByteArray());
-            AccountState account = Snapshot.Accounts.GetOrAdd(hash, () => new AccountState(hash));
-            engine.CurrentContext.EvaluationStack.Push(StackItem.FromInterface(account));
             return true;
         }
 
@@ -399,44 +387,6 @@ namespace Bhp.SmartContract
                 TransactionOutput output = _interface.GetInterface<TransactionOutput>();
                 if (output == null) return false;
                 engine.CurrentContext.EvaluationStack.Push(output.ScriptHash.ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private bool Account_GetScriptHash(ExecutionEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                AccountState account = _interface.GetInterface<AccountState>();
-                if (account == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(account.ScriptHash.ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private bool Account_GetVotes(ExecutionEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                AccountState account = _interface.GetInterface<AccountState>();
-                if (account == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(account.Votes.Select(p => (StackItem)p.EncodePoint(true)).ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private bool Account_GetBalance(ExecutionEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                AccountState account = _interface.GetInterface<AccountState>();
-                UInt256 asset_id = new UInt256(engine.CurrentContext.EvaluationStack.Pop().GetByteArray());
-                if (account == null) return false;
-                Fixed8 balance = account.Balances.TryGetValue(asset_id, out Fixed8 value) ? value : Fixed8.Zero;
-                engine.CurrentContext.EvaluationStack.Push(balance.GetData());
                 return true;
             }
             return false;
