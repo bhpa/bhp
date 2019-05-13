@@ -96,11 +96,7 @@ namespace Bhp.BhpExtensions.Transactions
                     if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
                         return "ClaimTransaction is invalid.";
                     break;
-                */
-                case TransactionType.IssueTransaction:
-                    if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
-                        return "IssueTransaction is invalid.";
-                    break;
+                */               
                 default:
                     if (results_issue.Length > 0)
                         return "Transaction input is not equal to output.";

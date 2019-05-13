@@ -315,21 +315,15 @@ namespace Bhp.Network.P2P.Payloads
             if (SystemFee > Fixed8.Zero && (results_destroy.Length == 0 || results_destroy[0].Amount < SystemFee))
                 return false;
             TransactionResult[] results_issue = results.Where(p => p.Amount < Fixed8.Zero).ToArray();
-            switch (Type)
+            if (Type == TransactionType.MinerTransaction)
+            {                
+                if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
+                    return false;
+            }
+            else
             {
-                case TransactionType.MinerTransaction:
-                case TransactionType.ClaimTransaction:
-                    if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
-                        return false;
-                    break;
-                case TransactionType.IssueTransaction:
-                    if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
-                        return false;
-                    break;
-                default:
-                    if (results_issue.Length > 0)
-                        return false;
-                    break;
+                if (results_issue.Length > 0)
+                    return false;
             }
             if (Attributes.Count(p => p.Usage == TransactionAttributeUsage.ECDH02 || p.Usage == TransactionAttributeUsage.ECDH03) > 1)
                 return false;
@@ -373,11 +367,7 @@ namespace Bhp.Network.P2P.Payloads
                 case TransactionType.MinerTransaction:
                     if (VerifyMiningTransaction.Verify(Outputs, Attributes) == false)
                         return false;
-                    break;
-                case TransactionType.IssueTransaction:
-                    if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
-                        return false;
-                    break;
+                    break;              
                 default:
                     if (results_issue.Length > 0)
                         return false;
