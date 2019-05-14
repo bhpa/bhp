@@ -82,7 +82,6 @@ namespace Bhp.SmartContract
             Register("Bhp.Contract.Destroy", Contract_Destroy, 1);
             Register("Bhp.Contract.GetScript", Contract_GetScript, 1);
             Register("Bhp.Contract.IsPayable", Contract_IsPayable, 1);
-            Register("Bhp.Contract.GetStorageContext", Contract_GetStorageContext, 1);
             Register("Bhp.Storage.GetContext", Storage_GetContext, 1);
             Register("Bhp.Storage.GetReadOnlyContext", Storage_GetReadOnlyContext, 1);
             Register("Bhp.Storage.Get", Storage_Get, 100);
@@ -122,14 +121,14 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Blockchain_GetValidators(ExecutionEngine engine)
+        private bool Blockchain_GetValidators(ApplicationEngine engine)
         {
             ECPoint[] validators = Snapshot.GetValidators();
             engine.CurrentContext.EvaluationStack.Push(validators.Select(p => (StackItem)p.EncodePoint(true)).ToArray());
             return true;
         }
 
-        private bool Blockchain_GetAsset(ExecutionEngine engine)
+        private bool Blockchain_GetAsset(ApplicationEngine engine)
         {
             UInt256 hash = new UInt256(engine.CurrentContext.EvaluationStack.Pop().GetByteArray());
             AssetState asset = Snapshot.Assets.TryGet(hash);
@@ -138,7 +137,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Header_GetVersion(ExecutionEngine engine)
+        private bool Header_GetVersion(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -150,7 +149,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Header_GetMerkleRoot(ExecutionEngine engine)
+        private bool Header_GetMerkleRoot(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -162,7 +161,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Header_GetConsensusData(ExecutionEngine engine)
+        private bool Header_GetConsensusData(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -174,7 +173,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Header_GetNextConsensus(ExecutionEngine engine)
+        private bool Header_GetNextConsensus(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -186,7 +185,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetType(ExecutionEngine engine)
+        private bool Transaction_GetType(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -198,7 +197,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetAttributes(ExecutionEngine engine)
+        private bool Transaction_GetAttributes(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -212,7 +211,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetInputs(ExecutionEngine engine)
+        private bool Transaction_GetInputs(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -226,7 +225,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetOutputs(ExecutionEngine engine)
+        private bool Transaction_GetOutputs(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -240,7 +239,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetReferences(ExecutionEngine engine)
+        private bool Transaction_GetReferences(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -254,7 +253,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetUnspentCoins(ExecutionEngine engine)
+        private bool Transaction_GetUnspentCoins(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -269,7 +268,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Transaction_GetWitnesses(ExecutionEngine engine)
+        private bool Transaction_GetWitnesses(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -283,7 +282,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool InvocationTransaction_GetScript(ExecutionEngine engine)
+        private bool InvocationTransaction_GetScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -295,7 +294,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Witness_GetVerificationScript(ExecutionEngine engine)
+        private bool Witness_GetVerificationScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -308,7 +307,7 @@ namespace Bhp.SmartContract
         }
 
 
-        private bool Attribute_GetUsage(ExecutionEngine engine)
+        private bool Attribute_GetUsage(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -320,7 +319,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Attribute_GetData(ExecutionEngine engine)
+        private bool Attribute_GetData(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -332,7 +331,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Input_GetHash(ExecutionEngine engine)
+        private bool Input_GetHash(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -344,7 +343,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Input_GetIndex(ExecutionEngine engine)
+        private bool Input_GetIndex(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -356,7 +355,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Output_GetAssetId(ExecutionEngine engine)
+        private bool Output_GetAssetId(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -368,7 +367,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Output_GetValue(ExecutionEngine engine)
+        private bool Output_GetValue(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -380,7 +379,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Output_GetScriptHash(ExecutionEngine engine)
+        private bool Output_GetScriptHash(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -392,7 +391,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Account_IsStandard(ExecutionEngine engine)
+        private bool Account_IsStandard(ApplicationEngine engine)
         {
             UInt160 hash = new UInt160(engine.CurrentContext.EvaluationStack.Pop().GetByteArray());
             ContractState contract = Snapshot.Contracts.TryGet(hash);
@@ -401,7 +400,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Asset_Create(ExecutionEngine engine)
+        private bool Asset_Create(ApplicationEngine engine)
         {
             if (Trigger != TriggerType.Application) return false;
             InvocationTransaction tx = (InvocationTransaction)engine.ScriptContainer;
@@ -446,7 +445,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Asset_Renew(ExecutionEngine engine)
+        private bool Asset_Renew(ApplicationEngine engine)
         {
             if (Trigger != TriggerType.Application) return false;
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
@@ -471,7 +470,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetAssetId(ExecutionEngine engine)
+        private bool Asset_GetAssetId(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -483,7 +482,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetAssetType(ExecutionEngine engine)
+        private bool Asset_GetAssetType(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -495,7 +494,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetAmount(ExecutionEngine engine)
+        private bool Asset_GetAmount(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -507,7 +506,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetAvailable(ExecutionEngine engine)
+        private bool Asset_GetAvailable(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -519,7 +518,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetPrecision(ExecutionEngine engine)
+        private bool Asset_GetPrecision(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -531,7 +530,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetOwner(ExecutionEngine engine)
+        private bool Asset_GetOwner(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -543,7 +542,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetAdmin(ExecutionEngine engine)
+        private bool Asset_GetAdmin(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -555,7 +554,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Asset_GetIssuer(ExecutionEngine engine)
+        private bool Asset_GetIssuer(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -567,7 +566,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Contract_Create(ExecutionEngine engine)
+        private bool Contract_Create(ApplicationEngine engine)
         {
             if (Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
@@ -583,13 +582,12 @@ namespace Bhp.SmartContract
                     ContractProperties = contract_properties
                 };
                 Snapshot.Contracts.Add(hash, contract);
-                ContractsCreated.Add(hash, new UInt160(engine.CurrentContext.ScriptHash));
             }
             engine.CurrentContext.EvaluationStack.Push(StackItem.FromInterface(contract));
             return true;
         }
 
-        private bool Contract_Migrate(ExecutionEngine engine)
+        private bool Contract_Migrate(ApplicationEngine engine)
         {
             if (Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
@@ -606,7 +604,6 @@ namespace Bhp.SmartContract
                     ContractProperties = contract_properties
                 };
                 Snapshot.Contracts.Add(hash, contract);
-                ContractsCreated.Add(hash, new UInt160(engine.CurrentContext.ScriptHash));
                 if (contract.HasStorage)
                 {
                     foreach (var pair in Snapshot.Storages.Find(engine.CurrentContext.ScriptHash).ToArray())
@@ -627,7 +624,7 @@ namespace Bhp.SmartContract
             return Contract_Destroy(engine);
         }
 
-        private bool Contract_GetScript(ExecutionEngine engine)
+        private bool Contract_GetScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -639,7 +636,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Contract_IsPayable(ExecutionEngine engine)
+        private bool Contract_IsPayable(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -651,7 +648,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Storage_Find(ExecutionEngine engine)
+        private bool Storage_Find(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -682,7 +679,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Enumerator_Create(ExecutionEngine engine)
+        private bool Enumerator_Create(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is VMArray array)
             {
@@ -693,7 +690,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Enumerator_Next(ExecutionEngine engine)
+        private bool Enumerator_Next(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -704,7 +701,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Enumerator_Value(ExecutionEngine engine)
+        private bool Enumerator_Value(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -715,7 +712,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Enumerator_Concat(ExecutionEngine engine)
+        private bool Enumerator_Concat(ApplicationEngine engine)
         {
             if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface1)) return false;
             if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface2)) return false;
@@ -726,7 +723,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Iterator_Create(ExecutionEngine engine)
+        private bool Iterator_Create(ApplicationEngine engine)
         {
             IIterator iterator;
             switch (engine.CurrentContext.EvaluationStack.Pop())
@@ -744,7 +741,7 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private bool Iterator_Key(ExecutionEngine engine)
+        private bool Iterator_Key(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -755,7 +752,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Iterator_Keys(ExecutionEngine engine)
+        private bool Iterator_Keys(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -766,7 +763,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Iterator_Values(ExecutionEngine engine)
+        private bool Iterator_Values(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
@@ -777,7 +774,7 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private bool Iterator_Concat(ExecutionEngine engine)
+        private bool Iterator_Concat(ApplicationEngine engine)
         {
             if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface1)) return false;
             if (!(engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface2)) return false;
