@@ -1,6 +1,8 @@
-﻿using Bhp.Cryptography.ECC;
+﻿using Bhp.Cryptography;
+using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Ledger;
+using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.VM;
@@ -47,6 +49,7 @@ namespace Bhp.SmartContract
             Register("System.Runtime.GetTime", Runtime_GetTime, 1);
             Register("System.Runtime.Serialize", Runtime_Serialize, 1);
             Register("System.Runtime.Deserialize", Runtime_Deserialize, 1);
+            Register("System.Crypto.Verify", Crypto_Verify, 100);
             Register("System.Blockchain.GetHeight", Blockchain_GetHeight, 1);
             Register("System.Blockchain.GetHeader", Blockchain_GetHeader, 100);
             Register("System.Blockchain.GetBlock", Blockchain_GetBlock, 200);
@@ -380,6 +383,23 @@ namespace Bhp.SmartContract
                 return false;
             }
             engine.CurrentContext.EvaluationStack.Push(item);
+            return true;
+        }
+
+        private bool Crypto_Verify(ApplicationEngine engine)
+        {
+            StackItem item0 = engine.CurrentContext.EvaluationStack.Pop();
+            byte[] message;
+            if (item0 is InteropInterface _interface)
+                message = _interface.GetInterface<IVerifiable>().GetHashData();
+            else
+                message = item0.GetByteArray();
+            byte[] pubkey = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
+            if (pubkey[0] != 2 && pubkey[0] != 3 && pubkey[0] != 4)
+                return false;
+            byte[] signature = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
+            bool result = Crypto.Default.VerifySignature(message, signature, pubkey);
+            engine.CurrentContext.EvaluationStack.Push(result);
             return true;
         }
 
