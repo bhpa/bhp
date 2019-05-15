@@ -4,7 +4,6 @@ using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.VM;
 using System;
 using System.IO;
 
@@ -90,12 +89,7 @@ namespace Bhp.Network.P2P.Payloads
             ValidatorIndex = reader.ReadUInt16();
             Data = reader.ReadVarBytes();
         }
-
-        byte[] IScriptContainer.GetMessage()
-        {
-            return this.GetHashData();
-        }
-
+        
         UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
         {
             ECPoint[] validators = snapshot.NextValidators.Get().Validators;

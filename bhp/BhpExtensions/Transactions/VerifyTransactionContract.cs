@@ -151,7 +151,7 @@ namespace Bhp.BhpExtensions.Transactions
 
                         if (!changeNum.Contains(item.PrevIndex))
                         {
-                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
+                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, 0))
                             {
                                 engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
                                 engine.Execute();
@@ -183,7 +183,7 @@ namespace Bhp.BhpExtensions.Transactions
 
                             if (!changeNum.Contains(item.Reference.PrevIndex))
                             {
-                                using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
+                                using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, 0))
                                 {
                                     engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
                                     engine.Execute();                                    

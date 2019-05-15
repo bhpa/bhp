@@ -1,11 +1,10 @@
 ﻿using Bhp.IO;
 using Bhp.Persistence;
-using Bhp.VM;
 using System.IO;
 
 namespace Bhp.Network.P2P.Payloads
 {
-    public interface IVerifiable : ISerializable, IScriptContainer
+    public interface IVerifiable : ISerializable
     {
         Witness[] Witnesses { get; }
 

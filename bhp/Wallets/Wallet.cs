@@ -116,7 +116,7 @@ namespace Bhp.Wallets
                     sb.EmitAppCall(asset_id_160, "decimals");
                     script = sb.ToArray();
                 }
-                ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: Fixed8.FromDecimal(0.2m) * accounts.Length);
+                ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: (Fixed8.FromDecimal(0.2m) * accounts.Length).value);
                 if (engine.State.HasFlag(VMState.FAULT))
                     return new BigDecimal(0, 0);
                 byte decimals = (byte)engine.ResultStack.Pop().GetBigInteger();
@@ -371,7 +371,7 @@ namespace Bhp.Wallets
                 {
                     Version = itx.Version,
                     Script = itx.Script,
-                    Gas = InvocationTransaction.GetGas(engine.GasConsumed),
+                    Gas = InvocationTransaction.GetGas(Fixed8.Parse(engine.GasConsumed.ToString())),
                     Attributes = itx.Attributes,
                     Inputs = itx.Inputs,
                     Outputs = itx.Outputs

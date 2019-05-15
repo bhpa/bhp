@@ -1,4 +1,4 @@
-﻿using System;
+﻿ using System;
 using System.Globalization;
 using System.Linq;
 
@@ -54,6 +54,7 @@ namespace Bhp
         /// </summary>
         public unsafe bool Equals(UInt160 other)
         {
+            if (other is null) return false;
             fixed (byte* px = ToArray(), py = other.ToArray())
             {
                 uint* lpx = (uint*)px;

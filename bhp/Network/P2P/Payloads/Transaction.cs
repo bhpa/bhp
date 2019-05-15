@@ -7,7 +7,6 @@ using Bhp.IO.Json;
 using Bhp.Ledger;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.VM;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -197,12 +196,7 @@ namespace Bhp.Network.P2P.Payloads
         {
             return Hash.GetHashCode();
         }
-
-        byte[] IScriptContainer.GetMessage()
-        {
-            return this.GetHashData();
-        }
-
+        
         public virtual UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
         {
             if (References == null) throw new InvalidOperationException();

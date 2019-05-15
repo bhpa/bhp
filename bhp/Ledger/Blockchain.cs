@@ -184,7 +184,7 @@ namespace Bhp.Ledger
             byte[] script;
             using (ScriptBuilder sb = new ScriptBuilder())
             {
-                sb.EmitSysCall("Bhp.Native.Deploy");
+                sb.EmitSysCall(InteropService.Bhp_Native_Deploy);
                 script = sb.ToArray();
             }
             return new InvocationTransaction
@@ -503,22 +503,22 @@ namespace Bhp.Ledger
                             break;
 #pragma warning restore CS0612                       
                         case InvocationTransaction tx_invocation:
-                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx_invocation, snapshot.Clone(), tx_invocation.Gas))
+                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx_invocation, snapshot.Clone(), tx_invocation.Gas.value))
                             {
                                 engine.LoadScript(tx_invocation.Script);
                                 engine.Execute();
                                 if (!engine.State.HasFlag(VMState.FAULT))
                                 {
-                                    engine.Service.Commit();
+                                    engine.Snapshot.Commit();
                                 }
                                 execution_results.Add(new ApplicationExecutionResult
                                 {
                                     Trigger = TriggerType.Application,
                                     ScriptHash = tx_invocation.Script.ToScriptHash(),
                                     VMState = engine.State,
-                                    GasConsumed = engine.GasConsumed,
+                                    GasConsumed = Fixed8.Parse(engine.GasConsumed.ToString()),
                                     Stack = engine.ResultStack.ToArray(),
-                                    Notifications = engine.Service.Notifications.ToArray()
+                                    Notifications = engine.Notifications.ToArray()
                                 });
                             }
                             break;

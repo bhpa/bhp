@@ -361,7 +361,7 @@ namespace Bhp.Network.RPC
 
         private JObject GetInvokeResult(byte[] script)
         {
-            ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: maxGasInvoke);
+            ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: maxGasInvoke.value);
             JObject json = new JObject();
             json["script"] = script.ToHexString();
             json["state"] = engine.State;

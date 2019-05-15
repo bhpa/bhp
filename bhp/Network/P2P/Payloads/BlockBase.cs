@@ -3,7 +3,6 @@ using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.VM;
 using Bhp.Wallets;
 using System;
 using System.IO;
@@ -60,11 +59,6 @@ namespace Bhp.Network.P2P.Payloads
             Index = reader.ReadUInt32();
             ConsensusData = reader.ReadUInt64();
             NextConsensus = reader.ReadSerializable<UInt160>();
-        }
-
-        byte[] IScriptContainer.GetMessage()
-        {
-            return this.GetHashData();
         }
 
         UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)

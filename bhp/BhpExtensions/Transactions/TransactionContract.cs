@@ -1,6 +1,7 @@
 ﻿using Bhp.BhpExtensions.Fees;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
+using Bhp.SmartContract;
 using Bhp.VM;
 using Bhp.Wallets;
 using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace Bhp.BhpExtensions.Transactions
             {
                 sb.EmitPush(timestamp);
                 sb.EmitPush(UInt160.Parse("0xe69a2241c0629210c44e37fb03eb786d88a0af21"));// utxo time lock hash
-                sb.EmitSysCall("System.Contract.Call");
+                sb.EmitSysCall(InteropService.System_Contract_Call);
                 return new TransactionAttribute
                 {
                     Usage = TransactionAttributeUsage.SmartContractScript,
