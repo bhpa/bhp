@@ -81,6 +81,11 @@ namespace Bhp.Ledger
                 InvocationScript = new byte[0],
                 VerificationScript = new[] { (byte)OpCode.PUSHT }
             },
+            ConsensusData = new ConsensusData
+            {
+                PrimaryIndex = 0,
+                Nonce = 2083236893
+            },
             Transactions = new Transaction[]
             {
                 new MinerTransaction

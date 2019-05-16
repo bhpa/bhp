@@ -149,6 +149,7 @@ namespace Bhp.SmartContract
                     InvocationScript = new byte[0],
                     VerificationScript = new byte[0]
                 },
+                ConsensusData = new ConsensusData(),
                 Transactions = new Transaction[0]
             };
             ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, container, snapshot, extraGAS, testMode);

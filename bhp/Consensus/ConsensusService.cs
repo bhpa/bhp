@@ -389,7 +389,7 @@ namespace Bhp.Consensus
         private void OnPrepareRequestReceived(ConsensusPayload payload, PrepareRequest message)
         {
             if (context.RequestSentOrReceived || context.NotAcceptingPayloadsDueToViewChanging) return;
-            if (payload.ValidatorIndex != context.PrimaryIndex || message.ViewNumber != context.ViewNumber) return;
+            if (payload.ValidatorIndex != context.Block.ConsensusData.PrimaryIndex || message.ViewNumber != context.ViewNumber) return;
             Log($"{nameof(OnPrepareRequestReceived)}: height={payload.BlockIndex} view={message.ViewNumber} index={payload.ValidatorIndex} tx={message.TransactionHashes.Length}");
             if (message.Timestamp <= context.PrevHeader.Timestamp || message.Timestamp > TimeProvider.Current.UtcNow.AddMinutes(10).ToTimestamp())
             {
@@ -406,7 +406,8 @@ namespace Bhp.Consensus
             // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
             ExtendTimerByFactor(2);
 
-            context.Block.Timestamp = message.Timestamp;            
+            context.Block.Timestamp = message.Timestamp;
+            context.Block.ConsensusData.Nonce = message.Nonce;
             context.TransactionHashes = message.TransactionHashes;
             context.Transactions = new Dictionary<UInt256, Transaction>();
             for (int i = 0; i < context.PreparationPayloads.Length; i++)
@@ -452,7 +453,7 @@ namespace Bhp.Consensus
         {
             if (message.ViewNumber != context.ViewNumber) return;
             if (context.PreparationPayloads[payload.ValidatorIndex] != null || context.NotAcceptingPayloadsDueToViewChanging) return;
-            if (context.PreparationPayloads[context.PrimaryIndex] != null && !message.PreparationHash.Equals(context.PreparationPayloads[context.PrimaryIndex].Hash))
+            if (context.PreparationPayloads[context.Block.ConsensusData.PrimaryIndex] != null && !message.PreparationHash.Equals(context.PreparationPayloads[context.Block.ConsensusData.PrimaryIndex].Hash))
                 return;
 
             // Timeout extension: prepare response has been received with success

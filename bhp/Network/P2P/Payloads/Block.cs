@@ -13,6 +13,7 @@ namespace Bhp.Network.P2P.Payloads
     {
         public const int MaxTransactionsPerBlock = ushort.MaxValue;
 
+        public ConsensusData ConsensusData;
         public Transaction[] Transactions;
 
         private Header _header = null;
@@ -38,7 +39,7 @@ namespace Bhp.Network.P2P.Payloads
 
         InventoryType IInventory.InventoryType => InventoryType.Block;
 
-        public override int Size => base.Size + Transactions.GetVarSize();
+        public override int Size => base.Size + ConsensusData.Size + Transactions.GetVarSize();
 
         public static Fixed8 CalculateNetFee(IEnumerable<Transaction> transactions)
         {
@@ -52,6 +53,7 @@ namespace Bhp.Network.P2P.Payloads
         public override void Deserialize(BinaryReader reader)
         {
             base.Deserialize(reader);
+            ConsensusData = reader.ReadSerializable<ConsensusData>();
             Transactions = new Transaction[reader.ReadVarInt(MaxTransactionsPerBlock)];
             if (Transactions.Length == 0) throw new FormatException();
             HashSet<UInt256> hashes = new HashSet<UInt256>();
@@ -94,18 +96,25 @@ namespace Bhp.Network.P2P.Payloads
 
         public void RebuildMerkleRoot()
         {
-            MerkleRoot = MerkleTree.ComputeRoot(Transactions.Select(p => p.Hash).ToArray());
+            List<UInt256> hashes = new List<UInt256>(Transactions.Length + 1)
+            {
+                ConsensusData.Hash
+            };
+            hashes.AddRange(Transactions.Select(p => p.Hash));
+            MerkleRoot = MerkleTree.ComputeRoot(hashes);
         }
 
         public override void Serialize(BinaryWriter writer)
         {
             base.Serialize(writer);
+            writer.Write(ConsensusData);
             writer.Write(Transactions);
         }
 
         public override JObject ToJson()
         {
             JObject json = base.ToJson();
+            json["consensus_data"] = ConsensusData.ToJson();
             json["tx"] = Transactions.Select(p => p.ToJson()).ToArray();
             return json;
         }
@@ -121,6 +130,7 @@ namespace Bhp.Network.P2P.Payloads
                 Index = Index,
                 NextConsensus = NextConsensus,
                 Witness = Witness,
+                ConsensusData = ConsensusData,
                 Hashes = Transactions.Select(p => p.Hash).ToArray()
             };
         }
