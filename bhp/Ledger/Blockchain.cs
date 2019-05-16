@@ -75,7 +75,6 @@ namespace Bhp.Ledger
             PrevHash = UInt256.Zero,
             Timestamp = (new DateTime(2018, 8, 8, 8, 8, 8, DateTimeKind.Utc)).ToTimestamp(),
             Index = 0,
-            ConsensusData = 2083236893, //向比特币致敬
             NextConsensus = GetConsensusAddress(StandbyValidators),
             Witness = new Witness
             {

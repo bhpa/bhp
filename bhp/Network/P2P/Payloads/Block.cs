@@ -28,7 +28,6 @@ namespace Bhp.Network.P2P.Payloads
                         MerkleRoot = MerkleRoot,
                         Timestamp = Timestamp,
                         Index = Index,
-                        ConsensusData = ConsensusData,
                         NextConsensus = NextConsensus,
                         Witness = Witness
                     };
@@ -120,7 +119,6 @@ namespace Bhp.Network.P2P.Payloads
                 MerkleRoot = MerkleRoot,
                 Timestamp = Timestamp,
                 Index = Index,
-                ConsensusData = ConsensusData,
                 NextConsensus = NextConsensus,
                 Witness = Witness,
                 Hashes = Transactions.Select(p => p.Hash).ToArray()

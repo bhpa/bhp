@@ -16,7 +16,6 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 MerkleRoot;
         public uint Timestamp;
         public uint Index;
-        public ulong ConsensusData;
         public UInt160 NextConsensus;
         public Witness Witness;
 
@@ -41,7 +40,7 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + sizeof(ulong) + NextConsensus.Size + 1 + Witness.Size;
+        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + NextConsensus.Size + 1 + Witness.Size;
 
         public virtual void Deserialize(BinaryReader reader)
         {
@@ -56,8 +55,7 @@ namespace Bhp.Network.P2P.Payloads
             PrevHash = reader.ReadSerializable<UInt256>();
             MerkleRoot = reader.ReadSerializable<UInt256>();
             Timestamp = reader.ReadUInt32();
-            Index = reader.ReadUInt32();
-            ConsensusData = reader.ReadUInt64();
+            Index = reader.ReadUInt32();           
             NextConsensus = reader.ReadSerializable<UInt160>();
         }
 
@@ -82,8 +80,7 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(PrevHash);
             writer.Write(MerkleRoot);
             writer.Write(Timestamp);
-            writer.Write(Index);
-            writer.Write(ConsensusData);
+            writer.Write(Index);            
             writer.Write(NextConsensus);
         }
 
@@ -96,8 +93,7 @@ namespace Bhp.Network.P2P.Payloads
             json["previousblockhash"] = PrevHash.ToString();
             json["merkleroot"] = MerkleRoot.ToString();
             json["time"] = Timestamp;
-            json["index"] = Index;
-            json["nonce"] = ConsensusData.ToString("x16");
+            json["index"] = Index;            
             json["nextconsensus"] = NextConsensus.ToAddress();
             json["script"] = Witness.ToJson();
             return json;

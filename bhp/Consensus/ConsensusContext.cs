@@ -13,10 +13,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Bhp.Consensus
 {
-    internal class ConsensusContext : IConsensusContext
+    internal class ConsensusContext : IDisposable, ISerializable
     {
         /// <summary>
         /// Prefix for saving consensus state.
@@ -24,29 +25,53 @@ namespace Bhp.Consensus
         public const byte CN_Context = 0xf4;
 
         public const uint Version = 0;
-        public uint BlockIndex { get; set; }
-        public UInt256 PrevHash { get; set; }
-        public byte ViewNumber { get; set; }
-        public ECPoint[] Validators { get; set; }
-        public int MyIndex { get; set; }
-        public uint PrimaryIndex { get; set; }
-        public uint Timestamp { get; set; }
-        public ulong Nonce { get; set; }
-        public UInt160 NextConsensus { get; set; }
-        public UInt256[] TransactionHashes { get; set; }
-        public Dictionary<UInt256, Transaction> Transactions { get; set; }
-        public ConsensusPayload[] PreparationPayloads { get; set; }
-        public ConsensusPayload[] CommitPayloads { get; set; }
-        public ConsensusPayload[] ChangeViewPayloads { get; set; }
-        public ConsensusPayload[] LastChangeViewPayloads { get; set; }
+        public uint BlockIndex;
+        public UInt256 PrevHash;
+        public byte ViewNumber;
+        public ECPoint[] Validators;
+        public int MyIndex;
+        public uint PrimaryIndex;
+        public uint Timestamp;
+        public UInt160 NextConsensus;
+        public UInt256[] TransactionHashes;
+        public Dictionary<UInt256, Transaction> Transactions;
+        public ConsensusPayload[] PreparationPayloads;
+        public ConsensusPayload[] CommitPayloads;
+        public ConsensusPayload[] ChangeViewPayloads;
+        public ConsensusPayload[] LastChangeViewPayloads;
         // LastSeenMessage array stores the height of the last seen message, for each validator.
         // if this node never heard from validator i, LastSeenMessage[i] will be -1.
-        public int[] LastSeenMessage { get; set; }
-        public Block Block { get; set; }
+        public int[] LastSeenMessage;
+
+        public Block Block { get; private set; }
         public Snapshot Snapshot { get; private set; }
         private KeyPair keyPair;
         private readonly Wallet wallet;
         private readonly Store store;
+
+        public int F => (Validators.Length - 1) / 3;
+        public int M => Validators.Length - F;
+        public bool IsPrimary => MyIndex == PrimaryIndex;
+        public bool IsBackup => MyIndex >= 0 && MyIndex != PrimaryIndex;
+        public bool WatchOnly => MyIndex < 0;
+        public Header PrevHeader => Snapshot.GetHeader(PrevHash);
+        public int CountCommitted => CommitPayloads.Count(p => p != null);
+        public int CountFailed => LastSeenMessage.Count(p => p < (((int)BlockIndex) - 1));
+
+        #region Consensus States
+        public bool RequestSentOrReceived => PreparationPayloads[PrimaryIndex] != null;
+        public bool ResponseSent => !WatchOnly && PreparationPayloads[MyIndex] != null;
+        public bool CommitSent => !WatchOnly && CommitPayloads[MyIndex] != null;
+        public bool BlockSent => Block != null;
+        public bool ViewChanging => !WatchOnly && ChangeViewPayloads[MyIndex]?.GetDeserializedMessage<ChangeView>().NewViewNumber > ViewNumber;
+        public bool NotAcceptingPayloadsDueToViewChanging => ViewChanging && !MoreThanFNodesCommittedOrLost;
+        // A possible attack can happen if the last node to commit is malicious and either sends change view after his
+        // commit to stall nodes in a higher view, or if he refuses to send recovery messages. In addition, if a node
+        // asking change views loses network or crashes and comes back when nodes are committed in more than one higher
+        // numbered view, it is possible for the node accepting recovery to commit in any of the higher views, thus
+        // potentially splitting nodes among views and stalling the network.
+        public bool MoreThanFNodesCommittedOrLost => (CountCommitted + CountFailed) > F;
+        #endregion
 
         public int Size => throw new NotImplementedException();
 
@@ -62,9 +87,9 @@ namespace Bhp.Consensus
             {
                 Block = MakeHeader();
                 if (Block == null) return null;
-                Contract contract = Contract.CreateMultiSigContract(this.M(), Validators);
+                Contract contract = Contract.CreateMultiSigContract(M, Validators);
                 ContractParametersContext sc = new ContractParametersContext(Block);
-                for (int i = 0, j = 0; i < Validators.Length && j < this.M(); i++)
+                for (int i = 0, j = 0; i < Validators.Length && j < M; i++)
                 {
                     if (CommitPayloads[i]?.ConsensusMessage.ViewNumber != ViewNumber) continue;
                     sc.AddSignature(contract, Validators[i], CommitPayloads[i].GetDeserializedMessage<Commit>().Signature);
@@ -84,7 +109,6 @@ namespace Bhp.Consensus
             ViewNumber = reader.ReadByte();
             PrimaryIndex = reader.ReadUInt32();
             Timestamp = reader.ReadUInt32();
-            Nonce = reader.ReadUInt64();
             NextConsensus = reader.ReadSerializable<UInt160>();
             if (NextConsensus.Equals(UInt160.Zero))
                 NextConsensus = null;
@@ -119,6 +143,13 @@ namespace Bhp.Consensus
         public void Dispose()
         {
             Snapshot?.Dispose();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint GetPrimaryIndex(byte viewNumber)
+        {
+            int p = ((int)BlockIndex - viewNumber) % Validators.Length;
+            return p >= 0 ? (uint)p : (uint)(p + Validators.Length);
         }
 
         public bool Load()
@@ -169,7 +200,6 @@ namespace Bhp.Consensus
                     MerkleRoot = MerkleTree.ComputeRoot(TransactionHashes),
                     Timestamp = Timestamp,
                     Index = BlockIndex,
-                    ConsensusData = Nonce,
                     NextConsensus = NextConsensus,
                     Transactions = new Transaction[0]
                 };
@@ -213,7 +243,6 @@ namespace Bhp.Consensus
             return PreparationPayloads[MyIndex] = MakeSignedPayload(new PrepareRequest
             {
                 Timestamp = Timestamp,
-                Nonce = Nonce,
                 NextConsensus = NextConsensus,
                 TransactionHashes = TransactionHashes,
                 MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]]
@@ -237,7 +266,6 @@ namespace Bhp.Consensus
                 {
                     ViewNumber = ViewNumber,
                     TransactionHashes = TransactionHashes,
-                    Nonce = Nonce,
                     NextConsensus = NextConsensus,
                     MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]],
                     Timestamp = Timestamp
@@ -245,12 +273,12 @@ namespace Bhp.Consensus
             }
             return MakeSignedPayload(new RecoveryMessage()
             {
-                ChangeViewMessages = LastChangeViewPayloads.Where(p => p != null).Select(p => RecoveryMessage.ChangeViewPayloadCompact.FromPayload(p)).Take(this.M()).ToDictionary(p => (int)p.ValidatorIndex),
+                ChangeViewMessages = LastChangeViewPayloads.Where(p => p != null).Select(p => RecoveryMessage.ChangeViewPayloadCompact.FromPayload(p)).Take(M).ToDictionary(p => (int)p.ValidatorIndex),
                 PrepareRequestMessage = prepareRequestMessage,
                 // We only need a PreparationHash set if we don't have the PrepareRequest information.
                 PreparationHash = TransactionHashes == null ? PreparationPayloads.Where(p => p != null).GroupBy(p => p.GetDeserializedMessage<PrepareResponse>().PreparationHash, (k, g) => new { Hash = k, Count = g.Count() }).OrderByDescending(p => p.Count).Select(p => p.Hash).FirstOrDefault() : null,
                 PreparationMessages = PreparationPayloads.Where(p => p != null).Select(p => RecoveryMessage.PreparationPayloadCompact.FromPayload(p)).ToDictionary(p => (int)p.ValidatorIndex),
-                CommitMessages = this.CommitSent()
+                CommitMessages = CommitSent
                     ? CommitPayloads.Where(p => p != null).Select(p => RecoveryMessage.CommitPayloadCompact.FromPayload(p)).ToDictionary(p => (int)p.ValidatorIndex)
                     : new Dictionary<int, RecoveryMessage.CommitPayloadCompact>()
             });
@@ -323,7 +351,6 @@ namespace Bhp.Consensus
             writer.Write(ViewNumber);
             writer.Write(PrimaryIndex);
             writer.Write(Timestamp);
-            writer.Write(Nonce);
             writer.Write(NextConsensus ?? UInt160.Zero);
             writer.Write(TransactionHashes ?? new UInt256[0]);
             writer.Write(Transactions?.Values.ToArray() ?? new Transaction[0]);
@@ -396,7 +423,7 @@ namespace Bhp.Consensus
             TransactionHashes = transactions.Select(p => p.Hash).ToArray();
             Transactions = transactions.ToDictionary(p => p.Hash);
             NextConsensus = Blockchain.GetConsensusAddress(Snapshot.GetValidators().ToArray());
-            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), this.PrevHeader().Timestamp + 1);
+            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), PrevHeader.Timestamp + 1);
         }
         */
 
@@ -418,7 +445,6 @@ namespace Bhp.Consensus
                 MinerTransaction tx = new MiningTransaction().MakeMinerTransaction(wallet, BlockIndex, nonce, amount_txfee, amountNetFee);
                 if (!Snapshot.ContainsTransaction(tx.Hash))
                 {
-                    Nonce = nonce;
                     transactions.Insert(0, tx);
                     break;
                 }
@@ -426,7 +452,7 @@ namespace Bhp.Consensus
             TransactionHashes = transactions.Select(p => p.Hash).ToArray();
             Transactions = transactions.ToDictionary(p => p.Hash);
             NextConsensus = Blockchain.GetConsensusAddress(Snapshot.GetValidators().ToArray());
-            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), this.PrevHeader().Timestamp + 1);
+            Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), PrevHeader.Timestamp + 1);
         }
 
         private static ulong GetNonce()
