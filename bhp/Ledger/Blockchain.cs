@@ -18,10 +18,10 @@ using System.Threading;
 
 namespace Bhp.Ledger
 {
-    public sealed class Blockchain : UntypedActor
+    public sealed partial class Blockchain : UntypedActor
     {
         public class Register { }
-        public class ApplicationExecuted { public Transaction Transaction; public ApplicationExecutionResult[] ExecutionResults; }
+        public partial class ApplicationExecuted { }
         public class PersistCompleted { public Block Block; }
         public class Import { public IEnumerable<Block> Blocks; }
         public class ImportCompleted { }
@@ -475,65 +475,15 @@ namespace Bhp.Ledger
                         BlockIndex = block.Index,
                         Transaction = tx
                     });
-                    snapshot.UnspentCoins.Add(tx.Hash, new UnspentCoinState
+                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx, snapshot.Clone(), tx.SystemFee.value))
                     {
-                        Items = Enumerable.Repeat(CoinState.Confirmed, tx.Outputs.Length).ToArray()
-                    });
-                    foreach (CoinReference input in tx.Inputs)
-                    {
-                        snapshot.UnspentCoins.GetAndChange(input.PrevHash).Items[input.PrevIndex] |= CoinState.Spent;
-                    }
-                    List<ApplicationExecutionResult> execution_results = new List<ApplicationExecutionResult>();
-                    switch (tx)
-                    {
-#pragma warning disable CS0612
-                        case RegisterTransaction tx_register:
-                            snapshot.Assets.Add(tx.Hash, new AssetState
-                            {
-                                AssetId = tx_register.Hash,
-                                AssetType = tx_register.AssetType,
-                                Name = tx_register.Name,
-                                Amount = tx_register.Amount,
-                                Available = Fixed8.Zero,
-                                Precision = tx_register.Precision,
-                                Fee = Fixed8.Zero,
-                                FeeAddress = new UInt160(),
-                                Owner = tx_register.Owner,
-                                Admin = tx_register.Admin,
-                                Issuer = tx_register.Admin,
-                                Expiration = block.Index + 2 * 2000000,
-                                IsFrozen = false
-                            });
-                            break;
-#pragma warning restore CS0612                       
-                        case InvocationTransaction tx_invocation:
-                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx_invocation, snapshot.Clone(), tx_invocation.Gas.value))
-                            {
-                                engine.LoadScript(tx_invocation.Script);
-                                engine.Execute();
-                                if (!engine.State.HasFlag(VMState.FAULT))
-                                {
-                                    engine.Snapshot.Commit();
-                                }
-                                execution_results.Add(new ApplicationExecutionResult
-                                {
-                                    Trigger = TriggerType.Application,
-                                    ScriptHash = tx_invocation.Script.ToScriptHash(),
-                                    VMState = engine.State,
-                                    GasConsumed = Fixed8.Parse(engine.GasConsumed.ToString()),
-                                    Stack = engine.ResultStack.ToArray(),
-                                    Notifications = engine.Notifications.ToArray()
-                                });
-                            }
-                            break;
-                    }
-                    if (execution_results.Count > 0)
-                    {
-                        ApplicationExecuted application_executed = new ApplicationExecuted
+                        engine.LoadScript(tx.GetHashData());
+                        engine.Execute();
+                        if (!engine.State.HasFlag(VMState.FAULT))
                         {
-                            Transaction = tx,
-                            ExecutionResults = execution_results.ToArray()
-                        };
+                            engine.Snapshot.Commit();
+                        }
+                        ApplicationExecuted application_executed = new ApplicationExecuted(engine);
                         Context.System.EventStream.Publish(application_executed);
                         all_application_executed.Add(application_executed);
                     }
@@ -549,7 +499,6 @@ namespace Bhp.Ledger
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
                     plugin.OnPersist(snapshot, all_application_executed);
                 snapshot.Commit();
-
                 List<Exception> commitExceptions = null;
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
                 {
