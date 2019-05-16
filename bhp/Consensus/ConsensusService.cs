@@ -77,25 +77,16 @@ namespace Bhp.Consensus
             context.Transactions[tx.Hash] = tx;
             if (context.TransactionHashes.Length == context.Transactions.Count)
             {
-                if (VerifyRequest())
-                {
-                    // if we are the primary for this view, but acting as a backup because we recovered our own
-                    // previously sent prepare request, then we don't want to send a prepare response.
-                    if (context.IsPrimary || context.WatchOnly) return true;
+                // if we are the primary for this view, but acting as a backup because we recovered our own
+                // previously sent prepare request, then we don't want to send a prepare response.
+                if (context.IsPrimary || context.WatchOnly) return true;
 
-                    // Timeout extension due to prepare response sent
-                    // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
-                    ExtendTimerByFactor(2);
-
-                    Log($"send prepare response");
-                    localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakePrepareResponse() });
-                    CheckPreparations();
-                }
-                else
-                {
-                    RequestChangeView();
-                    return false;
-                }
+                // Timeout extension due to prepare response sent
+                // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
+                ExtendTimerByFactor(2);
+                Log($"send prepare response");
+                localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakePrepareResponse() });
+                CheckPreparations();
             }
             return true;
         }
@@ -107,7 +98,7 @@ namespace Bhp.Consensus
             timer_token.CancelIfNotNull();
             timer_token = Context.System.Scheduler.ScheduleTellOnceCancelable(delay, Self, new Timer
             {
-                Height = context.BlockIndex,
+                Height = context.Block.Index,
                 ViewNumber = context.ViewNumber
             }, ActorRefs.NoSender);
         }
@@ -159,7 +150,7 @@ namespace Bhp.Consensus
             context.Reset(viewNumber);
             if (viewNumber > 0)
                 Log($"changeview: view={viewNumber} primary={context.Validators[context.GetPrimaryIndex((byte)(viewNumber - 1u))]}", LogLevel.Warning);
-            Log($"initialize: height={context.BlockIndex} view={viewNumber} index={context.MyIndex} role={(context.IsPrimary ? "Primary" : context.WatchOnly ? "WatchOnly" : "Backup")}");
+            Log($"initialize: height={context.Block.Index} view={viewNumber} index={context.MyIndex} role={(context.IsPrimary ? "Primary" : context.WatchOnly ? "WatchOnly" : "Backup")}");
             if (context.WatchOnly) return;
             if (context.IsPrimary)
             {
@@ -221,7 +212,7 @@ namespace Bhp.Consensus
             {
                 Log($"{nameof(OnCommitReceived)}: height={payload.BlockIndex} view={commit.ViewNumber} index={payload.ValidatorIndex} nc={context.CountCommitted} nf={context.CountFailed}");
 
-                byte[] hashData = context.MakeHeader()?.GetHashData();
+                byte[] hashData = context.EnsureHeader()?.GetHashData();
                 if (hashData == null)
                 {
                     existingCommitPayload = payload;
@@ -250,12 +241,12 @@ namespace Bhp.Consensus
         private void OnConsensusPayload(ConsensusPayload payload)
         {
             if (context.BlockSent) return;
-            if (payload.Version != ConsensusContext.Version) return;
-            if (payload.PrevHash != context.PrevHash || payload.BlockIndex != context.BlockIndex)
+            if (payload.Version != context.Block.Version) return;
+            if (payload.PrevHash != context.Block.PrevHash || payload.BlockIndex != context.Block.Index)
             {
-                if (context.BlockIndex < payload.BlockIndex)
+                if (context.Block.Index < payload.BlockIndex)
                 {
-                    Log($"chain sync: expected={payload.BlockIndex} current={context.BlockIndex - 1} nodes={LocalNode.Singleton.ConnectedCount}", LogLevel.Warning);
+                    Log($"chain sync: expected={payload.BlockIndex} current={context.Block.Index - 1} nodes={LocalNode.Singleton.ConnectedCount}", LogLevel.Warning);
                 }
                 return;
             }
@@ -415,8 +406,7 @@ namespace Bhp.Consensus
             // around 2*15/M=30.0/5 ~ 40% block time (for M=5)
             ExtendTimerByFactor(2);
 
-            context.Timestamp = message.Timestamp;
-            context.NextConsensus = message.NextConsensus;
+            context.Block.Timestamp = message.Timestamp;            
             context.TransactionHashes = message.TransactionHashes;
             context.Transactions = new Dictionary<UInt256, Transaction>();
             for (int i = 0; i < context.PreparationPayloads.Length; i++)
@@ -424,7 +414,7 @@ namespace Bhp.Consensus
                     if (!context.PreparationPayloads[i].GetDeserializedMessage<PrepareResponse>().PreparationHash.Equals(payload.Hash))
                         context.PreparationPayloads[i] = null;
             context.PreparationPayloads[payload.ValidatorIndex] = payload;
-            byte[] hashData = context.MakeHeader().GetHashData();
+            byte[] hashData = context.EnsureHeader().GetHashData();
             for (int i = 0; i < context.CommitPayloads.Length; i++)
                 if (context.CommitPayloads[i]?.ConsensusMessage.ViewNumber == context.ViewNumber)
                     if (!Crypto.Default.VerifySignature(hashData, context.CommitPayloads[i].GetDeserializedMessage<Commit>().Signature, context.Validators[i].EncodePoint(false)))
@@ -509,7 +499,7 @@ namespace Bhp.Consensus
 
         private void RequestRecovery()
         {
-            if (context.BlockIndex == Blockchain.Singleton.HeaderHeight + 1)
+            if (context.Block.Index == Blockchain.Singleton.HeaderHeight + 1)
                 localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeRecoveryRequest() });
         }
 
@@ -541,7 +531,7 @@ namespace Bhp.Consensus
         private void OnTimer(Timer timer)
         {
             if (context.WatchOnly || context.BlockSent) return;
-            if (timer.Height != context.BlockIndex || timer.ViewNumber != context.ViewNumber) return;
+            if (timer.Height != context.Block.Index || timer.ViewNumber != context.ViewNumber) return;
             Log($"timeout: height={timer.Height} view={timer.ViewNumber}");
             if (context.IsPrimary && !context.RequestSentOrReceived)
             {
@@ -602,7 +592,7 @@ namespace Bhp.Consensus
                 RequestRecovery();
                 return;
             }
-            Log($"request change view: height={context.BlockIndex} view={context.ViewNumber} nv={expectedView} nc={context.CountCommitted} nf={context.CountFailed}");
+            Log($"request change view: height={context.Block.Index} view={context.ViewNumber} nv={expectedView} nc={context.CountCommitted} nf={context.CountFailed}");
             localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeChangeView() });
             CheckExpectedView(expectedView);
         }
@@ -616,7 +606,7 @@ namespace Bhp.Consensus
 
         private void SendPrepareRequest()
         {
-            Log($"send prepare request: height={context.BlockIndex} view={context.ViewNumber}");
+            Log($"send prepare request: height={context.Block.Index} view={context.ViewNumber}");
             localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakePrepareRequest() });
 
             if (context.Validators.Length == 1)
@@ -630,20 +620,10 @@ namespace Bhp.Consensus
             ChangeTimer(TimeSpan.FromSeconds((Blockchain.SecondsPerBlock << (context.ViewNumber + 1)) - (context.ViewNumber == 0 ? Blockchain.SecondsPerBlock : 0)));
         }
 
-        //private bool VerifyRequest()
-        //{
-        //    if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators().ToArray()).Equals(context.NextConsensus))
-        //        return false;
-        //    Transaction minerTx = context.Transactions.Values.FirstOrDefault(p => p.Type == TransactionType.MinerTransaction);
-        //    Fixed8 amountNetFee = Block.CalculateNetFee(context.Transactions.Values);
-        //    if (minerTx?.Outputs.Sum(p => p.Value) != amountNetFee) return false;
-        //    return true;
-        //}
-
         //By BHP
         public bool VerifyRequest()
         {
-            if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators().ToArray()).Equals(context.NextConsensus))
+            if (!Blockchain.GetConsensusAddress(context.Snapshot.GetValidators().ToArray()).Equals(context.Block.NextConsensus))
                 return false;
 
             Transaction tx_gen = context.Transactions.Values.FirstOrDefault(p => p.Type == TransactionType.MinerTransaction);
@@ -655,7 +635,7 @@ namespace Bhp.Consensus
 
             // 交易手续费单独计算
             Fixed8 amount_txfee = BhpTxFee.CalcuTxFee(context.Transactions.Values.ToList());
-            if (tx_gen?.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(p => p.Value) - MiningSubsidy.GetMiningSubsidy(context.BlockIndex) != amount_txfee) return false;
+            if (tx_gen?.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(p => p.Value) - MiningSubsidy.GetMiningSubsidy(context.Block.Index) != amount_txfee) return false;
 
             return true;
         }

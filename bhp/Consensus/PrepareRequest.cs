@@ -9,13 +9,11 @@ namespace Bhp.Consensus
     public class PrepareRequest : ConsensusMessage
     {
         public uint Timestamp;
-        public UInt160 NextConsensus;
         public UInt256[] TransactionHashes;
         public MinerTransaction MinerTransaction;
 
         public override int Size => base.Size
             + sizeof(uint)                      //Timestamp
-            + NextConsensus.Size                //NextConsensus
             + TransactionHashes.GetVarSize()    //TransactionHashes
             + MinerTransaction.Size;            //MinerTransaction
 
@@ -28,7 +26,6 @@ namespace Bhp.Consensus
         {
             base.Deserialize(reader);
             Timestamp = reader.ReadUInt32();
-            NextConsensus = reader.ReadSerializable<UInt160>();
             TransactionHashes = reader.ReadSerializableArray<UInt256>(Block.MaxTransactionsPerBlock);
             if (TransactionHashes.Distinct().Count() != TransactionHashes.Length)
                 throw new FormatException();
@@ -41,7 +38,6 @@ namespace Bhp.Consensus
         {
             base.Serialize(writer);
             writer.Write(Timestamp);
-            writer.Write(NextConsensus);
             writer.Write(TransactionHashes);
             writer.Write(MinerTransaction);
         }
