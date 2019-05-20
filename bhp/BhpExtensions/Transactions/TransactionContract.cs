@@ -93,7 +93,7 @@ namespace Bhp.BhpExtensions.Transactions
                     {
                         AssetId = asset_id,
                         Value = input_sum[asset_id].Value - pay_total[asset_id].Value - txFee,
-                        ScriptHash = change_address
+                        Hash = change_address
                     });
 
                     n = outputs_new.Count - 1;

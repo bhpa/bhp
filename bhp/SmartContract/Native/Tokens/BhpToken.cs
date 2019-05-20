@@ -18,7 +18,7 @@ namespace Bhp.SmartContract.Native.Tokens
         public override string ServiceName => "Bhp.Native.Tokens.BHP";
         public override string Name => "BHP";
         public override string Symbol => "bhp";
-        public override int Decimals => 0;
+        public override byte Decimals => 0;
         public BigInteger TotalAmount { get; }
 
         private const byte Prefix_Validator = 33;

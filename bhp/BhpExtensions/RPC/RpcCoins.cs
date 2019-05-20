@@ -79,7 +79,7 @@ namespace Bhp.BhpExtensions.RPC
                         {
                             AssetId = Blockchain.UtilityToken.Hash,
                             Value = snapshot.CalculateBonus(claims.Take(MAX_CLAIMS_AMOUNT)),                            
-                            ScriptHash = change_address ?? current_wallet.GetChangeAddress()
+                            Hash = change_address ?? current_wallet.GetChangeAddress()
                         }
                     }
 
@@ -126,7 +126,7 @@ namespace Bhp.BhpExtensions.RPC
                             {
                                 AssetId = Blockchain.UtilityToken.Hash,
                                 Value = snapshot.CalculateBonus(claims.Skip(i * MAX_CLAIMS_AMOUNT).Take(MAX_CLAIMS_AMOUNT)),
-                                ScriptHash = change_address ?? current_wallet.GetChangeAddress()
+                                Hash = change_address ?? current_wallet.GetChangeAddress()
                             }
                         }
                     };

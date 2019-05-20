@@ -59,7 +59,7 @@ namespace Bhp.Persistence
             byte[] script;
             using (ScriptBuilder sb = new ScriptBuilder())
             {
-                sb.EmitAppCall(NativeContract.Bhp.ScriptHash, "getValidators");
+                sb.EmitAppCall(NativeContract.Bhp.Hash, "getValidators");
                 script = sb.ToArray();
             }
             using (ApplicationEngine engine = ApplicationEngine.Run(script, this, testMode: true))

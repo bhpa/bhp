@@ -413,7 +413,7 @@ namespace Bhp.Network.P2P.Payloads
         private bool VerifyReceivingScripts()
         {
             //TODO: run ApplicationEngine
-            //foreach (UInt160 hash in Outputs.Select(p => p.ScriptHash).Distinct())
+            //foreach (UInt160 hash in Outputs.Select(p => p.Hash).Distinct())
             //{
             //    ContractState contract = Blockchain.Default.GetContract(hash);
             //    if (contract == null) continue;

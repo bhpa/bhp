@@ -394,7 +394,7 @@ namespace Bhp.Consensus
             {
                 AssetId = Blockchain.UtilityToken.Hash,
                 Value = amountNetFee,
-                ScriptHash = wallet.GetChangeAddress()
+                Hash = wallet.GetChangeAddress()
             } };
             while (true)
             {
