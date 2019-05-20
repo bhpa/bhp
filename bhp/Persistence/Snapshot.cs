@@ -7,11 +7,8 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.SmartContract;
 using Bhp.SmartContract.Native;
 using Bhp.VM;
-using Bhp.VM.Types;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using VMArray = Bhp.VM.Types.Array;
 
 namespace Bhp.Persistence
@@ -26,7 +23,6 @@ namespace Bhp.Persistence
         public abstract DataCache<UInt160, ContractState> Contracts { get; }
         public abstract DataCache<StorageKey, StorageItem> Storages { get; }
         public abstract DataCache<UInt32Wrapper, HeaderHashList> HeaderHashList { get; }
-        public abstract MetaDataCache<NextValidatorsState> NextValidators { get; }
         public abstract MetaDataCache<HashIndexState> BlockHashIndex { get; }
         public abstract MetaDataCache<HashIndexState> HeaderHashIndex { get; }
 
@@ -50,31 +46,12 @@ namespace Bhp.Persistence
             Contracts.Commit();
             Storages.Commit();
             HeaderHashList.Commit();
-            NextValidators.Commit();
             BlockHashIndex.Commit();
             HeaderHashIndex.Commit();
         }
 
         public virtual void Dispose()
         {
-        }
-
-        public IEnumerable<(ECPoint PublicKey, BigInteger Votes)> GetRegisteredValidators()
-        {
-            byte[] script;
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                sb.EmitAppCall(NativeContract.Bhp.ScriptHash, "getRegisteredValidators");
-                script = sb.ToArray();
-            }
-            using (ApplicationEngine engine = ApplicationEngine.Run(script, this, testMode: true))
-            {
-                return ((VMArray)engine.ResultStack.Peek()).Select(p =>
-                {
-                    Struct @struct = (Struct)p;
-                    return (@struct.GetByteArray().AsSerializable<ECPoint>(), @struct.GetBigInteger());
-                });
-            }
         }
 
         public ECPoint[] GetValidators()

@@ -4,6 +4,7 @@ using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Persistence;
 using Bhp.SmartContract;
+using Bhp.SmartContract.Native;
 using System;
 using System.IO;
 
@@ -92,7 +93,7 @@ namespace Bhp.Network.P2P.Payloads
         
         UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
         {
-            ECPoint[] validators = snapshot.NextValidators.Get().Validators;
+            ECPoint[] validators = NativeContract.Bhp.GetNextBlockValidators(snapshot);
             if (validators.Length <= ValidatorIndex)
                 throw new InvalidOperationException();
             return new[] { Contract.CreateSignatureRedeemScript(validators[ValidatorIndex]).ToScriptHash() };

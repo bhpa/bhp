@@ -328,8 +328,8 @@ namespace Bhp.Network.RPC
         {
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
-                var validators = snapshot.GetValidators();
-                return snapshot.GetRegisteredValidators().Select(p =>
+                var validators = NativeContract.Bhp.GetValidators(snapshot);
+                return NativeContract.Bhp.GetRegisteredValidators(snapshot).Select(p =>
                 {
                     JObject validator = new JObject();
                     validator["publickey"] = p.PublicKey.ToString();

@@ -8,6 +8,7 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
 using Bhp.SmartContract;
+using Bhp.SmartContract.Native;
 using Bhp.Wallets;
 using System;
 using System.Collections.Generic;
@@ -290,10 +291,10 @@ namespace Bhp.Consensus
                 {
                     PrevHash = Snapshot.CurrentBlockHash,
                     Index = Snapshot.Height + 1,
-                    NextConsensus = Blockchain.GetConsensusAddress(Snapshot.GetValidators().ToArray()),
+                    NextConsensus = Blockchain.GetConsensusAddress(NativeContract.Bhp.GetValidators(Snapshot).ToArray()),
                     ConsensusData = new ConsensusData()
                 };
-                Validators = Snapshot.NextValidators.Get().Validators;
+                Validators = NativeContract.Bhp.GetNextBlockValidators(Snapshot);
                 MyIndex = -1;
                 ChangeViewPayloads = new ConsensusPayload[Validators.Length];
                 LastChangeViewPayloads = new ConsensusPayload[Validators.Length];
