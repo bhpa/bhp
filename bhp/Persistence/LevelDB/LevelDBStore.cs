@@ -47,9 +47,9 @@ namespace Bhp.Persistence.LevelDB
             return new DbCache<UInt256, AssetState>(db, null, null, Prefixes.ST_Asset);
         }
 
-        public override DataCache<UInt256, BlockState> GetBlocks()
+        public override DataCache<UInt256, TrimmedBlock> GetBlocks()
         {
-            return new DbCache<UInt256, BlockState>(db, null, null, Prefixes.DATA_Block);
+            return new DbCache<UInt256, TrimmedBlock>(db, null, null, Prefixes.DATA_Block);
         }
 
         public override DataCache<UInt160, ContractState> GetContracts()

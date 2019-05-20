@@ -4,11 +4,11 @@ using System.Linq;
 
 namespace Bhp.Ledger
 {
-    public class UnspentCoinState : StateBase, ICloneable<UnspentCoinState>
+    public class UnspentCoinState : ICloneable<UnspentCoinState>, ISerializable
     {
         public CoinState[] Items;
 
-        public override int Size => base.Size + Items.GetVarSize();
+        public int Size => Items.GetVarSize();
 
         UnspentCoinState ICloneable<UnspentCoinState>.Clone()
         {
@@ -18,9 +18,8 @@ namespace Bhp.Ledger
             };
         }
 
-        public override void Deserialize(BinaryReader reader)
+        public void Deserialize(BinaryReader reader)
         {
-            base.Deserialize(reader);
             Items = reader.ReadVarBytes().Select(p => (CoinState)p).ToArray();
         }
 
@@ -29,9 +28,8 @@ namespace Bhp.Ledger
             Items = replica.Items;
         }
 
-        public override void Serialize(BinaryWriter writer)
+        public void Serialize(BinaryWriter writer)
         {
-            base.Serialize(writer);
             writer.WriteVarBytes(Items.Cast<byte>().ToArray());
         }
     }

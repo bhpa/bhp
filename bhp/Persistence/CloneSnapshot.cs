@@ -6,7 +6,7 @@ namespace Bhp.Persistence
 {
     internal class CloneSnapshot : Snapshot
     {
-        public override DataCache<UInt256, BlockState> Blocks { get; }
+        public override DataCache<UInt256, TrimmedBlock> Blocks { get; }
         public override DataCache<UInt256, TransactionState> Transactions { get; }
         public override DataCache<UInt256, UnspentCoinState> UnspentCoins { get; }
         public override DataCache<UInt256, AssetState> Assets { get; }

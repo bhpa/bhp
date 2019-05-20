@@ -13,7 +13,7 @@ namespace Bhp.Persistence.LevelDB
         private readonly LSnapshot snapshot;
         private readonly WriteBatch batch;
 
-        public override DataCache<UInt256, BlockState> Blocks { get; }
+        public override DataCache<UInt256, TrimmedBlock> Blocks { get; }
         public override DataCache<UInt256, TransactionState> Transactions { get; }
         public override DataCache<UInt256, UnspentCoinState> UnspentCoins { get; }
         public override DataCache<UInt256, AssetState> Assets { get; }
@@ -29,7 +29,7 @@ namespace Bhp.Persistence.LevelDB
             this.snapshot = db.GetSnapshot();
             this.batch = new WriteBatch();
             ReadOptions options = new ReadOptions { FillCache = false, Snapshot = snapshot };
-            Blocks = new DbCache<UInt256, BlockState>(db, options, batch, Prefixes.DATA_Block);
+            Blocks = new DbCache<UInt256, TrimmedBlock>(db, options, batch, Prefixes.DATA_Block);
             Transactions = new DbCache<UInt256, TransactionState>(db, options, batch, Prefixes.DATA_Transaction);
             UnspentCoins = new DbCache<UInt256, UnspentCoinState>(db, options, batch, Prefixes.ST_Coin);
             Assets = new DbCache<UInt256, AssetState>(db, options, batch, Prefixes.ST_Asset);

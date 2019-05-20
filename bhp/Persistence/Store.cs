@@ -7,7 +7,7 @@ namespace Bhp.Persistence
 {
     public abstract class Store : IPersistence
     {
-        DataCache<UInt256, BlockState> IPersistence.Blocks => GetBlocks();
+        DataCache<UInt256, TrimmedBlock> IPersistence.Blocks => GetBlocks();
         DataCache<UInt256, TransactionState> IPersistence.Transactions => GetTransactions();
         DataCache<UInt256, UnspentCoinState> IPersistence.UnspentCoins => GetUnspentCoins();
         DataCache<UInt256, AssetState> IPersistence.Assets => GetAssets();
@@ -18,7 +18,7 @@ namespace Bhp.Persistence
         MetaDataCache<HashIndexState> IPersistence.HeaderHashIndex => GetHeaderHashIndex();
 
         public abstract byte[] Get(byte prefix, byte[] key);
-        public abstract DataCache<UInt256, BlockState> GetBlocks();
+        public abstract DataCache<UInt256, TrimmedBlock> GetBlocks();
         public abstract DataCache<UInt256, TransactionState> GetTransactions();
         public abstract DataCache<UInt256, UnspentCoinState> GetUnspentCoins();
         public abstract DataCache<UInt256, AssetState> GetAssets();

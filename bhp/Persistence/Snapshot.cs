@@ -16,7 +16,7 @@ namespace Bhp.Persistence
     public abstract class Snapshot : IDisposable, IPersistence
     {
         public Block PersistingBlock { get; internal set; }
-        public abstract DataCache<UInt256, BlockState> Blocks { get; }
+        public abstract DataCache<UInt256, TrimmedBlock> Blocks { get; }
         public abstract DataCache<UInt256, TransactionState> Transactions { get; }
         public abstract DataCache<UInt256, UnspentCoinState> UnspentCoins { get; }
         public abstract DataCache<UInt256, AssetState> Assets { get; }
