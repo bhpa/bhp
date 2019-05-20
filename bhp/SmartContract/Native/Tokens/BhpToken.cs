@@ -1,7 +1,6 @@
 ﻿using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Ledger;
-using Bhp.Persistence;
 using Bhp.VM;
 using Bhp.VM.Types;
 using System;
@@ -108,7 +107,7 @@ namespace Bhp.SmartContract.Native.Tokens
                 }
                 amount += (iend - istart) * Blockchain.GenerationAmount[ustart];
             }
-            amount += (engine.Snapshot.GetSysFeeAmount(end - 1) - (start == 0 ? 0 : engine.Snapshot.GetSysFeeAmount(start - 1)));
+            amount += GAS.GetSysFeeAmount(engine, end - 1) - (start == 0 ? 0 : GAS.GetSysFeeAmount(engine, start - 1));
             return value * amount * GAS.Factor / TotalAmount;
         }
 

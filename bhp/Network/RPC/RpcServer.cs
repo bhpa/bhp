@@ -26,6 +26,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Bhp.BhpExtensions.RPC;
+using Bhp.SmartContract.Native;
 
 namespace Bhp.Network.RPC
 {
@@ -181,9 +182,10 @@ namespace Bhp.Network.RPC
         {
             uint height = uint.Parse(_params[0].AsString());
             if (height <= Blockchain.Singleton.Height)
-            {
-                return Blockchain.Singleton.GetBlockHash(height).ToString();
-            }
+                using (ApplicationEngine engine = NativeContract.GAS.TestCall("getSysFeeAmount", height))
+                {
+                    return engine.ResultStack.Peek().GetBigInteger().ToString();
+                }
             throw new RpcException(-100, "Invalid Height");
         }
 
@@ -221,9 +223,10 @@ namespace Bhp.Network.RPC
         {
             uint height = uint.Parse(_params[0].AsString());
             if (height <= Blockchain.Singleton.Height)
-            {
-                return Blockchain.Singleton.Store.GetSysFeeAmount(height).ToString();
-            }
+                using (ApplicationEngine engine = NativeContract.GAS.TestCall("getSysFeeAmount", height))
+                {
+                    return engine.ResultStack.Peek().GetBigInteger().ToString();
+                }
             throw new RpcException(-100, "Invalid Height");
         }
 

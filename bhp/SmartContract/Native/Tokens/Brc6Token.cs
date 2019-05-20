@@ -1,4 +1,5 @@
 ﻿using Bhp.Ledger;
+using Bhp.Persistence;
 using Bhp.VM;
 using System;
 using System.Numerics;
@@ -106,9 +107,14 @@ namespace Bhp.SmartContract.Native.Tokens
             return new BigInteger(storage.Value);
         }
 
-        protected virtual BigInteger BalanceOf(ApplicationEngine engine, UInt160 account)
+        protected BigInteger BalanceOf(ApplicationEngine engine, UInt160 account)
         {
-            StorageItem storage = engine.Snapshot.Storages.TryGet(CreateAccountKey(account));
+            return BalanceOf(engine.Snapshot, account);
+        }
+
+        public virtual BigInteger BalanceOf(Snapshot snapshot, UInt160 account)
+        {
+            StorageItem storage = snapshot.Storages.TryGet(CreateAccountKey(account));
             if (storage is null) return BigInteger.Zero;
             Brc6AccountState state = new Brc6AccountState(storage.Value);
             return state.Balance;

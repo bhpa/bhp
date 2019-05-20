@@ -10,6 +10,7 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
 using Bhp.SmartContract;
+using Bhp.SmartContract.Native;
 using Bhp.VM;
 using System;
 using System.Collections.Generic;
@@ -351,7 +352,6 @@ namespace Bhp.Ledger
                     {
                         snapshot.Blocks.Add(block.Hash, new BlockState
                         {
-                            SystemFeeAmount = 0,
                             TrimmedBlock = block.Header.Trim()
                         });
                         snapshot.HeaderHashIndex.GetAndChange().Hash = block.Hash;
@@ -386,7 +386,6 @@ namespace Bhp.Ledger
                     header_index.Add(header.Hash);
                     snapshot.Blocks.Add(header.Hash, new BlockState
                     {
-                        SystemFeeAmount = 0,
                         TrimmedBlock = header.Trim()
                     });
                     snapshot.HeaderHashIndex.GetAndChange().Hash = header.Hash;
@@ -462,10 +461,24 @@ namespace Bhp.Ledger
                 List<ApplicationExecuted> all_application_executed = new List<ApplicationExecuted>();
                 snapshot.PersistingBlock = block;
                 if (block.Index > 0)
+                {
+                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.System, null, snapshot, 0, true))
+                    {
+                        using (ScriptBuilder sb = new ScriptBuilder())
+                        {
+                            sb.EmitAppCall(NativeContract.GAS.ScriptHash, "distributeFees");
+                            engine.LoadScript(sb.ToArray());
+                        }
+                        engine.Execute();
+                        if (engine.State != VMState.HALT) throw new InvalidOperationException();
+                        ApplicationExecuted application_executed = new ApplicationExecuted(engine);
+                        Context.System.EventStream.Publish(application_executed);
+                        all_application_executed.Add(application_executed);
+                    }
                     snapshot.NextValidators.GetAndChange().Validators = snapshot.GetValidators();
+                }
                 snapshot.Blocks.Add(block.Hash, new BlockState
                 {
-                    SystemFeeAmount = snapshot.GetSysFeeAmount(block.PrevHash) + (long)block.Transactions.Sum(p => p.SystemFee),
                     TrimmedBlock = block.Trim()
                 });
                 foreach (Transaction tx in block.Transactions)

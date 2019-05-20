@@ -9,8 +9,8 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class InvocationTransaction : Transaction
     {
-        public byte[] Script;
-        public Fixed8 Gas;
+        public new byte[] Script;
+        public new Fixed8 Gas;
 
         public override int Size => base.Size  // Transaction base size
           + Script.GetVarSize()               // Script variable size

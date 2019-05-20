@@ -10,7 +10,7 @@ namespace Bhp.Network.P2P.Payloads
     {
         public uint Nonce;
 
-        public override Fixed8 NetworkFee => Fixed8.Zero;
+        public new Fixed8 NetworkFee => Fixed8.Zero;
 
         public override int Size => base.Size + sizeof(uint);
 
