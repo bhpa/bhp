@@ -15,10 +15,11 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using Bhp.VM;
 
 namespace Bhp.Network.P2P.Payloads
 {
-    public abstract class Transaction : IEquatable<Transaction>, IInventory
+    public class Transaction : IEquatable<Transaction>, IInventory
     {
         public const int MaxTransactionSize = 102400;
         /// <summary>
@@ -127,6 +128,37 @@ namespace Bhp.Network.P2P.Payloads
         protected Transaction(TransactionType type)
         {
             this.Type = type;
+        }
+
+        public void CalculateGas()
+        {
+            if (Sender is null) Sender = UInt160.Zero;
+            if (Attributes is null) Attributes = new TransactionAttribute[0];
+            if (Witnesses is null) Witnesses = new Witness[0];
+            _hash = null;
+            long consumed;
+            using (ApplicationEngine engine = ApplicationEngine.Run(Script, this))
+            {
+                if (engine.State.HasFlag(VMState.FAULT))
+                    throw new InvalidOperationException();
+                consumed = engine.GasConsumed;
+            }
+            _hash = null;
+            long d = (long)NativeContract.GAS.Factor;
+            Gas = consumed - ApplicationEngine.GasFree;
+            if (Gas <= 0)
+            {
+                Gas = 0;
+            }
+            else
+            {
+                long remainder = Gas % d;
+                if (remainder == 0) return;
+                if (remainder > 0)
+                    Gas += d - remainder;
+                else
+                    Gas -= remainder;
+            }
         }
 
         void ISerializable.Deserialize(BinaryReader reader)
