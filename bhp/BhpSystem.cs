@@ -14,7 +14,7 @@ namespace Bhp
 {
     public class BhpSystem : IDisposable
     {
-        private Peer.Start start_message = null;
+        private ChannelsConfig start_message = null;
         private bool suspend = false;
 
         public ActorSystem ActorSystem { get; } = ActorSystem.Create(nameof(BhpSystem),
@@ -105,17 +105,10 @@ namespace Bhp
             }
         }
 
-        public void StartNode(int port = 0, int wsPort = 0, int minDesiredConnections = Peer.DefaultMinDesiredConnections,
-            int maxConnections = Peer.DefaultMaxConnections, int maxConnectionsPerAddress = 3)
+        public void StartNode(ChannelsConfig config)
         {
-            start_message = new Peer.Start
-            {
-                Port = port,
-                WsPort = wsPort,
-                MinDesiredConnections = minDesiredConnections,
-                MaxConnections = maxConnections,
-                MaxConnectionsPerAddress = maxConnectionsPerAddress
-            };
+            start_message = config;
+
             if (!suspend)
             {
                 LocalNode.Tell(start_message);

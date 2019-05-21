@@ -30,7 +30,7 @@ namespace Bhp.Network.P2P
         public static readonly uint Nonce;
         public static string UserAgent { get; set; }
 
-        private static LocalNode singleton { get; set; }
+        private static LocalNode singleton;
         public static LocalNode Singleton
         {
             get

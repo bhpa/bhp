@@ -13,8 +13,7 @@ namespace Bhp.Network.P2P
         internal class Ack : Tcp.Event { public static Ack Instance = new Ack(); }
 
         public IPEndPoint Remote { get; }
-        public IPEndPoint Local { get; }
-        public abstract int ListenerPort { get; }
+        public IPEndPoint Local { get; }        
 
         private ICancelable timer;
         private readonly IActorRef tcp;
