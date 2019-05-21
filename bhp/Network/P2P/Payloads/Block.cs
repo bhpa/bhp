@@ -50,6 +50,13 @@ namespace Bhp.Network.P2P.Payloads
             return amount_in - amount_out - amount_sysfee;
         }
 
+        public static UInt256 CalculateMerkleRoot(UInt256 consensusDataHash, params UInt256[] transactionHashes)
+        {
+            List<UInt256> hashes = new List<UInt256>(transactionHashes.Length + 1) { consensusDataHash };
+            hashes.AddRange(transactionHashes);
+            return MerkleTree.ComputeRoot(hashes);
+        }
+
         public override void Deserialize(BinaryReader reader)
         {
             base.Deserialize(reader);
@@ -73,7 +80,7 @@ namespace Bhp.Network.P2P.Payloads
                 if (!hashes.Add(Transactions[i].Hash))
                     throw new FormatException();
             }
-            if (MerkleTree.ComputeRoot(Transactions.Select(p => p.Hash).ToArray()) != MerkleRoot)
+            if (CalculateMerkleRoot(ConsensusData.Hash, Transactions.Select(p => p.Hash).ToArray()) != MerkleRoot)
                 throw new FormatException();
         }
 
@@ -96,12 +103,7 @@ namespace Bhp.Network.P2P.Payloads
 
         public void RebuildMerkleRoot()
         {
-            List<UInt256> hashes = new List<UInt256>(Transactions.Length + 1)
-            {
-                ConsensusData.Hash
-            };
-            hashes.AddRange(Transactions.Select(p => p.Hash));
-            MerkleRoot = MerkleTree.ComputeRoot(hashes);
+            MerkleRoot = CalculateMerkleRoot(ConsensusData.Hash, Transactions.Select(p => p.Hash).ToArray());
         }
 
         public override void Serialize(BinaryWriter writer)

@@ -140,7 +140,7 @@ namespace Bhp.Consensus
         {
             if (TransactionHashes == null) return null;
             if (Block.MerkleRoot is null)
-                Block.MerkleRoot = MerkleTree.ComputeRoot(TransactionHashes);
+                Block.MerkleRoot = Block.CalculateMerkleRoot(Block.ConsensusData.Hash, TransactionHashes);
             return Block;
         }
 
