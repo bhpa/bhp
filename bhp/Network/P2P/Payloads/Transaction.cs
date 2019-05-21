@@ -48,15 +48,7 @@ namespace Bhp.Network.P2P.Payloads
         /// The <c>NetworkFee</c> for the transaction divided by its <c>Size</c>.
         /// <para>Note that this property must be used with care. Getting the value of this property multiple times will return the same result. The value of this property can only be obtained after the transaction has been completely built (no longer modified).</para>
         /// </summary>
-        public Fixed8 FeePerByte
-        {
-            get
-            {
-                if (_feePerByte == -Fixed8.Satoshi)
-                    _feePerByte = Fixed8.Parse((NetworkFee / Size).ToString());
-                return _feePerByte;
-            }
-        }
+        public long FeePerByte => NetworkFee / Size;
 
         private UInt256 _hash = null;
         public UInt256 Hash
@@ -72,8 +64,7 @@ namespace Bhp.Network.P2P.Payloads
         }
 
         InventoryType IInventory.InventoryType => InventoryType.TX;
-        public bool IsLowPriority => NetworkFee < long.Parse(ProtocolSettings.Default.LowPriorityThreshold.ToString());
-
+        
         private IReadOnlyDictionary<CoinReference, TransactionOutput> _references;
         public IReadOnlyDictionary<CoinReference, TransactionOutput> References
         {
@@ -130,7 +121,7 @@ namespace Bhp.Network.P2P.Payloads
             this.Type = type;
         }
 
-        public void CalculateGas()
+        public void CalculateFees()
         {
             if (Sender is null) Sender = UInt160.Zero;
             if (Attributes is null) Attributes = new TransactionAttribute[0];
@@ -158,6 +149,13 @@ namespace Bhp.Network.P2P.Payloads
                     Gas += d - remainder;
                 else
                     Gas -= remainder;
+                using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+                {
+                    long feeperbyte = NativeContract.Policy.GetFeePerByte(snapshot);
+                    long fee = feeperbyte * Size;
+                    if (fee > NetworkFee)
+                        NetworkFee = fee;
+                }
             }
         }
 
@@ -311,7 +309,12 @@ namespace Bhp.Network.P2P.Payloads
         /*
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
-            if (Size > MaxTransactionSize) return false;
+             int size = Size;
+            if (size > MaxTransactionSize) return false;
+            if (size > NativeContract.Policy.GetMaxLowPriorityTransactionSize(snapshot) && NetworkFee / size < NativeContract.Policy.GetFeePerByte(snapshot))
+                return false;
+            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
+                return false;
             for (int i = 1; i < Inputs.Length; i++)
                 for (int j = 0; j < i; j++)
                     if (Inputs[i].PrevHash == Inputs[j].PrevHash && Inputs[i].PrevIndex == Inputs[j].PrevIndex)
@@ -358,7 +361,12 @@ namespace Bhp.Network.P2P.Payloads
 
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
-            if (Size > MaxTransactionSize) return false;
+            int size = Size;
+            if (size > MaxTransactionSize) return false;
+            if (size > NativeContract.Policy.GetMaxLowPriorityTransactionSize(snapshot) && NetworkFee / size < NativeContract.Policy.GetFeePerByte(snapshot))
+                return false;
+            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
+                return false;
             BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, Sender);
             BigInteger fee = Gas + NetworkFee;
             if (balance < fee) return false;

@@ -3,6 +3,7 @@ using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
+using Bhp.SmartContract.Native;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -70,6 +71,7 @@ namespace Bhp.Ledger
 
         private int _maxTxPerBlock;
         private int _maxLowPriorityTxPerBlock;
+        private long _feePerByte;
 
         /// <summary>
         /// Total maximum capacity of transactions the pool can hold.
@@ -106,18 +108,13 @@ namespace Bhp.Ledger
         {
             _system = system;
             Capacity = capacity;
-            LoadMaxTxLimitsFromPolicyPlugins();
         }
 
-        public void LoadMaxTxLimitsFromPolicyPlugins()
+        internal void LoadPolicy(Snapshot snapshot)
         {
-            _maxTxPerBlock = int.MaxValue;
-            _maxLowPriorityTxPerBlock = int.MaxValue;
-            foreach (IPolicyPlugin plugin in Plugin.Policies)
-            {
-                _maxTxPerBlock = Math.Min(_maxTxPerBlock, plugin.MaxTxPerBlock);
-                _maxLowPriorityTxPerBlock = Math.Min(_maxLowPriorityTxPerBlock, plugin.MaxLowPriorityTxPerBlock);
-            }
+            _maxTxPerBlock = (int)NativeContract.Policy.GetMaxTransactionsPerBlock(snapshot);
+            _maxLowPriorityTxPerBlock = (int)NativeContract.Policy.GetMaxLowPriorityTransactionsPerBlock(snapshot);
+            _feePerByte = NativeContract.Policy.GetFeePerByte(snapshot);
         }
 
         /// <summary>
@@ -272,6 +269,11 @@ namespace Bhp.Ledger
             return GetLowestFeeTransaction(out _, out _).CompareTo(tx) <= 0;
         }
 
+        private bool IsLowPriority(Transaction tx)
+        {
+            return tx.FeePerByte < 1000;
+        }
+
         /// <summary>
         /// Adds an already verified transaction to the memory pool.
         ///
@@ -294,7 +296,7 @@ namespace Bhp.Ledger
             {
                 _unsortedTransactions.Add(hash, poolItem);
 
-                SortedSet<PoolItem> pool = tx.IsLowPriority ? _sortedLowPrioTransactions : _sortedHighPrioTransactions;
+                SortedSet<PoolItem> pool = IsLowPriority(tx) ? _sortedLowPrioTransactions : _sortedHighPrioTransactions;
                 pool.Add(poolItem);
                 if (Count > Capacity)
                     removedTransactions = RemoveOverCapacity();
@@ -336,7 +338,7 @@ namespace Bhp.Ledger
                 return false;
 
             _unsortedTransactions.Remove(hash);
-            SortedSet<PoolItem> pool = item.Tx.IsLowPriority
+            SortedSet<PoolItem> pool = IsLowPriority(item.Tx)
                 ? _sortedLowPrioTransactions : _sortedHighPrioTransactions;
             pool.Remove(item);
             return true;
@@ -349,14 +351,14 @@ namespace Bhp.Ledger
                 return false;
 
             _unverifiedTransactions.Remove(hash);
-            SortedSet<PoolItem> pool = item.Tx.IsLowPriority
-                ? _unverifiedSortedLowPriorityTransactions : _unverifiedSortedHighPriorityTransactions;
+            SortedSet<PoolItem> pool = IsLowPriority(item.Tx)
+               ? _unverifiedSortedLowPriorityTransactions : _unverifiedSortedHighPriorityTransactions;
             pool.Remove(item);
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InvalidateVerifiedTransactions()
+        internal void InvalidateVerifiedTransactions()
         {
             foreach (PoolItem item in _sortedHighPrioTransactions)
             {
@@ -402,10 +404,7 @@ namespace Bhp.Ledger
             if (block.Index > 0 && block.Index < Blockchain.Singleton.HeaderHeight)
                 return;
 
-            if (Plugin.Policies.Count == 0)
-                return;
-
-            LoadMaxTxLimitsFromPolicyPlugins();
+            LoadPolicy(snapshot);
 
             ReverifyTransactions(_sortedHighPrioTransactions, _unverifiedSortedHighPriorityTransactions,
                 _maxTxPerBlock, MaxSecondsToReverifyHighPrioTx, snapshot);

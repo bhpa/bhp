@@ -13,7 +13,6 @@ namespace Bhp
         public string[] StandbyValidators { get; }
         public string[] SeedList { get; }
         public IReadOnlyDictionary<TransactionType, Fixed8> SystemFee { get; }
-        public Fixed8 LowPriorityThreshold { get; }
         public uint SecondsPerBlock { get; }
 
         public static ProtocolSettings Default { get; }
@@ -65,7 +64,6 @@ namespace Bhp
             }
             this.SystemFee = sys_fee;
             this.SecondsPerBlock = section.GetValue("SecondsPerBlock", 15u);
-            this.LowPriorityThreshold = Fixed8.Parse(section.GetValue("LowPriorityThreshold", "0.001"));
         }
     }
 }
