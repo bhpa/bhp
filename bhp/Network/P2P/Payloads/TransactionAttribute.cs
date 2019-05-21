@@ -18,7 +18,7 @@ namespace Bhp.Network.P2P.Payloads
             {
                 if (Usage == TransactionAttributeUsage.ContractHash || Usage == TransactionAttributeUsage.ECDH02 || Usage == TransactionAttributeUsage.ECDH03 || Usage == TransactionAttributeUsage.Vote || (Usage >= TransactionAttributeUsage.Hash1 && Usage <= TransactionAttributeUsage.Hash15))
                     return sizeof(TransactionAttributeUsage) + 32;
-                else if (Usage == TransactionAttributeUsage.Script)
+                else if (Usage == TransactionAttributeUsage.Cosigner)
                     return sizeof(TransactionAttributeUsage) + 20;
                 else if (Usage == TransactionAttributeUsage.DescriptionUrl)
                     return sizeof(TransactionAttributeUsage) + sizeof(byte) + Data.Length;
@@ -34,7 +34,7 @@ namespace Bhp.Network.P2P.Payloads
                 Data = reader.ReadBytes(32);
             else if (Usage == TransactionAttributeUsage.ECDH02 || Usage == TransactionAttributeUsage.ECDH03)
                 Data = new[] { (byte)Usage }.Concat(reader.ReadBytes(32)).ToArray();
-            else if (Usage == TransactionAttributeUsage.Script)
+            else if (Usage == TransactionAttributeUsage.Cosigner)
                 Data = reader.ReadBytes(20);
             else if (Usage == TransactionAttributeUsage.DescriptionUrl)
                 Data = reader.ReadBytes(reader.ReadByte());
@@ -50,6 +50,8 @@ namespace Bhp.Network.P2P.Payloads
         void ISerializable.Serialize(BinaryWriter writer)
         {
             writer.Write((byte)Usage);
+            if (Usage == TransactionAttributeUsage.Cosigner)
+                writer.Write(Data);
             if (Usage == TransactionAttributeUsage.DescriptionUrl)
                 writer.Write((byte)Data.Length);
             else if (Usage == TransactionAttributeUsage.Description || Usage >= TransactionAttributeUsage.Remark)
