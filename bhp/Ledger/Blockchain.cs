@@ -465,8 +465,7 @@ namespace Bhp.Ledger
                                 sb.EmitAppCall(contract.Hash, "onPersist");
                             engine.LoadScript(sb.ToArray());
                         }
-                        engine.Execute();
-                        if (engine.State != VMState.HALT) throw new InvalidOperationException();
+                        if (engine.Execute() != VMState.HALT) throw new InvalidOperationException();
                         ApplicationExecuted application_executed = new ApplicationExecuted(engine);
                         Context.System.EventStream.Publish(application_executed);
                         all_application_executed.Add(application_executed);
@@ -483,8 +482,7 @@ namespace Bhp.Ledger
                     using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx, snapshot.Clone(), tx.SystemFee.value))
                     {
                         engine.LoadScript(tx.GetHashData());
-                        engine.Execute();
-                        if (!engine.State.HasFlag(VMState.FAULT))
+                        if (!engine.Execute().HasFlag(VMState.FAULT))
                         {
                             engine.Snapshot.Commit();
                         }

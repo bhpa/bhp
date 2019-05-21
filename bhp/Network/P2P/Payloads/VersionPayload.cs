@@ -2,6 +2,7 @@
 using Bhp.Network.P2P.Capabilities;
 using System;
 using System.IO;
+using System.Linq;
 
 namespace Bhp.Network.P2P.Payloads
 {
@@ -48,6 +49,8 @@ namespace Bhp.Network.P2P.Payloads
             Capabilities = new NodeCapability[reader.ReadVarInt(MaxCapabilities)];
             for (int x = 0, max = Capabilities.Length; x < max; x++)
                 Capabilities[x] = NodeCapability.DeserializeFrom(reader);
+            if (Capabilities.Select(p => p.Type).Distinct().Count() != Capabilities.Length)
+                throw new FormatException();
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
