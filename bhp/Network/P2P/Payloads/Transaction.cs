@@ -22,6 +22,7 @@ namespace Bhp.Network.P2P.Payloads
     public class Transaction : IEquatable<Transaction>, IInventory
     {
         public const int MaxTransactionSize = 102400;
+        public const uint MaxValidUntilBlockIncrement = 2102400;
         /// <summary>
         /// Maximum number of attributes that can be contained within a transaction
         /// </summary>
@@ -34,10 +35,12 @@ namespace Bhp.Network.P2P.Payloads
 
         public readonly TransactionType Type;
         public byte Version;
+        public uint Nonce;
         public byte[] Script;
         public UInt160 Sender;
         public long Gas;
         public long NetworkFee;
+        public uint ValidUntilBlock;
         public TransactionAttribute[] Attributes;
         public CoinReference[] Inputs;
         public TransactionOutput[] Outputs;
@@ -94,10 +97,12 @@ namespace Bhp.Network.P2P.Payloads
 
         public virtual int Size =>
             sizeof(byte) +              //Version
+            sizeof(uint) +              //Nonce
             Script.GetVarSize() +       //Script
             Sender.Size +               //Sender
             sizeof(long) +              //Gas
             sizeof(long) +              //NetworkFee
+            sizeof(uint) +              //ValidUntilBlock
             Attributes.GetVarSize() +   //Attributes
             Inputs.GetVarSize() + Outputs.GetVarSize() + Witnesses.GetVarSize();
 
@@ -202,6 +207,7 @@ namespace Bhp.Network.P2P.Payloads
         private void DeserializeUnsignedWithoutType(BinaryReader reader)
         {
             if (Version > 0) throw new FormatException();
+            Nonce = reader.ReadUInt32();
             Script = reader.ReadVarBytes(ushort.MaxValue);
             if (Script.Length == 0) throw new FormatException();
             Sender = reader.ReadSerializable<UInt160>();
@@ -211,6 +217,7 @@ namespace Bhp.Network.P2P.Payloads
             NetworkFee = reader.ReadInt64();
             if (NetworkFee < 0) throw new FormatException();
             if (Gas + NetworkFee < Gas) throw new FormatException();
+            ValidUntilBlock = reader.ReadUInt32();
             Attributes = reader.ReadSerializableArray<TransactionAttribute>(MaxTransactionAttributes);
             Inputs = reader.ReadSerializableArray<CoinReference>();
             Outputs = reader.ReadSerializableArray<TransactionOutput>(ushort.MaxValue + 1);
@@ -276,7 +283,9 @@ namespace Bhp.Network.P2P.Payloads
         {
             writer.Write((byte)Type);
             writer.Write(Version);
+            writer.Write(Nonce);
             writer.Write(Sender);
+            writer.Write(ValidUntilBlock);
             SerializeExclusiveData(writer);
             writer.Write(Attributes);
             writer.Write(Inputs);
@@ -290,12 +299,14 @@ namespace Bhp.Network.P2P.Payloads
             json["size"] = Size;
             json["type"] = Type;
             json["version"] = Version;
+            json["nonce"] = Nonce;
             json["sender"] = Sender.ToAddress();
             json["attributes"] = Attributes.Select(p => p.ToJson()).ToArray();
             json["vin"] = Inputs.Select(p => p.ToJson()).ToArray();
             json["vout"] = Outputs.Select((p, i) => p.ToJson((ushort)i)).ToArray();
             json["sys_fee"] = SystemFee.ToString();
             json["net_fee"] = NetworkFee.ToString();
+            json["valid_until_block"] = ValidUntilBlock;
             json["tx_fee"] = TxFee.ToString();
             json["scripts"] = Witnesses.Select(p => p.ToJson()).ToArray();
             return json;
@@ -309,7 +320,9 @@ namespace Bhp.Network.P2P.Payloads
         /*
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
-             int size = Size;
+            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
+                return false;
+            int size = Size;
             if (size > MaxTransactionSize) return false;
             if (size > NativeContract.Policy.GetMaxLowPriorityTransactionSize(snapshot) && NetworkFee / size < NativeContract.Policy.GetFeePerByte(snapshot))
                 return false;
@@ -361,6 +374,8 @@ namespace Bhp.Network.P2P.Payloads
 
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
+            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
+                return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
             if (size > NativeContract.Policy.GetMaxLowPriorityTransactionSize(snapshot) && NetworkFee / size < NativeContract.Policy.GetFeePerByte(snapshot))
