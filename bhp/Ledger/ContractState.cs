@@ -1,6 +1,7 @@
 ﻿using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.SmartContract;
+using Bhp.SmartContract.Manifest;
 using System.IO;
 
 namespace Bhp.Ledger
@@ -8,10 +9,10 @@ namespace Bhp.Ledger
     public class ContractState : ICloneable<ContractState>, ISerializable
     {
         public byte[] Script;
-        public ContractPropertyState ContractProperties;
+        public ContractManifest Manifest;
 
-        public bool HasStorage => ContractProperties.HasFlag(ContractPropertyState.HasStorage);
-        public bool Payable => ContractProperties.HasFlag(ContractPropertyState.Payable);
+        public bool HasStorage => Manifest.Features.HasFlag(ContractFeatures.HasStorage);
+        public bool Payable => Manifest.Features.HasFlag(ContractFeatures.Payable);
 
         private UInt160 _scriptHash;
         public UInt160 ScriptHash
@@ -26,43 +27,41 @@ namespace Bhp.Ledger
             }
         }
 
-        int ISerializable.Size => Script.GetVarSize() + sizeof(ContractParameterType);
+        int ISerializable.Size => Script.GetVarSize() + Manifest.ToJson().ToString().GetVarSize();
 
         ContractState ICloneable<ContractState>.Clone()
         {
             return new ContractState
             {
                 Script = Script,
-                ContractProperties = ContractProperties
+                Manifest = Manifest.Clone()
             };
         }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
             Script = reader.ReadVarBytes();           
-            ContractProperties = (ContractPropertyState)reader.ReadByte();           
+            Manifest = reader.ReadSerializable<ContractManifest>();
         }
 
         void ICloneable<ContractState>.FromReplica(ContractState replica)
         {
-            Script = replica.Script;           
-            ContractProperties = replica.ContractProperties;           
+            Script = replica.Script;
+            Manifest = replica.Manifest.Clone();
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
         {
-            writer.WriteVarBytes(Script);           
-            writer.Write((byte)ContractProperties);           
+            writer.WriteVarBytes(Script);
+            writer.Write(Manifest);
         }
 
         public JObject ToJson()
         {
             JObject json = new JObject();
             json["hash"] = ScriptHash.ToString();
-            json["script"] = Script.ToHexString();            
-            json["properties"] = new JObject();
-            json["properties"]["storage"] = HasStorage;
-            json["properties"]["payable"] = Payable;
+            json["script"] = Script.ToHexString();
+            json["manifest"] = Manifest.ToJson();
             return json;
         }
     }

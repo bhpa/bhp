@@ -5,6 +5,7 @@ using Bhp.Ledger;
 using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
+using Bhp.SmartContract.Manifest;
 using Bhp.VM;
 using Bhp.VM.Types;
 using System;
@@ -469,49 +470,30 @@ namespace Bhp.SmartContract
             }
             return false;
         }
-        /*
+       
         private static bool Contract_Call(ApplicationEngine engine)
         {
-            StackItem item0 = engine.CurrentContext.EvaluationStack.Pop();
+            StackItem contractOrHash = engine.CurrentContext.EvaluationStack.Pop();
             ContractState contract;
-            if (item0 is InteropInterface<ContractState> _interface)
+             if (contractOrHash is InteropInterface<ContractState> _interface)
                 contract = _interface;
             else
-                contract = engine.Snapshot.Contracts.TryGet(new UInt160(item0.GetByteArray()));
+                contract = engine.Snapshot.Contracts.TryGet(new UInt160(contractOrHash.GetByteArray()));
             if (contract is null) return false;
-            StackItem item1 = engine.CurrentContext.EvaluationStack.Pop();
-            StackItem item2 = engine.CurrentContext.EvaluationStack.Pop();
+           
+            StackItem method = engine.CurrentContext.EvaluationStack.Pop();
+            StackItem args = engine.CurrentContext.EvaluationStack.Pop();
+            ContractManifest currentManifest = engine.Snapshot.Contracts.TryGet(engine.CurrentScriptHash)?.Manifest;
+
+            if (currentManifest != null && !currentManifest.CanCall(contract.Manifest, method.GetString()))
+                return false;
+
             ExecutionContext context_new = engine.LoadScript(contract.Script, 1);
-            context_new.EvaluationStack.Push(item2);
-            context_new.EvaluationStack.Push(item1);
+            context_new.EvaluationStack.Push(args);
+            context_new.EvaluationStack.Push(method);
             return true;
         }
-        */
-
-        //by bhp
-        private static bool Contract_Call(ApplicationEngine engine)
-        {
-            StackItem item0 = engine.CurrentContext.EvaluationStack.Pop();
-            ContractState contract;
-            if (item0 is InteropInterface<ContractState> _interface)
-                contract = _interface;
-            else
-                contract = engine.Snapshot.Contracts.TryGet(new UInt160(item0.GetByteArray()));
-            if (contract is null) return false;
-
-            RandomAccessStack<StackItem> stacks = new RandomAccessStack<StackItem>();
-            for (int i = 0; i < engine.CurrentContext.EvaluationStack.Count;)
-            {
-                stacks.Push(engine.CurrentContext.EvaluationStack.Pop());
-            }
-            ExecutionContext context_new = engine.LoadScript(contract.Script, engine.CurrentContext.ScriptHash, 1);
-            for (int i = 0; i < stacks.Count;)
-            {
-                context_new.EvaluationStack.Push(stacks.Pop());
-            }
-            return true;
-        }
-
+       
         private static bool Contract_Destroy(ApplicationEngine engine)
         {
             if (engine.Trigger != TriggerType.Application) return false;

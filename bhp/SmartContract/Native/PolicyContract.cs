@@ -1,6 +1,7 @@
 ﻿using Bhp.IO;
 using Bhp.Ledger;
 using Bhp.Persistence;
+using Bhp.SmartContract.Manifest;
 using Bhp.VM;
 using System;
 using System.Collections.Generic;
@@ -10,14 +11,133 @@ namespace Bhp.SmartContract.Native
 {
     public sealed class PolicyContract : NativeContract
     {
-        public override string ServiceName => "Bhp.Native.Policy";
-        public override ContractPropertyState Properties => ContractPropertyState.HasStorage;
+        public override string ServiceName => "Bhp.Native.Policy";        
 
         private const byte Prefix_MaxTransactionsPerBlock = 23;
         private const byte Prefix_MaxLowPriorityTransactionsPerBlock = 34;
         private const byte Prefix_MaxLowPriorityTransactionSize = 29;
         private const byte Prefix_FeePerByte = 10;
         private const byte Prefix_BlockedAccounts = 15;
+
+        public PolicyContract() : base()
+        {
+            Manifest.Features = ContractFeatures.HasStorage;
+
+            var list = new List<ContractMethodDescriptor>(Manifest.Abi.Methods)
+            {
+                new ContractMethodDescriptor()
+                {
+                    Name = "getMaxTransactionsPerBlock",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "getMaxLowPriorityTransactionsPerBlock",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "getMaxLowPriorityTransactionSize",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "getFeePerByte",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "getBlockedAccounts",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "setMaxTransactionsPerBlock",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "value",
+                             Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "setMaxLowPriorityTransactionsPerBlock",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "value",
+                             Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "setMaxLowPriorityTransactionSize",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "value",
+                             Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "setFeePerByte",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "value",
+                             Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                },
+
+                new ContractMethodDescriptor()
+                {
+                    Name = "blockAccount",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "account",
+                             Type = ContractParameterType.Hash160
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "unblockAccount",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "account",
+                             Type = ContractParameterType.Hash160
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                }
+            };
+
+            Manifest.Abi.Methods = list.ToArray();
+        }
 
         private bool CheckValidators(ApplicationEngine engine)
         {

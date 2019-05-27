@@ -1,7 +1,9 @@
 ﻿using Bhp.Ledger;
 using Bhp.Persistence;
+using Bhp.SmartContract.Manifest;
 using Bhp.VM;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using VMArray = Bhp.VM.Types.Array;
 
@@ -9,8 +11,7 @@ namespace Bhp.SmartContract.Native.Tokens
 {
     public abstract class Brc6Token<TState> : NativeContract
         where TState : Brc6AccountState, new()
-    {
-        public override ContractPropertyState Properties => ContractPropertyState.HasStorage;
+    {       
         public override string[] SupportedStandards { get; } = { "BRC-5", "BRC-10" };
         public abstract string Name { get; }
         public abstract string Symbol { get; }
@@ -20,9 +21,104 @@ namespace Bhp.SmartContract.Native.Tokens
         protected const byte Prefix_TotalSupply = 11;
         protected const byte Prefix_Account = 20;
 
-        protected Brc6Token()
+        protected Brc6Token() : base()
         {
             this.Factor = BigInteger.Pow(10, Decimals);
+
+            var methods = new List<ContractMethodDescriptor>(Manifest.Abi.Methods)
+            {
+                new ContractMethodDescriptor()
+                {
+                    Name = "name",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.String
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "symbol",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.String
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "decimals",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "totalSupply",
+                    Parameters = new ContractParameterDefinition[0],
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "balanceOf",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                            Name = "account",
+                            Type = ContractParameterType.Hash160
+                        }
+                    },
+                    ReturnType = ContractParameterType.Integer
+                },
+                new ContractMethodDescriptor()
+                {
+                    Name = "transfer",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                            Name = "from",
+                            Type = ContractParameterType.Hash160
+                        },
+                        new ContractParameterDefinition()
+                        {
+                            Name = "to",
+                            Type = ContractParameterType.Hash160
+                        },
+                        new ContractParameterDefinition()
+                        {
+                            Name = "amount",
+                            Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                }
+            };
+
+            Manifest.Abi.Methods = methods.ToArray();
+
+            var events = new List<ContractEventDescriptor>(Manifest.Abi.Events)
+            {
+                new ContractMethodDescriptor()
+                {
+                    Name = "Transfer",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                            Name = "from",
+                            Type = ContractParameterType.Hash160
+                        },
+                        new ContractParameterDefinition()
+                        {
+                            Name = "to",
+                            Type = ContractParameterType.Hash160
+                        },
+                        new ContractParameterDefinition()
+                        {
+                            Name = "amount",
+                            Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Boolean
+                }
+            };
+
+            Manifest.Abi.Events = events.ToArray();
         }
 
         protected StorageKey CreateAccountKey(UInt160 account)

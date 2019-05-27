@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Bhp.Cryptography.ECC;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
+using Bhp.SmartContract.Manifest;
 using Bhp.VM;
 using VMArray = Bhp.VM.Types.Array;
 
@@ -19,8 +21,26 @@ namespace Bhp.SmartContract.Native.Tokens
 
         private const byte Prefix_SystemFeeAmount = 15;
 
-        internal GasToken()
+        internal GasToken() : base()
         {
+            var list = new List<ContractMethodDescriptor>(Manifest.Abi.Methods)
+            {
+                new ContractMethodDescriptor()
+                {
+                    Name = "getSysFeeAmount",
+                    Parameters = new ContractParameterDefinition[]
+                    {
+                        new ContractParameterDefinition()
+                        {
+                             Name = "index",
+                             Type = ContractParameterType.Integer
+                        }
+                    },
+                    ReturnType = ContractParameterType.Integer
+                }
+            };
+
+            Manifest.Abi.Methods = list.ToArray();
         }
 
         protected override StackItem Main(ApplicationEngine engine, string operation, VMArray args)
