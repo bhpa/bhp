@@ -150,21 +150,6 @@ namespace Bhp.Wallets.SQLite
                 }
         }
 
-        public override void ApplyTransaction(Transaction tx)
-        {
-            lock (unconfirmed)
-            {
-                unconfirmed[tx.Hash] = tx;
-            }
-            WalletTransaction?.Invoke(this, new WalletTransactionEventArgs
-            {
-                Transaction = tx,
-                RelatedAccounts = tx.Witnesses.Select(p => p.ScriptHash).Union(tx.Outputs.Select(p => p.ScriptHash)).Where(p => Contains(p)).ToArray(),
-                Height = null,
-                Time = DateTime.UtcNow.ToTimestamp()
-            });
-        }
-
         private void BuildDatabase()
         {
             using (WalletDataContext ctx = new WalletDataContext(path))

@@ -395,7 +395,7 @@ namespace Bhp.Network.RPC
                     ContractParametersContext context = new ContractParametersContext(tx);
                     Wallet.Sign(context);
                     if (context.Completed)
-                        tx.Witnesses = context.GetWitnesses();
+                        tx.Witness = context.GetWitness();
                     else
                         tx = null;
                 }
@@ -416,12 +416,12 @@ namespace Bhp.Network.RPC
             Wallet.Sign(context);
             if (context.Completed)
             {
-                tx.Witnesses = context.GetWitnesses();
+                tx.Witness = context.GetWitness();
 
                 if (tx.Size > Transaction.MaxTransactionSize)
                     throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
 
-                Wallet.ApplyTransaction(tx);
+                //Wallet.ApplyTransaction(tx);
                 system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
 
                 if (isHexString)

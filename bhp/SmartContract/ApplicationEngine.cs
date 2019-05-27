@@ -10,13 +10,12 @@ using VMArray = Bhp.VM.Types.Array;
 
 namespace Bhp.SmartContract
 {
-    public class ApplicationEngine : ExecutionEngine
+    public partial class ApplicationEngine : ExecutionEngine
     {
         public static event EventHandler<NotifyEventArgs> Notify;
         public static event EventHandler<LogEventArgs> Log;
 
-        public static readonly long GasFree = 10 * (long)NativeContract.GAS.Factor;
-        private const long ratio = 100000;
+        public const long GasFree = 0;
         private readonly long gas_amount;
         private readonly bool testMode;
         private readonly RandomAccessStack<UInt160> hashes = new RandomAccessStack<UInt160>();
@@ -49,6 +48,12 @@ namespace Bhp.SmartContract
             return disposable;
         }
 
+        private bool AddGas(long gas)
+        {
+            GasConsumed = checked(GasConsumed + gas);
+            return testMode || GasConsumed <= gas_amount;
+        }
+
         private void ApplicationEngine_ContextLoaded(object sender, ExecutionContext e)
         {
             hashes.Push(((byte[])e.Script).ToScriptHash());
@@ -66,62 +71,11 @@ namespace Bhp.SmartContract
             disposables.Clear();
             base.Dispose();
         }
-
-        protected virtual long GetPrice()
-        {
-            Instruction instruction = CurrentContext.CurrentInstruction;
-            if (instruction.OpCode <= OpCode.NOP) return 0;
-            switch (instruction.OpCode)
-            {
-                case OpCode.SYSCALL:
-                    return GetPriceForSysCall();
-                case OpCode.SHA1:
-                case OpCode.SHA256:
-                    return 10;
-                default: return 1;
-            }
-        }
-
-        protected virtual long GetPriceForSysCall()
-        {
-            Instruction instruction = CurrentContext.CurrentInstruction;
-            uint method = instruction.TokenU32;
-            long price = InteropService.GetPrice(method);
-            if (price > 0) return price;
-            if (method == InteropService.Bhp_Crypto_CheckMultiSig)
-            {
-                if (CurrentContext.EvaluationStack.Count == 0) return 1;
-
-                var item = CurrentContext.EvaluationStack.Peek();
-
-                int n;
-                if (item is VMArray array) n = array.Count;
-                else n = (int)item.GetBigInteger();
-
-                if (n < 1) return 1;
-                return 100 * n;
-            }
-            if (method == InteropService.Bhp_Contract_Create ||
-                method == InteropService.Bhp_Contract_Update)
-            {
-                long fee = 100L;
-
-                ContractFeatures contract_properties = (ContractFeatures)(byte)CurrentContext.EvaluationStack.Peek(3).GetBigInteger();
-
-                if (contract_properties.HasFlag(ContractFeatures.HasStorage))
-                {
-                    fee += 400L;
-                }
-                return fee * (long)NativeContract.GAS.Factor / ratio;
-            }
-            if (method == InteropService.System_Storage_Put ||
-                method == InteropService.System_Storage_PutEx)
-                return ((CurrentContext.EvaluationStack.Peek(1).GetByteArray().Length + CurrentContext.EvaluationStack.Peek(2).GetByteArray().Length - 1) / 1024 + 1) * 1000;
-            return 1;
-        }
-
+        
         protected override bool OnSysCall(uint method)
         {
+            if (!AddGas(InteropService.GetPrice(method, CurrentContext.EvaluationStack)))
+                return false;
             return InteropService.Invoke(this, method);
         }
 
@@ -129,9 +83,7 @@ namespace Bhp.SmartContract
         {
             if (CurrentContext.InstructionPointer >= CurrentContext.Script.Length)
                 return true;
-            GasConsumed = checked(GasConsumed + GetPrice() * ratio);
-            if (!testMode && GasConsumed > gas_amount) return false;
-            return true;
+            return AddGas(OpCodePrices[CurrentContext.CurrentInstruction.OpCode]);
         }
 
         public static ApplicationEngine Run(byte[] script, Snapshot snapshot,

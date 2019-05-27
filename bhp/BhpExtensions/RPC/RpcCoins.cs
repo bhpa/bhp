@@ -170,7 +170,7 @@ namespace Bhp.BhpExtensions.RPC
 
             if (context.Completed)
             {
-                tx.Witnesses = context.GetWitnesses();
+                tx.Witness = context.GetWitness();
 
                 if (tx.Size > Transaction.MaxTransactionSize)
                 {
@@ -178,7 +178,7 @@ namespace Bhp.BhpExtensions.RPC
                     return null;
                 }
 
-                current_wallet.ApplyTransaction(tx);
+                //current_wallet.ApplyTransaction(tx);
 
                 bool relay_result = system.Blockchain.Ask<RelayResultReason>(tx).Result == RelayResultReason.Succeed;
 

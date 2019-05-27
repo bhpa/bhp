@@ -91,22 +91,7 @@ namespace Bhp.Wallets.BRC6
                 accounts[account.ScriptHash] = account;
             }
         }
-
-        public override void ApplyTransaction(Transaction tx)
-        {
-            lock (unconfirmed)
-            {
-                unconfirmed[tx.Hash] = tx;
-            }
-            WalletTransaction?.Invoke(this, new WalletTransactionEventArgs
-            {
-                Transaction = tx,
-                RelatedAccounts = tx.Witnesses.Select(p => p.ScriptHash).Union(tx.Outputs.Select(p => p.ScriptHash)).Where(p => Contains(p)).ToArray(),
-                Height = null,
-                Time = DateTime.UtcNow.ToTimestamp()
-            });
-        }
-
+        
         public override bool Contains(UInt160 scriptHash)
         {
             lock (accounts)

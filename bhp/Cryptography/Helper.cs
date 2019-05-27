@@ -119,8 +119,7 @@ namespace Bhp.Cryptography
             if (filter.Check(tx.Hash.ToArray())) return true;
             if (tx.Outputs.Any(p => filter.Check(p.ScriptHash.ToArray()))) return true;
             if (tx.Inputs.Any(p => filter.Check(p.ToArray()))) return true;
-            if (tx.Witnesses.Any(p => filter.Check(p.ScriptHash.ToArray())))
-                return true;
+            if (filter.Check(tx.Sender.ToArray())) return true;
 #pragma warning disable CS0612
             if (tx is RegisterTransaction asset)
                 if (filter.Check(asset.Admin.ToArray())) return true;

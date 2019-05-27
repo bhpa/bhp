@@ -5,9 +5,7 @@
         ContractHash = 0x00,
 
         ECDH02 = 0x02,
-        ECDH03 = 0x03,
-
-        Cosigner = 0x20,
+        ECDH03 = 0x03,       
 
         Vote = 0x30,
 

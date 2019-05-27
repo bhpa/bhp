@@ -64,13 +64,7 @@ namespace Bhp.Network.P2P.Payloads
                 throw new FormatException();
             Admin = reader.ReadSerializable<UInt160>();
         }
-
-        public override UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
-        {
-            UInt160 owner = Contract.CreateSignatureRedeemScript(Owner).ToScriptHash();
-            return base.GetScriptHashesForVerifying(snapshot).Union(new[] { owner }).OrderBy(p => p).ToArray();
-        }
-
+        
         protected override void OnDeserialized()
         {
             base.OnDeserialized();

@@ -53,7 +53,11 @@ namespace Bhp.Ledger
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
             Outputs = new TransactionOutput[0],
-            Witnesses = new Witness[0]
+            Witness = new Witness
+            {
+                InvocationScript = new byte[0],
+                VerificationScript = new[] { (byte)OpCode.PUSHT }
+            }
         };
 
         public static readonly RegisterTransaction UtilityToken = new RegisterTransaction
@@ -67,7 +71,7 @@ namespace Bhp.Ledger
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
             Outputs = new TransactionOutput[0],
-            Witnesses = new Witness[0]
+            Witness = new Witness()
         };
 #pragma warning restore CS0612
 
@@ -95,7 +99,7 @@ namespace Bhp.Ledger
                     Attributes = new TransactionAttribute[0],
                     Inputs = new CoinReference[0],
                     Outputs = new TransactionOutput[0],
-                    Witnesses = new Witness[0]
+                    Witness = new Witness()
                 },
                 GoverningToken,
                 UtilityToken,
@@ -205,7 +209,7 @@ namespace Bhp.Ledger
                 Attributes = new TransactionAttribute[0],
                 Inputs = new CoinReference[0],
                 Outputs = new TransactionOutput[0],
-                Witnesses = new Witness[0]
+                Witness = new Witness()
             };
         }
 

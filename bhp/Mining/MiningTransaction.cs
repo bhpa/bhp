@@ -30,7 +30,7 @@ namespace Bhp.Mining
                 Attributes = attributes.ToArray(),
                 Inputs = new CoinReference[0],
                 Outputs = outputs.ToArray(),
-                Witnesses = new Witness[0]
+                Witness = new Witness()
             };
             return tx;
         }

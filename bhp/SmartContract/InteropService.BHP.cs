@@ -18,34 +18,50 @@ namespace Bhp.SmartContract
     static partial class InteropService
     {
         public static readonly uint Bhp_Native_Deploy = Register("Bhp.Native.Deploy", Native_Deploy, 0);
-        public static readonly uint Bhp_Crypto_CheckSig = Register("Bhp.Crypto.CheckSig", Crypto_CheckSig, 100);
-        public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig);
-        public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 1);
-        public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 1);        
-        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 1);
-        public static readonly uint Bhp_Transaction_GetWitnesses = Register("Bhp.Transaction.GetWitnesses", Transaction_GetWitnesses, 200);
-        public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 1);
-        public static readonly uint Bhp_Witness_GetVerificationScript = Register("Bhp.Witness.GetVerificationScript", Witness_GetVerificationScript, 100);
-        public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 100);
-        public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create);
-        public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update);
-        public static readonly uint Bhp_Contract_GetScript = Register("Bhp.Contract.GetScript", Contract_GetScript, 1);
-        public static readonly uint Bhp_Contract_IsPayable = Register("Bhp.Contract.IsPayable", Contract_IsPayable, 1);
-        public static readonly uint Bhp_Storage_Find = Register("Bhp.Storage.Find", Storage_Find, 1);
-        public static readonly uint Bhp_Enumerator_Create = Register("Bhp.Enumerator.Create", Enumerator_Create, 1);
-        public static readonly uint Bhp_Enumerator_Next = Register("Bhp.Enumerator.Next", Enumerator_Next, 1);
-        public static readonly uint Bhp_Enumerator_Value = Register("Bhp.Enumerator.Value", Enumerator_Value, 1);
-        public static readonly uint Bhp_Enumerator_Concat = Register("Bhp.Enumerator.Concat", Enumerator_Concat, 1);
-        public static readonly uint Bhp_Iterator_Create = Register("Bhp.Iterator.Create", Iterator_Create, 1);
-        public static readonly uint Bhp_Iterator_Key = Register("Bhp.Iterator.Key", Iterator_Key, 1);
-        public static readonly uint Bhp_Iterator_Keys = Register("Bhp.Iterator.Keys", Iterator_Keys, 1);
-        public static readonly uint Bhp_Iterator_Values = Register("Bhp.Iterator.Values", Iterator_Values, 1);
-        public static readonly uint Bhp_Iterator_Concat = Register("Bhp.Iterator.Concat", Iterator_Concat, 1);
+        public static readonly uint Bhp_Crypto_CheckSig = Register("Bhp.Crypto.CheckSig", Crypto_CheckSig, 0_01000000);
+        public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig, GetCheckMultiSigPrice);
+        public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 0_00000400);
+        public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 0_00000400);
+        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400);        
+        public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 0_00000400);
+        public static readonly uint Bhp_Transaction_GetWitnessScript = Register("Bhp.Transaction.GetWitnessScript", Transaction_GetWitnessScript, 0_00000400);
+        public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 0_00030000);
+        public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create, GetDeploymentPrice);
+        public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update, GetDeploymentPrice);
+        public static readonly uint Bhp_Contract_GetScript = Register("Bhp.Contract.GetScript", Contract_GetScript, 0_00000400);
+        public static readonly uint Bhp_Contract_IsPayable = Register("Bhp.Contract.IsPayable", Contract_IsPayable, 0_00000400);
+        public static readonly uint Bhp_Storage_Find = Register("Bhp.Storage.Find", Storage_Find, 0_01000000);
+        public static readonly uint Bhp_Enumerator_Create = Register("Bhp.Enumerator.Create", Enumerator_Create, 0_00000400);
+        public static readonly uint Bhp_Enumerator_Next = Register("Bhp.Enumerator.Next", Enumerator_Next, 0_01000000);
+        public static readonly uint Bhp_Enumerator_Value = Register("Bhp.Enumerator.Value", Enumerator_Value, 0_00000400);
+        public static readonly uint Bhp_Enumerator_Concat = Register("Bhp.Enumerator.Concat", Enumerator_Concat, 0_00000400);
+        public static readonly uint Bhp_Iterator_Create = Register("Bhp.Iterator.Create", Iterator_Create, 0_00000400);
+        public static readonly uint Bhp_Iterator_Key = Register("Bhp.Iterator.Key", Iterator_Key, 0_00000400);
+        public static readonly uint Bhp_Iterator_Keys = Register("Bhp.Iterator.Keys", Iterator_Keys, 0_00000400);
+        public static readonly uint Bhp_Iterator_Values = Register("Bhp.Iterator.Values", Iterator_Values, 0_00000400);
+        public static readonly uint Bhp_Iterator_Concat = Register("Bhp.Iterator.Concat", Iterator_Concat, 0_00000400);
 
         static InteropService()
         {
             foreach (NativeContract contract in NativeContract.Contracts)
-                Register(contract.ServiceName, contract.Invoke);
+                Register(contract.ServiceName, contract.Invoke, contract.GetPrice);
+        }
+
+        private static long GetCheckMultiSigPrice(RandomAccessStack<StackItem> stack)
+        {
+            if (stack.Count == 0) return 0;
+            var item = stack.Peek();
+            int n;
+            if (item is VMArray array) n = array.Count;
+            else n = (int)item.GetBigInteger();
+            if (n < 1) return 0;
+            return GetPrice(Bhp_Crypto_CheckSig, stack) * n;
+        }
+
+        private static long GetDeploymentPrice(RandomAccessStack<StackItem> stack)
+        {
+            int size = stack.Peek(0).GetByteLength() + stack.Peek(1).GetByteLength();
+            return GasPerByte * size;
         }
 
         private static bool Native_Deploy(ApplicationEngine engine)
@@ -174,21 +190,7 @@ namespace Bhp.SmartContract
             }
             return false;
         }
-
-        private static bool Transaction_GetWitnesses(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                Transaction tx = _interface.GetInterface<Transaction>();
-                if (tx == null) return false;
-                if (tx.Witnesses.Length > engine.MaxArraySize)
-                    return false;
-                engine.CurrentContext.EvaluationStack.Push(WitnessWrapper.Create(tx, engine.Snapshot).Select(p => StackItem.FromInterface(p)).ToArray());
-                return true;
-            }
-            return false;
-        }
-
+        
         private static bool Transaction_GetScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
@@ -201,13 +203,16 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private static bool Witness_GetVerificationScript(ApplicationEngine engine)
+        private static bool Transaction_GetWitnessScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
-                WitnessWrapper witness = _interface.GetInterface<WitnessWrapper>();
-                if (witness == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(witness.VerificationScript);
+                Transaction tx = _interface.GetInterface<Transaction>();
+                if (tx == null) return false;
+                byte[] script = tx.Witness.VerificationScript;
+                if (script.Length == 0)
+                    script = engine.Snapshot.Contracts[tx.Sender].Script;
+                engine.CurrentContext.EvaluationStack.Push(script);
                 return true;
             }
             return false;
