@@ -11,7 +11,8 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class Block : BlockBase, IInventory, IEquatable<Block>
     {
-        public const int MaxTransactionsPerBlock = ushort.MaxValue;
+        public const int MaxContentsPerBlock = ushort.MaxValue;
+        public const int MaxTransactionsPerBlock = MaxContentsPerBlock - 1;
 
         public ConsensusData ConsensusData;
         public Transaction[] Transactions;
@@ -39,7 +40,10 @@ namespace Bhp.Network.P2P.Payloads
 
         InventoryType IInventory.InventoryType => InventoryType.Block;
 
-        public override int Size => base.Size + ConsensusData.Size + Transactions.GetVarSize();
+        public override int Size => base.Size
+             + IO.Helper.GetVarSize(Transactions.Length + 1) //Count
+             + ConsensusData.Size                            //ConsensusData
+             + Transactions.Sum(p => p.Size);                //Transactions
 
         public static Fixed8 CalculateNetFee(IEnumerable<Transaction> transactions)
         {
@@ -60,9 +64,12 @@ namespace Bhp.Network.P2P.Payloads
         public override void Deserialize(BinaryReader reader)
         {
             base.Deserialize(reader);
+            int count = (int)reader.ReadVarInt(MaxContentsPerBlock);
+            if (count == 0) throw new FormatException();
             ConsensusData = reader.ReadSerializable<ConsensusData>();
-            Transactions = new Transaction[reader.ReadVarInt(MaxTransactionsPerBlock)];
-            if (Transactions.Length == 0) throw new FormatException();
+            Transactions = new Transaction[count - 1];
+            for (int i = 0; i < Transactions.Length; i++)
+                Transactions[i] = reader.ReadSerializable<Transaction>();
             HashSet<UInt256> hashes = new HashSet<UInt256>();
             for (int i = 0; i < Transactions.Length; i++)
             {
@@ -109,8 +116,10 @@ namespace Bhp.Network.P2P.Payloads
         public override void Serialize(BinaryWriter writer)
         {
             base.Serialize(writer);
+            writer.WriteVarInt(Transactions.Length + 1);
             writer.Write(ConsensusData);
-            writer.Write(Transactions);
+            foreach (Transaction tx in Transactions)
+                writer.Write(tx);
         }
 
         public override JObject ToJson()
@@ -132,8 +141,8 @@ namespace Bhp.Network.P2P.Payloads
                 Index = Index,
                 NextConsensus = NextConsensus,
                 Witness = Witness,
-                ConsensusData = ConsensusData,
-                Hashes = Transactions.Select(p => p.Hash).ToArray()
+                Hashes = new[] { ConsensusData.Hash }.Concat(Transactions.Select(p => p.Hash)).ToArray(),
+                ConsensusData = ConsensusData
             };
         }
     }

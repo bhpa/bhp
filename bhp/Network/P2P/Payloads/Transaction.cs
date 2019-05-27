@@ -121,11 +121,6 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        protected Transaction(TransactionType type)
-        {
-            this.Type = type;
-        }
-
         public void CalculateFees()
         {
             if (Sender is null) Sender = UInt160.Zero;

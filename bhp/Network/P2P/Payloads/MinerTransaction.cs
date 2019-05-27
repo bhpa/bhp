@@ -15,7 +15,7 @@ namespace Bhp.Network.P2P.Payloads
         public override int Size => base.Size + sizeof(uint);
 
         public MinerTransaction()
-            : base(TransactionType.MinerTransaction)
+            : base()
         {
         }
 

@@ -19,7 +19,7 @@ namespace Bhp.Network.P2P.Payloads
         public override Fixed8 SystemFee => Gas;
 
         public InvocationTransaction()
-            : base(TransactionType.InvocationTransaction)
+            : base()
         {
         }
 

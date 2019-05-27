@@ -48,7 +48,7 @@ namespace Bhp.Network.P2P.Payloads
         }
 
         public RegisterTransaction()
-            : base(TransactionType.RegisterTransaction)
+            : base()
         {
         }
 
