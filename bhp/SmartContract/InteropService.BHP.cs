@@ -1,4 +1,5 @@
 ﻿using Bhp.Cryptography;
+using Bhp.IO.Json;
 using Bhp.Ledger;
 using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
@@ -40,6 +41,8 @@ namespace Bhp.SmartContract
         public static readonly uint Bhp_Iterator_Keys = Register("Bhp.Iterator.Keys", Iterator_Keys, 0_00000400);
         public static readonly uint Bhp_Iterator_Values = Register("Bhp.Iterator.Values", Iterator_Values, 0_00000400);
         public static readonly uint Bhp_Iterator_Concat = Register("Bhp.Iterator.Concat", Iterator_Concat, 0_00000400);
+        public static readonly uint Bhp_Json_Serialize = Register("Bhp.Json.Serialize", Json_Serialize, 0_00100000);
+        public static readonly uint Bhp_Json_Deserialize = Register("Bhp.Json.Deserialize", Json_Deserialize, 0_00500000);
 
         static InteropService()
         {
@@ -459,6 +462,25 @@ namespace Bhp.SmartContract
             IIterator second = _interface2.GetInterface<IIterator>();
             IIterator result = new ConcatenatedIterator(first, second);
             engine.CurrentContext.EvaluationStack.Push(StackItem.FromInterface(result));
+            return true;
+        }
+
+        private static bool Json_Deserialize(ApplicationEngine engine)
+        {
+            var json = engine.CurrentContext.EvaluationStack.Pop().GetString();
+            var obj = JObject.Parse(json, 10);
+            var item = JsonSerializer.Deserialize(obj);
+
+            engine.CurrentContext.EvaluationStack.Push(item);
+            return true;
+        }
+
+        private static bool Json_Serialize(ApplicationEngine engine)
+        {
+            var item = engine.CurrentContext.EvaluationStack.Pop();
+            var json = JsonSerializer.Serialize(item);
+
+            engine.CurrentContext.EvaluationStack.Push(json.ToString());
             return true;
         }
     }
