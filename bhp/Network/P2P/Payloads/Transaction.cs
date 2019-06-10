@@ -293,7 +293,7 @@ namespace Bhp.Network.P2P.Payloads
         public virtual JObject ToJson()
         {
             JObject json = new JObject();
-            json["txid"] = Hash.ToString();
+            json["hash"] = Hash.ToString();
             json["size"] = Size;
             json["type"] = Type;
             json["version"] = Version;

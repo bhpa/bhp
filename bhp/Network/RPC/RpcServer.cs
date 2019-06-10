@@ -438,14 +438,14 @@ namespace Bhp.Network.RPC
         {
             Transaction tx = Transaction.DeserializeFrom(_params[0].AsString().HexToBytes());
             RelayResultReason reason = system.Blockchain.Ask<RelayResultReason>(tx).Result;
-            return GetRelayResult(reason);
+            return GetRelayResult(reason, tx.Hash);
         }
 
         private JObject SubmitBlock(JArray _params)
         {
             Block block = _params[0].AsString().HexToBytes().AsSerializable<Block>();
             RelayResultReason reason = system.Blockchain.Ask<RelayResultReason>(block).Result;
-            return GetRelayResult(reason);
+            return GetRelayResult(reason, block.Hash);
         }
 
         private JObject ValidateAddress(JArray _params)
@@ -480,12 +480,16 @@ namespace Bhp.Network.RPC
                 }));
         }
 
-        private static JObject GetRelayResult(RelayResultReason reason)
+        private static JObject GetRelayResult(RelayResultReason reason, UInt256 hash)
         {
             switch (reason)
             {
                 case RelayResultReason.Succeed:
-                    return true;
+                    {
+                        var ret = new JObject();
+                        ret["hash"] = hash.ToString();
+                        return ret;
+                    }
                 case RelayResultReason.AlreadyExists:
                     throw new RpcException(-501, "Block or transaction already exists and cannot be sent repeatedly.");
                 case RelayResultReason.OutOfMemory:
