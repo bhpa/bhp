@@ -93,7 +93,8 @@ namespace Bhp.Plugins
             if (!Directory.Exists(pluginsPath)) return;
             foreach (string filename in Directory.EnumerateFiles(pluginsPath, "*.dll", SearchOption.TopDirectoryOnly))
             {
-                Assembly assembly = Assembly.LoadFile(filename);
+                var file = File.ReadAllBytes(filename);
+                Assembly assembly = Assembly.Load(file);
                 foreach (Type type in assembly.ExportedTypes)
                 {
                     if (!type.IsSubclassOf(typeof(Plugin))) continue;
