@@ -552,10 +552,20 @@ namespace Bhp.SmartContract
                 ScriptHash = context.ScriptHash,
                 Key = key
             };
-            StorageItem item = engine.Snapshot.Storages.GetAndChange(skey, () => new StorageItem());
-            if (item.IsConstant) return false;
-            item.Value = value;
-            item.IsConstant = flags.HasFlag(StorageFlags.Constant);
+
+            if (engine.Snapshot.Storages.TryGet(skey)?.IsConstant == true) return false;
+
+            if (value.Length == 0 && !flags.HasFlag(StorageFlags.Constant))
+            {
+                // If put 'value' is empty (and non-const), we remove it (implicit `Storage.Delete`)
+                engine.Snapshot.Storages.Delete(skey);
+            }
+            else
+            {
+                StorageItem item = engine.Snapshot.Storages.GetAndChange(skey, () => new StorageItem());
+                item.Value = value;
+                item.IsConstant = flags.HasFlag(StorageFlags.Constant);
+            }
             return true;
         }
 
