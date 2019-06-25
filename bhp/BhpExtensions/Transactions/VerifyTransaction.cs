@@ -96,15 +96,15 @@ namespace Bhp.BhpExtensions.Transactions
                     if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
                         return "ClaimTransaction is invalid.";
                     break;
-                */               
+                */
                 default:
                     if (results_issue.Length > 0)
                         return "Transaction input is not equal to output.";
                     break;
             }
             if (tx.Attributes.Count(p => p.Usage == TransactionAttributeUsage.ECDH02 || p.Usage == TransactionAttributeUsage.ECDH03) > 1)
-                return "ECDH02 and ECDH03 too much.";            
-            if (tx.VerifyWitness(snapshot, 1_00000000) == false) return "Verify Witnesses is failure.";
+                return "ECDH02 and ECDH03 too much.";
+            if (tx.VerifyWitnesses(snapshot, 1_00000000) == false) return "Verify Witnesses is failure.";
             return "success";
         }
 
@@ -169,7 +169,7 @@ namespace Bhp.BhpExtensions.Transactions
             if (inputSum != Fixed8.Zero)
             {
                 Fixed8 txFee = BhpTxFee.MinTxFee;
-                int tx_size = tx.Size - tx.Witness.Size;
+                int tx_size = tx.Size - tx.Witnesses.Sum(p => p.Size);
                 txFee = Fixed8.FromDecimal(tx_size / BhpTxFee.SizeRadix + (tx_size % BhpTxFee.SizeRadix == 0 ? 0 : 1)) * BhpTxFee.MinTxFee; ;
                 txFee = txFee <= BhpTxFee.MaxTxFee ? txFee : BhpTxFee.MaxTxFee;
                 Fixed8 payFee = inputSum - outputSum;

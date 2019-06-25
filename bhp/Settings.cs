@@ -35,7 +35,7 @@ namespace Bhp
             {
                 if (_default == null)
                 {
-                    var configuration = new ConfigurationBuilder().AddJsonFile("protocol.json", true).Build();
+                    var configuration = Helper.LoadConfig("protocol");
                     UpdateDefault(configuration);
                 }
 

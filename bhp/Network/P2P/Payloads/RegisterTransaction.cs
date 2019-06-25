@@ -35,15 +35,15 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public override int Size => base.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + sizeof(byte) + Owner.Size + Admin.Size;
+        public new int Size => base.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + sizeof(byte) + Owner.Size + Admin.Size;
 
-        public override Fixed8 SystemFee
+        public new Fixed8 SystemFee
         {
             get
             {
                 if (AssetType == AssetType.GoverningToken || AssetType == AssetType.UtilityToken)
                     return Fixed8.Zero;
-                return base.SystemFee;
+                return Fixed8.Parse(base.SystemFee.ToString());
             }
         }
 
@@ -64,7 +64,7 @@ namespace Bhp.Network.P2P.Payloads
                 throw new FormatException();
             Admin = reader.ReadSerializable<UInt160>();
         }
-        
+
         protected override void OnDeserialized()
         {
             base.OnDeserialized();

@@ -30,7 +30,7 @@ namespace Bhp.BhpExtensions.Transactions
         {
             if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
             if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
-            fee += tx.SystemFee;
+            fee += Fixed8.Parse(tx.SystemFee.ToString());
             var pay_total = tx.Outputs.GroupBy(p => p.AssetId, (k, g) => new
             {
                 AssetId = k,

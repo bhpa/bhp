@@ -17,7 +17,7 @@ namespace Bhp.Network.P2P.Payloads
         public uint Timestamp;
         public uint Index;
         public UInt160 NextConsensus;
-        public Witness Witness { get; set; }
+        public Witness Witness;
 
         private UInt256 _hash = null;
         public UInt256 Hash
@@ -32,11 +32,25 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + NextConsensus.Size + Witness.Size;
+        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + NextConsensus.Size + 1 + Witness.Size;
+
+        Witness[] IVerifiable.Witnesses
+        {
+            get
+            {
+                return new[] { Witness };
+            }
+            set
+            {
+                if (value.Length != 1) throw new ArgumentException();
+                Witness = value[0];
+            }
+        }
 
         public virtual void Deserialize(BinaryReader reader)
         {
-            ((IVerifiable)this).DeserializeUnsigned(reader);            
+            ((IVerifiable)this).DeserializeUnsigned(reader);
+            if (reader.ReadByte() != 1) throw new FormatException();
             Witness = reader.ReadSerializable<Witness>();
         }
 
@@ -46,7 +60,7 @@ namespace Bhp.Network.P2P.Payloads
             PrevHash = reader.ReadSerializable<UInt256>();
             MerkleRoot = reader.ReadSerializable<UInt256>();
             Timestamp = reader.ReadUInt32();
-            Index = reader.ReadUInt32();           
+            Index = reader.ReadUInt32();
             NextConsensus = reader.ReadSerializable<UInt160>();
         }
 
@@ -56,12 +70,12 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write((byte)1); writer.Write(Witness);
         }
 
-        UInt160 IVerifiable.GetScriptHashForVerification(Snapshot snapshot)
+        UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
         {
-            if (PrevHash == UInt256.Zero) return Witness.ScriptHash;
+            if (PrevHash == UInt256.Zero) return new[] { Witness.ScriptHash };
             Header prev_header = snapshot.GetHeader(PrevHash);
             if (prev_header == null) throw new InvalidOperationException();
-            return prev_header.NextConsensus;
+            return new[] { prev_header.NextConsensus };
         }
 
         void IVerifiable.SerializeUnsigned(BinaryWriter writer)
@@ -70,7 +84,7 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(PrevHash);
             writer.Write(MerkleRoot);
             writer.Write(Timestamp);
-            writer.Write(Index);            
+            writer.Write(Index);
             writer.Write(NextConsensus);
         }
 
@@ -83,9 +97,9 @@ namespace Bhp.Network.P2P.Payloads
             json["previousblockhash"] = PrevHash.ToString();
             json["merkleroot"] = MerkleRoot.ToString();
             json["time"] = Timestamp;
-            json["index"] = Index;            
+            json["index"] = Index;
             json["nextconsensus"] = NextConsensus.ToAddress();
-            json["witness"] = Witness.ToJson();
+            json["witnesses"] = new JArray(Witness.ToJson());
             return json;
         }
 
@@ -95,7 +109,7 @@ namespace Bhp.Network.P2P.Payloads
             if (prev_header == null) return false;
             if (prev_header.Index + 1 != Index) return false;
             if (prev_header.Timestamp >= Timestamp) return false;
-            if (!this.VerifyWitness(snapshot, 1_00000000)) return false;
+            if (!this.VerifyWitnesses(snapshot, 1_00000000)) return false;
             return true;
         }
     }

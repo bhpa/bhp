@@ -190,8 +190,8 @@ namespace Bhp.Wallets
                         break;
 #pragma warning restore CS0612
                     default:
-                        if (accounts_tracked.ContainsKey(tx.Witness.ScriptHash))
-                            accounts_changed.Add(tx.Witness.ScriptHash);
+                        if (accounts_tracked.ContainsKey(tx.Witnesses[0].ScriptHash))
+                            accounts_changed.Add(tx.Witnesses[0].ScriptHash);
                         break;
                 }
                 if (accounts_changed.Count > 0)

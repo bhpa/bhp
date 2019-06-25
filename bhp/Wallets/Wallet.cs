@@ -1,5 +1,6 @@
 ﻿using Bhp.BhpExtensions.Transactions;
 using Bhp.Cryptography;
+using Bhp.IO;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
@@ -20,8 +21,6 @@ namespace Bhp.Wallets
     public abstract class Wallet : IDisposable
     {
         public abstract event EventHandler<WalletTransactionEventArgs> WalletTransaction;
-
-        private static readonly Random rand = new Random();
 
         //By BHP
         TransactionContract transactionContract = new TransactionContract();
@@ -62,27 +61,62 @@ namespace Bhp.Wallets
         {
         }
 
-        public void FillTransaction(Transaction tx, UInt160 sender = null)
+        private List<(UInt160 Account, BigInteger Value)> FindPayingAccounts(List<(UInt160 Account, BigInteger Value)> orderedAccounts, BigInteger amount)
         {
-            if (tx.Nonce == 0)
-                tx.Nonce = (uint)rand.Next();
-            if (tx.ValidUntilBlock == 0)
-                using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
-                    tx.ValidUntilBlock = snapshot.Height + Transaction.MaxValidUntilBlockIncrement;
-            tx.CalculateFees();
-            UInt160[] accounts = sender is null ? GetAccounts().Where(p => !p.Lock && !p.WatchOnly).Select(p => p.ScriptHash).ToArray() : new[] { sender };
-            BigInteger fee = tx.Gas + tx.NetworkFee;
-            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
-                foreach (UInt160 account in accounts)
+            var result = new List<(UInt160 Account, BigInteger Value)>();
+            BigInteger sum_balance = orderedAccounts.Select(p => p.Value).Sum();
+            if (sum_balance == amount)
+            {
+                result.AddRange(orderedAccounts);
+                orderedAccounts.Clear();
+            }
+            else
+            {
+                for (int i = 0; i < orderedAccounts.Count; i++)
                 {
-                    BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, account);
-                    if (balance >= fee)
+                    if (orderedAccounts[i].Value < amount)
+                        continue;
+                    if (orderedAccounts[i].Value == amount)
                     {
-                        tx.Sender = account;
-                        return;
+                        result.Add(orderedAccounts[i]);
+                        orderedAccounts.RemoveAt(i);
+                    }
+                    else
+                    {
+                        result.Add((orderedAccounts[i].Account, amount));
+                        orderedAccounts[i] = (orderedAccounts[i].Account, orderedAccounts[i].Value - amount);
+                    }
+                    break;
+                }
+                if (result.Count == 0)
+                {
+                    int i = orderedAccounts.Count - 1;
+                    while (orderedAccounts[i].Value <= amount)
+                    {
+                        result.Add(orderedAccounts[i]);
+                        amount -= orderedAccounts[i].Value;
+                        orderedAccounts.RemoveAt(i);
+                        i--;
+                    }
+                    for (i = 0; i < orderedAccounts.Count; i++)
+                    {
+                        if (orderedAccounts[i].Value < amount)
+                            continue;
+                        if (orderedAccounts[i].Value == amount)
+                        {
+                            result.Add(orderedAccounts[i]);
+                            orderedAccounts.RemoveAt(i);
+                        }
+                        else
+                        {
+                            result.Add((orderedAccounts[i].Account, amount));
+                            orderedAccounts[i] = (orderedAccounts[i].Account, orderedAccounts[i].Value - amount);
+                        }
+                        break;
                     }
                 }
-            throw new InvalidOperationException();
+            }
+            return result;
         }
 
         public IEnumerable<Coin> FindUnspentCoins(params UInt160[] from)
@@ -282,7 +316,7 @@ namespace Bhp.Wallets
         {
             if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
             if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
-            fee += tx.SystemFee;
+            fee += Fixed8.Parse(tx.SystemFee.ToString());
             var pay_total = tx.Outputs.GroupBy(p => p.AssetId, (k, g) => new
             {
                 AssetId = k,
@@ -337,10 +371,8 @@ namespace Bhp.Wallets
             return tx;
         }
 
-        public Transaction MakeTransaction(IEnumerable<TransactionAttribute> attributes, TransferOutput[] outputs, UInt160 from = null)
+        public Transaction MakeTransaction(TransferOutput[] outputs, UInt160 from = null)
         {
-            uint nonce = (uint)rand.Next();
-            var totalPay = outputs.GroupBy(p => p.AssetId, (k, g) => (k, g.Select(p => p.Value.Value).Sum())).ToArray();
             UInt160[] accounts;
             if (from is null)
             {
@@ -348,80 +380,153 @@ namespace Bhp.Wallets
             }
             else
             {
-                if (!Contains(from)) return null;
+                if (!Contains(from))
+                    throw new ArgumentException($"The address {from.ToString()} was not found in the wallet");
                 accounts = new[] { from };
             }
-            TransactionAttribute[] attr = attributes?.ToArray() ?? new TransactionAttribute[0];
             using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
-                uint validUntilBlock = snapshot.Height + Transaction.MaxValidUntilBlockIncrement;
-                foreach (UInt160 account in accounts)
-                {
-                    Transaction tx = MakeTransaction(snapshot, 0, nonce, totalPay, outputs, account, validUntilBlock, attr);
-                    if (tx != null) return tx;
-                }
-            }
-            return null;
-        }
-
-        private Transaction MakeTransaction(Snapshot snapshot, byte version, uint nonce, (UIntBase, BigInteger)[] totalPay, TransferOutput[] outputs, UInt160 sender, uint validUntilBlock, TransactionAttribute[] attributes)
-        {
-            BigInteger balance_gas = BigInteger.Zero;
-            foreach (var (assetId, amount) in totalPay)
+                HashSet<UInt160> cosigners = new HashSet<UInt160>();
+                byte[] script;
+                List<(UInt160 Account, BigInteger Value)> balances_gas = null;
                 using (ScriptBuilder sb = new ScriptBuilder())
                 {
-                    sb.EmitAppCall(UInt160.Parse(assetId.ToString()), "balanceOf", sender);
-                    ApplicationEngine engine = ApplicationEngine.Run(sb.ToArray());
-                    if (engine.State.HasFlag(VMState.FAULT)) return null;
-                    BigInteger balance = engine.ResultStack.Peek().GetBigInteger();
-                    if (balance < amount) return null;
-                    if (assetId.Equals(NativeContract.GAS.Hash))
+                    foreach (var (assetId, group, sum) in outputs.GroupBy(p => p.AssetId, (k, g) => (k, g, g.Select(p => p.Value.Value).Sum())))
                     {
-                        balance_gas = balance - amount;
-                        if (balance_gas.Sign <= 0) return null;
+                        var balances = new List<(UInt160 Account, BigInteger Value)>();
+                        foreach (UInt160 account in accounts)
+                            using (ScriptBuilder sb2 = new ScriptBuilder())
+                            {
+                                sb2.EmitAppCall((UInt160)assetId, "balanceOf", account);
+                                using (ApplicationEngine engine = ApplicationEngine.Run(sb2.ToArray(), snapshot, testMode: true))
+                                {
+                                    if (engine.State.HasFlag(VMState.FAULT))
+                                        throw new InvalidOperationException($"Execution for {assetId.ToString()}.balanceOf('{account.ToString()}' fault");
+                                    BigInteger value = engine.ResultStack.Pop().GetBigInteger();
+                                    if (value.Sign > 0) balances.Add((account, value));
+                                }
+                            }
+                        BigInteger sum_balance = balances.Select(p => p.Value).Sum();
+                        if (sum_balance < sum)
+                            throw new InvalidOperationException($"It does not have enough balance, expected: {sum.ToString()} found: {sum_balance.ToString()}");
+                        foreach (TransferOutput output in group)
+                        {
+                            balances = balances.OrderBy(p => p.Value).ToList();
+                            var balances_used = FindPayingAccounts(balances, output.Value.Value);
+                            cosigners.UnionWith(balances_used.Select(p => p.Account));
+                            foreach (var (account, value) in balances_used)
+                            {
+                                sb.EmitAppCall((UInt160)output.AssetId, "transfer", account, output.ScriptHash, value);
+                                sb.Emit(OpCode.THROWIFNOT);
+                            }
+                        }
+                        if (assetId.Equals(NativeContract.GAS.Hash))
+                            balances_gas = balances;
+                    }
+                    script = sb.ToArray();
+                }
+                if (balances_gas is null)
+                    balances_gas = accounts.Select(p => (Account: p, Value: NativeContract.GAS.BalanceOf(snapshot, p))).Where(p => p.Value.Sign > 0).ToList();
+                TransactionAttribute[] attributes = cosigners.Select(p => new TransactionAttribute { Usage = TransactionAttributeUsage.Cosigner, Data = p.ToArray() }).ToArray();
+                return MakeTransaction(snapshot, attributes, script, balances_gas);
+            }
+        }
+
+        public Transaction MakeTransaction(TransactionAttribute[] attributes, byte[] script, UInt160 sender = null)
+        {
+            UInt160[] accounts;
+            if (sender is null)
+            {
+                accounts = GetAccounts().Where(p => !p.Lock && !p.WatchOnly).Select(p => p.ScriptHash).ToArray();
+            }
+            else
+            {
+                if (!Contains(sender))
+                    throw new ArgumentException($"The address {sender.ToString()} was not found in the wallet");
+                accounts = new[] { sender };
+            }
+            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+            {
+                var balances_gas = accounts.Select(p => (Account: p, Value: NativeContract.GAS.BalanceOf(snapshot, p))).Where(p => p.Value.Sign > 0).ToList();
+                return MakeTransaction(snapshot, attributes, script, balances_gas);
+            }
+        }
+
+        private Transaction MakeTransaction(Snapshot snapshot, TransactionAttribute[] attributes, byte[] script, List<(UInt160 Account, BigInteger Value)> balances_gas)
+        {
+            Random rand = new Random();
+            foreach (var (account, value) in balances_gas)
+            {
+                Transaction tx = new Transaction
+                {
+                    Version = 0,
+                    Nonce = (uint)rand.Next(),
+                    Script = script,
+                    Sender = account,
+                    ValidUntilBlock = snapshot.Height + Transaction.MaxValidUntilBlockIncrement,
+                    Attributes = attributes
+                };
+                using (ApplicationEngine engine = ApplicationEngine.Run(script, snapshot, tx, testMode: true))
+                {
+                    if (engine.State.HasFlag(VMState.FAULT))
+                        throw new InvalidOperationException($"Failed execution for '{script.ToHexString()}'");
+                    tx.SystemFee = Math.Max(engine.GasConsumed - ApplicationEngine.GasFree, 0);
+                    if (tx.SystemFee > 0)
+                    {
+                        long d = (long)NativeContract.GAS.Factor;
+                        long remainder = tx.SystemFee % d;
+                        if (remainder > 0)
+                            tx.SystemFee += d - remainder;
+                        else if (remainder < 0)
+                            tx.SystemFee -= remainder;
                     }
                 }
-            byte[] script;
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                foreach (var output in outputs)
+                UInt160[] hashes = tx.GetScriptHashesForVerifying(snapshot);
+                int size = Transaction.HeaderSize + attributes.GetVarSize() + script.GetVarSize() + IO.Helper.GetVarSize(hashes.Length);
+                foreach (UInt160 hash in hashes)
                 {
-                    sb.EmitAppCall(UInt160.Parse(output.AssetId.ToString()), "transfer", sender, output.ScriptHash, output.Value.Value);
-                    sb.Emit(OpCode.THROWIFNOT);
+                    script = GetAccount(hash)?.Contract?.Script ?? snapshot.Contracts.TryGet(hash)?.Script;
+                    if (script is null) continue;
+                    if (script.IsSignatureContract())
+                    {
+                        size += 66 + script.GetVarSize();
+                        tx.NetworkFee += ApplicationEngine.OpCodePrices[OpCode.PUSHBYTES64] + ApplicationEngine.OpCodePrices[OpCode.PUSHBYTES33] + InteropService.GetPrice(InteropService.Bhp_Crypto_CheckSig, null);
+                    }
+                    else if (script.IsMultiSigContract(out int m, out int n))
+                    {
+                        int size_inv = 65 * m;
+                        size += IO.Helper.GetVarSize(size_inv) + size_inv + script.GetVarSize();
+                        tx.NetworkFee += ApplicationEngine.OpCodePrices[OpCode.PUSHBYTES64] * m;
+                        using (ScriptBuilder sb = new ScriptBuilder())
+                            tx.NetworkFee += ApplicationEngine.OpCodePrices[(OpCode)sb.EmitPush(m).ToArray()[0]];
+                        tx.NetworkFee += ApplicationEngine.OpCodePrices[OpCode.PUSHBYTES33] * n;
+                        using (ScriptBuilder sb = new ScriptBuilder())
+                            tx.NetworkFee += ApplicationEngine.OpCodePrices[(OpCode)sb.EmitPush(n).ToArray()[0]];
+                        tx.NetworkFee += InteropService.GetPrice(InteropService.Bhp_Crypto_CheckSig, null) * n;
+                    }
+                    else
+                    {
+                        //We can support more contract types in the future.
+                    }
                 }
-                script = sb.ToArray();
+                tx.NetworkFee += size * NativeContract.Policy.GetFeePerByte(snapshot);
+                if (value >= tx.SystemFee + tx.NetworkFee) return tx;
             }
-            Transaction tx = new Transaction
-            {
-                Version = version,
-                Nonce = nonce,
-                Script = script,
-                Sender = sender,
-                ValidUntilBlock = validUntilBlock,
-                Attributes = attributes
-            };
-            try
-            {
-                tx.CalculateFees();
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-            BigInteger fee = tx.Gas + tx.NetworkFee;
-            if (balance_gas == BigInteger.Zero)
-                balance_gas = NativeContract.GAS.BalanceOf(snapshot, sender);
-            if (balance_gas < fee) return null;
-            return tx;
+            throw new InvalidOperationException("Insufficient GAS");
         }
 
         public bool Sign(ContractParametersContext context)
         {
-            WalletAccount account = GetAccount(context.ScriptHash);
-            if (account?.HasKey != true) return false;
-            KeyPair key = account.GetKey();
-            byte[] signature = context.Verifiable.Sign(key);
-            return context.AddSignature(account.Contract, key.PublicKey, signature);
+            bool fSuccess = false;
+            foreach (UInt160 scriptHash in context.ScriptHashes)
+            {
+                WalletAccount account = GetAccount(scriptHash);
+                if (account?.HasKey != true) continue;
+                KeyPair key = account.GetKey();
+                byte[] signature = context.Verifiable.Sign(key);
+                fSuccess |= context.AddSignature(account.Contract, key.PublicKey, signature);
+            }
+            return fSuccess;
         }
 
         public abstract bool VerifyPassword(string password);

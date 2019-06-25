@@ -27,7 +27,6 @@ namespace Bhp.Network.P2P.Payloads
         /// Maximum number of attributes that can be contained within a transaction
         /// </summary>
         private const int MaxTransactionAttributes = 16;
-        private const long VerificationGasLimited = 0_10000000;
 
         /// <summary>
         /// Reflection cache for TransactionType
@@ -37,15 +36,21 @@ namespace Bhp.Network.P2P.Payloads
         public readonly TransactionType Type;
         public byte Version;
         public uint Nonce;
-        public byte[] Script;
         public UInt160 Sender;
-        public long Gas;
+        /// <summary>
+        /// Distributed to BHP holders.
+        /// </summary>
+        public long SystemFee;
+        /// <summary>
+        /// Distributed to consensus nodes.
+        /// </summary>
         public long NetworkFee;
         public uint ValidUntilBlock;
         public TransactionAttribute[] Attributes;
         public CoinReference[] Inputs;
         public TransactionOutput[] Outputs;
-        public Witness Witness { get; set; }
+        public byte[] Script;
+        public Witness[] Witnesses { get; set; }
 
         private Fixed8 _feePerByte = -Fixed8.Satoshi;
         /// <summary>
@@ -68,7 +73,7 @@ namespace Bhp.Network.P2P.Payloads
         }
 
         InventoryType IInventory.InventoryType => InventoryType.TX;
-        
+
         private IReadOnlyDictionary<CoinReference, TransactionOutput> _references;
         public IReadOnlyDictionary<CoinReference, TransactionOutput> References
         {
@@ -96,18 +101,13 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public virtual int Size =>
-            sizeof(byte) +              //Version
-            sizeof(uint) +              //Nonce
-            Script.GetVarSize() +       //Script
-            Sender.Size +               //Sender
-            sizeof(long) +              //Gas
-            sizeof(long) +              //NetworkFee
-            sizeof(uint) +              //ValidUntilBlock
-            Attributes.GetVarSize() +   //Attributes
-             Witness.Size;               //Witnesses
-
-        public virtual Fixed8 SystemFee => ProtocolSettings.Default.SystemFee.TryGetValue(Type, out Fixed8 fee) ? fee : Fixed8.Zero;
+        public const int HeaderSize =
+            sizeof(byte) +  //Version
+            sizeof(uint) +  //Nonce
+            20 +            //Sender
+            sizeof(long) +  //Gas
+            sizeof(long) +  //NetworkFee
+            sizeof(uint);   //ValidUntilBlock
 
         //By BHP
         public virtual int OutputSize => Outputs.GetVarSize();
@@ -122,52 +122,15 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public void CalculateFees()
-        {
-            if (Sender is null) Sender = UInt160.Zero;
-            if (Attributes is null) Attributes = new TransactionAttribute[0];
-            if (Witness is null) Witness = new Witness
-            {
-                InvocationScript = new byte[65],
-                VerificationScript = new byte[39]
-            };
-            _hash = null;
-            long consumed;
-            using (ApplicationEngine engine = ApplicationEngine.Run(Script, this))
-            {
-                if (engine.State.HasFlag(VMState.FAULT))
-                    throw new InvalidOperationException();
-                consumed = engine.GasConsumed;
-            }
-            _hash = null;
-            long d = (long)NativeContract.GAS.Factor;
-            Gas = consumed - ApplicationEngine.GasFree;
-            if (Gas <= 0)
-            {
-                Gas = 0;
-            }
-            else
-            {
-                long remainder = Gas % d;
-                if (remainder == 0) return;
-                if (remainder > 0)
-                    Gas += d - remainder;
-                else
-                    Gas -= remainder;
-            }
-            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
-            {
-                long feeperbyte = NativeContract.Policy.GetFeePerByte(snapshot);
-                long fee = feeperbyte * Size;
-                if (fee > NetworkFee)
-                    NetworkFee = fee;
-            }
-        }
+        public int Size => HeaderSize +
+                   Attributes.GetVarSize() +   //Attributes
+                   Script.GetVarSize() +       //Script
+                   Witnesses.GetVarSize();     //Witnesses
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
             ((IVerifiable)this).DeserializeUnsigned(reader);
-            Witness = reader.ReadSerializable<Witness>();
+            Witnesses = reader.ReadSerializableArray<Witness>();
             OnDeserialized();
         }
 
@@ -192,7 +155,7 @@ namespace Bhp.Network.P2P.Payloads
             if (transaction == null) throw new FormatException();
 
             transaction.DeserializeUnsignedWithoutType(reader);
-            transaction.Witness = reader.ReadSerializable<Witness>();
+            transaction.Witnesses = reader.ReadSerializableArray<Witness>();
             transaction.OnDeserialized();
             return transaction;
         }
@@ -208,19 +171,21 @@ namespace Bhp.Network.P2P.Payloads
         {
             if (Version > 0) throw new FormatException();
             Nonce = reader.ReadUInt32();
-            Script = reader.ReadVarBytes(ushort.MaxValue);
-            if (Script.Length == 0) throw new FormatException();
             Sender = reader.ReadSerializable<UInt160>();
-            Gas = reader.ReadInt64();
-            if (Gas < 0) throw new FormatException();
-            if (Gas % NativeContract.GAS.Factor != 0) throw new FormatException();
+            SystemFee = reader.ReadInt64();
+            if (SystemFee < 0) throw new FormatException();
+            if (SystemFee % NativeContract.GAS.Factor != 0) throw new FormatException();
             NetworkFee = reader.ReadInt64();
             if (NetworkFee < 0) throw new FormatException();
-            if (Gas + NetworkFee < Gas) throw new FormatException();
+            if (SystemFee + NetworkFee < SystemFee) throw new FormatException();
             ValidUntilBlock = reader.ReadUInt32();
             Attributes = reader.ReadSerializableArray<TransactionAttribute>(MaxTransactionAttributes);
             Inputs = reader.ReadSerializableArray<CoinReference>();
             Outputs = reader.ReadSerializableArray<TransactionOutput>(ushort.MaxValue + 1);
+            var cosigners = Attributes.Where(p => p.Usage == TransactionAttributeUsage.Cosigner).Select(p => new UInt160(p.Data)).ToArray();
+            if (cosigners.Distinct().Count() != cosigners.Length) throw new FormatException();
+            Script = reader.ReadVarBytes(ushort.MaxValue);
+            if (Script.Length == 0) throw new FormatException();
         }
 
         public bool Equals(Transaction other)
@@ -239,7 +204,7 @@ namespace Bhp.Network.P2P.Payloads
         {
             return Hash.GetHashCode();
         }
-        
+
         public IEnumerable<TransactionResult> GetTransactionResults()
         {
             if (References == null) return null;
@@ -262,15 +227,17 @@ namespace Bhp.Network.P2P.Payloads
         {
         }
 
-        public UInt160 GetScriptHashForVerification(Snapshot snapshot)
+        public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
         {
-            return Sender;
+            var hashes = new HashSet<UInt160> { Sender };
+            hashes.UnionWith(Attributes.Where(p => p.Usage == TransactionAttributeUsage.Cosigner).Select(p => new UInt160(p.Data)));
+            return hashes.OrderBy(p => p).ToArray();
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
         {
             ((IVerifiable)this).SerializeUnsigned(writer);
-            writer.Write(Witness);
+            writer.Write(Witnesses);
         }
 
         protected virtual void SerializeExclusiveData(BinaryWriter writer)
@@ -302,11 +269,12 @@ namespace Bhp.Network.P2P.Payloads
             json["attributes"] = Attributes.Select(p => p.ToJson()).ToArray();
             json["vin"] = Inputs.Select(p => p.ToJson()).ToArray();
             json["vout"] = Outputs.Select((p, i) => p.ToJson((ushort)i)).ToArray();
-            json["sys_fee"] = SystemFee.ToString();
-            json["net_fee"] = NetworkFee.ToString();
+            json["sys_fee"] = new BigDecimal(SystemFee, NativeContract.GAS.Decimals).ToString();
+            json["net_fee"] = new BigDecimal(NetworkFee, NativeContract.GAS.Decimals).ToString();
             json["valid_until_block"] = ValidUntilBlock;
             json["tx_fee"] = TxFee.ToString();
-            json["witness"] = Witness.ToJson();
+            json["script"] = Script.ToHexString();
+            json["witnesses"] = Witnesses.Select(p => p.ToJson()).ToArray();
             return json;
         }
 
@@ -322,8 +290,8 @@ namespace Bhp.Network.P2P.Payloads
                 return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
-            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Contains(Sender))
-                return false;
+            long net_fee = NetworkFee - size * NativeContract.Policy.GetFeePerByte(snapshot);
+            if (net_fee < 0) return false;
             if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
                 return false;
             for (int i = 1; i < Inputs.Length; i++)
@@ -376,12 +344,14 @@ namespace Bhp.Network.P2P.Payloads
                 return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
-            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Contains(Sender))
-                return false;           
+            long net_fee = NetworkFee - size * NativeContract.Policy.GetFeePerByte(snapshot);
+            if (net_fee < 0) return false;
+            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
+                return false;
             BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, Sender);
-            BigInteger fee = Gas + NetworkFee;
+            BigInteger fee = SystemFee + NetworkFee;
             if (balance < fee) return false;
-            fee += mempool.Where(p => p != this && p.Sender.Equals(Sender)).Sum(p => p.Gas + p.NetworkFee);
+            fee += mempool.Where(p => p != this && p.Sender.Equals(Sender)).Select(p => (BigInteger)(p.SystemFee + p.NetworkFee)).Sum();
             if (balance < fee) return false;
             for (int i = 1; i < Inputs.Length; i++)
                 for (int j = 0; j < i; j++)
@@ -406,7 +376,7 @@ namespace Bhp.Network.P2P.Payloads
             TransactionResult[] results_destroy = results.Where(p => p.Amount > Fixed8.Zero).ToArray();
 
             //By BHP
-            if (BhpTxFee.Verify(this, results_destroy, SystemFee) == false) return false;
+            if (BhpTxFee.Verify(this, results_destroy, Fixed8.Parse(SystemFee.ToString())) == false) return false;
 
             TransactionResult[] results_issue = results.Where(p => p.Amount < Fixed8.Zero).ToArray();
             switch (Type)
@@ -415,7 +385,7 @@ namespace Bhp.Network.P2P.Payloads
                 case TransactionType.MinerTransaction:
                     if (VerifyMiningTransaction.Verify(Outputs, Attributes) == false)
                         return false;
-                    break;              
+                    break;
                 default:
                     if (results_issue.Length > 0)
                         return false;
@@ -426,7 +396,7 @@ namespace Bhp.Network.P2P.Payloads
             if (!VerifyReceivingScripts()) return false;
             //By BHP
             if (VerifyTransactionContract.Verify(snapshot, this) == false) return false;
-            return this.VerifyWitness(snapshot, VerificationGasLimited);
+            return this.VerifyWitnesses(snapshot, net_fee);
         }
 
         private bool VerifyReceivingScripts()

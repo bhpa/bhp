@@ -53,10 +53,12 @@ namespace Bhp.Ledger
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
             Outputs = new TransactionOutput[0],
-            Witness = new Witness
-            {
-                InvocationScript = new byte[0],
-                VerificationScript = new[] { (byte)OpCode.PUSHT }
+            Witnesses = new Witness[1] {
+                new Witness
+                {
+                    InvocationScript = new byte[0],
+                    VerificationScript = new[] { (byte)OpCode.PUSHT }
+                }
             }
         };
 
@@ -71,7 +73,7 @@ namespace Bhp.Ledger
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
             Outputs = new TransactionOutput[0],
-            Witness = new Witness()
+            Witnesses = new Witness[0]
         };
 #pragma warning restore CS0612
 
@@ -99,7 +101,7 @@ namespace Bhp.Ledger
                     Attributes = new TransactionAttribute[0],
                     Inputs = new CoinReference[0],
                     Outputs = new TransactionOutput[0],
-                    Witness = new Witness()
+                    Witnesses = new Witness[0]
                 },
                 GoverningToken,
                 UtilityToken,
@@ -205,11 +207,17 @@ namespace Bhp.Ledger
             {
                 Version = 1,
                 Script = script,
-                Gas = Fixed8.Zero,
                 Attributes = new TransactionAttribute[0],
                 Inputs = new CoinReference[0],
                 Outputs = new TransactionOutput[0],
-                Witness = new Witness()
+                Witnesses = new[]
+                {
+                    new Witness
+                    {
+                        InvocationScript = new byte[0],
+                        VerificationScript = new[] { (byte)OpCode.PUSHT }
+                    }
+                }
             };
         }
 
@@ -488,7 +496,7 @@ namespace Bhp.Ledger
                         BlockIndex = block.Index,
                         Transaction = tx
                     });
-                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx, snapshot.Clone(), tx.SystemFee.value))
+                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx, snapshot.Clone(), tx.SystemFee))
                     {
                         engine.LoadScript(tx.GetHashData());
                         if (!engine.Execute().HasFlag(VMState.FAULT))

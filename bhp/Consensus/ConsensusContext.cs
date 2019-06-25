@@ -28,7 +28,7 @@ namespace Bhp.Consensus
         public Block Block;
         public byte ViewNumber;
         public ECPoint[] Validators;
-        public int MyIndex;       
+        public int MyIndex;
         public UInt256[] TransactionHashes;
         public Dictionary<UInt256, Transaction> Transactions;
         public ConsensusPayload[] PreparationPayloads;
@@ -87,7 +87,7 @@ namespace Bhp.Consensus
                 sc.AddSignature(contract, Validators[i], CommitPayloads[i].GetDeserializedMessage<Commit>().Signature);
                 j++;
             }
-            Block.Witness = sc.GetWitness();
+            Block.Witness = sc.GetWitnesses()[0];
             Block.Transactions = TransactionHashes.Select(p => Transactions[p]).ToArray();
             return Block;
         }
@@ -96,8 +96,8 @@ namespace Bhp.Consensus
         {
             Reset(0);
             if (reader.ReadUInt32() != Block.Version) throw new FormatException();
-            if (reader.ReadUInt32() != Block.Index) throw new InvalidOperationException();            
-            Block.Timestamp = reader.ReadUInt32();            
+            if (reader.ReadUInt32() != Block.Index) throw new InvalidOperationException();
+            Block.Timestamp = reader.ReadUInt32();
             Block.NextConsensus = reader.ReadSerializable<UInt160>();
             if (Block.NextConsensus.Equals(UInt160.Zero))
                 Block.NextConsensus = null;
@@ -185,7 +185,7 @@ namespace Bhp.Consensus
                 Signature = EnsureHeader()?.Sign(keyPair)
             }));
         }
-        
+
         private ConsensusPayload MakeSignedPayload(ConsensusMessage message)
         {
             message.ViewNumber = ViewNumber;
@@ -213,7 +213,7 @@ namespace Bhp.Consensus
             {
                 return;
             }
-            payload.Witness = sc.GetWitness();
+            payload.Witness = sc.GetWitnesses()[0];
         }
 
         public ConsensusPayload MakePrepareRequest()
@@ -255,9 +255,9 @@ namespace Bhp.Consensus
                 {
                     ViewNumber = ViewNumber,
                     Timestamp = Block.Timestamp,
-                    Nonce = Block.ConsensusData.Nonce,                    
-                    TransactionHashes = TransactionHashes,                    
-                    MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]]                    
+                    Nonce = Block.ConsensusData.Nonce,
+                    TransactionHashes = TransactionHashes,
+                    MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]]
                 };
             }
             return MakeSignedPayload(new RecoveryMessage()
@@ -342,7 +342,7 @@ namespace Bhp.Consensus
         {
             writer.Write(Block.Version);
             writer.Write(Block.Index);
-            writer.Write(Block.Timestamp);            
+            writer.Write(Block.Timestamp);
             writer.Write(Block.NextConsensus ?? UInt160.Zero);
             writer.Write(Block.ConsensusData);
             writer.Write(ViewNumber);

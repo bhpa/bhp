@@ -149,7 +149,8 @@ namespace Bhp.SmartContract
 
         internal static bool CheckWitness(ApplicationEngine engine, UInt160 hash)
         {
-            return hash.Equals(engine.ScriptContainer.GetScriptHashForVerification(engine.Snapshot));
+            var _hashes_for_verifying = engine.ScriptContainer.GetScriptHashesForVerifying(engine.Snapshot);
+            return _hashes_for_verifying.Contains(hash);
         }
 
         private static bool CheckWitness(ApplicationEngine engine, ECPoint pubkey)
@@ -494,17 +495,17 @@ namespace Bhp.SmartContract
             }
             return false;
         }
-       
+
         private static bool Contract_Call(ApplicationEngine engine)
         {
             StackItem contractOrHash = engine.CurrentContext.EvaluationStack.Pop();
             ContractState contract;
-             if (contractOrHash is InteropInterface<ContractState> _interface)
+            if (contractOrHash is InteropInterface<ContractState> _interface)
                 contract = _interface;
             else
                 contract = engine.Snapshot.Contracts.TryGet(new UInt160(contractOrHash.GetByteArray()));
             if (contract is null) return false;
-           
+
             StackItem method = engine.CurrentContext.EvaluationStack.Pop();
             StackItem args = engine.CurrentContext.EvaluationStack.Pop();
             ContractManifest currentManifest = engine.Snapshot.Contracts.TryGet(engine.CurrentScriptHash)?.Manifest;
@@ -526,7 +527,7 @@ namespace Bhp.SmartContract
             context_new.EvaluationStack.Push(method);
             return true;
         }
-       
+
         private static bool Contract_Destroy(ApplicationEngine engine)
         {
             if (engine.Trigger != TriggerType.Application) return false;

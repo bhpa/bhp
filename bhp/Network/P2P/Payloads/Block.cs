@@ -50,7 +50,7 @@ namespace Bhp.Network.P2P.Payloads
             Transaction[] ts = transactions.Where(p => p.Type != TransactionType.MinerTransaction).ToArray();
             Fixed8 amount_in = ts.SelectMany(p => p.References.Values.Where(o => o.AssetId == Blockchain.UtilityToken.Hash)).Sum(p => p.Value);
             Fixed8 amount_out = ts.SelectMany(p => p.Outputs.Where(o => o.AssetId == Blockchain.UtilityToken.Hash)).Sum(p => p.Value);
-            Fixed8 amount_sysfee = ts.Sum(p => p.SystemFee);
+            Fixed8 amount_sysfee = Fixed8.Parse(ts.Sum(p => p.SystemFee).ToString());
             return amount_in - amount_out - amount_sysfee;
         }
 

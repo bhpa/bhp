@@ -170,7 +170,7 @@ namespace Bhp.BhpExtensions.RPC
 
             if (context.Completed)
             {
-                tx.Witness = context.GetWitness();
+                tx.Witnesses = context.GetWitnesses();
 
                 if (tx.Size > Transaction.MaxTransactionSize)
                 {

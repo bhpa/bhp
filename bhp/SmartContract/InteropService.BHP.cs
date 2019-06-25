@@ -23,9 +23,10 @@ namespace Bhp.SmartContract
         public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig, GetCheckMultiSigPrice);
         public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 0_00000400);
         public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 0_00000400);
-        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400);        
+        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400);
         public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 0_00000400);
-        public static readonly uint Bhp_Transaction_GetWitnessScript = Register("Bhp.Transaction.GetWitnessScript", Transaction_GetWitnessScript, 0_00000400);
+        public static readonly uint Bhp_Transaction_GetWitnesses = Register("Bhp.Transaction.GetWitnesses", Transaction_GetWitnesses, 0_00010000);
+        public static readonly uint Bhp_Witness_GetVerificationScript = Register("Bhp.Witness.GetVerificationScript", Witness_GetVerificationScript, 0_00000400);
         public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 0_00030000);
         public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create, GetDeploymentPrice);
         public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update, GetDeploymentPrice);
@@ -181,7 +182,7 @@ namespace Bhp.SmartContract
             }
             return false;
         }
-        
+
         private static bool Header_GetNextConsensus(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
@@ -193,7 +194,7 @@ namespace Bhp.SmartContract
             }
             return false;
         }
-        
+
         private static bool Transaction_GetScript(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
@@ -206,16 +207,27 @@ namespace Bhp.SmartContract
             return false;
         }
 
-        private static bool Transaction_GetWitnessScript(ApplicationEngine engine)
+        private static bool Transaction_GetWitnesses(ApplicationEngine engine)
         {
             if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
             {
                 Transaction tx = _interface.GetInterface<Transaction>();
                 if (tx == null) return false;
-                byte[] script = tx.Witness.VerificationScript;
-                if (script.Length == 0)
-                    script = engine.Snapshot.Contracts[tx.Sender].Script;
-                engine.CurrentContext.EvaluationStack.Push(script);
+                if (tx.Witnesses.Length > engine.MaxArraySize)
+                    return false;
+                engine.CurrentContext.EvaluationStack.Push(WitnessWrapper.Create(tx, engine.Snapshot).Select(p => StackItem.FromInterface(p)).ToArray());
+                return true;
+            }
+            return false;
+        }
+
+        private static bool Witness_GetVerificationScript(ApplicationEngine engine)
+        {
+            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
+            {
+                WitnessWrapper witness = _interface.GetInterface<WitnessWrapper>();
+                if (witness == null) return false;
+                engine.CurrentContext.EvaluationStack.Push(witness.VerificationScript);
                 return true;
             }
             return false;
