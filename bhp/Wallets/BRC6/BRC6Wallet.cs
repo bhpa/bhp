@@ -41,11 +41,7 @@ namespace Bhp.Wallets.BRC6
                 {
                     wallet = JObject.Parse(reader);
                 }
-                this.name = wallet["name"]?.AsString();
-                this.version = Version.Parse(wallet["version"].AsString());
-                this.Scrypt = ScryptParameters.FromJson(wallet["scrypt"]);
-                this.accounts = ((JArray)wallet["accounts"]).Select(p => BRC6Account.FromJson(p, this)).ToDictionary(p => p.ScriptHash);
-                this.extra = wallet["extra"];
+                LoadFromJson(wallet, out Scrypt, out accounts, out extra);
                 indexer.RegisterAccounts(accounts.Keys);
             }
             else
@@ -57,6 +53,21 @@ namespace Bhp.Wallets.BRC6
                 this.extra = JObject.Null;
             }
             indexer.WalletTransaction += WalletIndexer_WalletTransaction;
+        }
+
+        public BRC6Wallet(JObject wallet)
+        {
+            this.path = "";
+            LoadFromJson(wallet, out Scrypt, out accounts, out extra);
+        }
+
+        private void LoadFromJson(JObject wallet, out ScryptParameters scrypt, out Dictionary<UInt160, BRC6Account> accounts, out JObject extra)
+        {
+            this.name = wallet["name"]?.AsString();
+            this.version = Version.Parse(wallet["version"].AsString());
+            scrypt = ScryptParameters.FromJson(wallet["scrypt"]);
+            accounts = ((JArray)wallet["accounts"]).Select(p => BRC6Account.FromJson(p, this)).ToDictionary(p => p.ScriptHash);
+            extra = wallet["extra"];
         }
 
         private void AddAccount(BRC6Account account, bool is_import)
