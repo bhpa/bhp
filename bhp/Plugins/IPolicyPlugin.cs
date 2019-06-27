@@ -7,7 +7,5 @@ namespace Bhp.Plugins
     {
         bool FilterForMemoryPool(Transaction tx);
         IEnumerable<Transaction> FilterForBlock(IEnumerable<Transaction> transactions);
-        int MaxTxPerBlock { get; }
-        int MaxLowPriorityTxPerBlock { get; }
     }
 }

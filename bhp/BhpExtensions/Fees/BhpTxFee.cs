@@ -1,9 +1,7 @@
 ﻿using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Bhp.BhpExtensions.Fees
 {
@@ -45,6 +43,8 @@ namespace Bhp.BhpExtensions.Fees
 
         public static Fixed8 EstimateTxFee(Transaction tx)
         {
+            return Fixed8.Zero;
+            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
                 Fixed8 txFee = MinTxFee;
@@ -57,6 +57,7 @@ namespace Bhp.BhpExtensions.Fees
             {
                 return Fixed8.Zero;
             }
+            */
         }
 
         public static Fixed8 EstimateTxFee(Transaction tx, UInt256 asset_id)
@@ -105,7 +106,9 @@ namespace Bhp.BhpExtensions.Fees
         }
 
         public static Fixed8 CalcuTxFee(List<Transaction> transactions)
-        { 
+        {
+            return Fixed8.Zero;
+            /*
             Transaction[] ts = transactions.Where(p => p.Type == TransactionType.ContractTransaction).ToArray();
             
             Fixed8 inputsum = Fixed8.Zero;
@@ -117,6 +120,7 @@ namespace Bhp.BhpExtensions.Fees
                 outputsum += tx.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
             }
             return inputsum - outputsum;
+            */
         }
 
         public static bool Verify(Transaction tx, TransactionResult[] results_destroy, Fixed8 SystemFee)
@@ -134,6 +138,8 @@ namespace Bhp.BhpExtensions.Fees
             Fixed8 _systemFee = results_destroy.Where(p => p.AssetId == Blockchain.UtilityToken.Hash).Sum(q => q.Amount);
             if (SystemFee > Fixed8.Zero && _systemFee < SystemFee) return false;
 
+            return true;
+            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
                 Fixed8 inputsum= tx.References.Values.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
@@ -146,6 +152,7 @@ namespace Bhp.BhpExtensions.Fees
             {
                 return true;
             }   
+            */
         }
 
         /*
@@ -208,6 +215,6 @@ namespace Bhp.BhpExtensions.Fees
             return true;
         }
         */
-        
+
     }
 }

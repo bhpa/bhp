@@ -45,8 +45,7 @@ namespace Bhp.Network.P2P.Payloads
                 PrevHash = PrevHash,
                 MerkleRoot = MerkleRoot,
                 Timestamp = Timestamp,
-                Index = Index,
-                ConsensusData = ConsensusData,
+                Index = Index,                
                 NextConsensus = NextConsensus,
                 Witness = Witness,
                 Hashes = new UInt256[0]

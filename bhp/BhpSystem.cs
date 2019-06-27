@@ -14,7 +14,7 @@ namespace Bhp
 {
     public class BhpSystem : IDisposable
     {
-        private Peer.Start start_message = null;
+        private ChannelsConfig start_message = null;
         private bool suspend = false;
 
         public ActorSystem ActorSystem { get; } = ActorSystem.Create(nameof(BhpSystem),
@@ -29,20 +29,33 @@ namespace Bhp
         internal IActorRef TaskManager { get; }
         public IActorRef Consensus { get; private set; }
         public RpcServer RpcServer { get; private set; }
+        private readonly Store store;
 
         public BhpSystem(Store store)
         {
+            this.store = store;
+            Plugin.LoadPlugins(this);
             this.Blockchain = ActorSystem.ActorOf(Ledger.Blockchain.Props(this, store));
             this.LocalNode = ActorSystem.ActorOf(Network.P2P.LocalNode.Props(this));
             this.TaskManager = ActorSystem.ActorOf(Network.P2P.TaskManager.Props(this));
-            Plugin.LoadPlugins(this);
+            Plugin.NotifyPluginsLoadedAfterSystemConstructed();
         }
 
         public void Dispose()
         {
             RpcServer?.Dispose();
-            ActorSystem.Stop(LocalNode);
+            EnsureStoped(LocalNode);
+            // Dispose will call ActorSystem.Terminate()
             ActorSystem.Dispose();
+            ActorSystem.WhenTerminated.Wait();
+        }
+
+        public void EnsureStoped(IActorRef actor)
+        {
+            Inbox inbox = Inbox.Create(ActorSystem);
+            inbox.Watch(actor);
+            ActorSystem.Stop(actor);
+            inbox.Receive(TimeSpan.FromMinutes(5));
         }
 
         internal void ResumeNodeStartup()
@@ -58,7 +71,7 @@ namespace Bhp
         /*
         public void StartConsensus(Wallet wallet)
         {
-            Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, wallet));
+            Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
             Consensus.Tell(new ConsensusService.Start());
         }
         */
@@ -67,7 +80,7 @@ namespace Bhp
         /// By BHP
         /// </summary>
         /// <param name="wallet"></param>
-        public void StartConsensus(Wallet wallet)
+        public void StartConsensus(Wallet wallet, Store consensus_store = null, bool ignoreRecoveryLogs = false)
         {
             bool found = false;
             foreach (WalletAccount account in wallet.GetAccounts())
@@ -87,21 +100,15 @@ namespace Bhp
             //只有共识节点才能开启共识
             if (found)
             {
-                Consensus = ActorSystem.ActorOf(ConsensusService.Props(LocalNode, TaskManager, wallet));
+                Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
                 Consensus.Tell(new ConsensusService.Start());
             }
         }
 
-        public void StartNode(int port = 0, int wsPort = 0, int minDesiredConnections = Peer.DefaultMinDesiredConnections,
-            int maxConnections = Peer.DefaultMaxConnections)
+        public void StartNode(ChannelsConfig config)
         {
-            start_message = new Peer.Start
-            {
-                Port = port,
-                WsPort = wsPort,
-                MinDesiredConnections = minDesiredConnections,
-                MaxConnections = maxConnections
-            };
+            start_message = config;
+
             if (!suspend)
             {
                 LocalNode.Tell(start_message);

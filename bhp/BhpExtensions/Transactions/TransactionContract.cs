@@ -1,6 +1,7 @@
 ﻿using Bhp.BhpExtensions.Fees;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
+using Bhp.SmartContract;
 using Bhp.VM;
 using Bhp.Wallets;
 using System.Collections.Generic;
@@ -15,7 +16,8 @@ namespace Bhp.BhpExtensions.Transactions
             using (ScriptBuilder sb = new ScriptBuilder())
             {
                 sb.EmitPush(timestamp);
-                sb.EmitAppCall(UInt160.Parse("0xe69a2241c0629210c44e37fb03eb786d88a0af21"));// utxo time lock hash
+                sb.EmitPush(UInt160.Parse("0xe69a2241c0629210c44e37fb03eb786d88a0af21"));// utxo time lock hash
+                sb.EmitSysCall(InteropService.System_Contract_Call);
                 return new TransactionAttribute
                 {
                     Usage = TransactionAttributeUsage.SmartContractScript,
@@ -28,8 +30,8 @@ namespace Bhp.BhpExtensions.Transactions
         {
             if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
             if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
-            fee += tx.SystemFee;
-            var pay_total = (typeof(T) == typeof(IssueTransaction) ? new TransactionOutput[0] : tx.Outputs).GroupBy(p => p.AssetId, (k, g) => new
+            fee += Fixed8.Parse(tx.SystemFee.ToString());
+            var pay_total = tx.Outputs.GroupBy(p => p.AssetId, (k, g) => new
             {
                 AssetId = k,
                 Value = g.Sum(p => p.Value)
@@ -91,7 +93,7 @@ namespace Bhp.BhpExtensions.Transactions
                     {
                         AssetId = asset_id,
                         Value = input_sum[asset_id].Value - pay_total[asset_id].Value - txFee,
-                        ScriptHash = change_address
+                        Hash = change_address
                     });
 
                     n = outputs_new.Count - 1;
@@ -205,5 +207,5 @@ namespace Bhp.BhpExtensions.Transactions
             unspents_asset = VerifyTransactionContract.checkUtxo(unspents_asset);//By BHP
             return unspents_asset;
         }
-    } 
+    }
 }

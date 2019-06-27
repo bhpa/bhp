@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace Bhp.Ledger
 {
-    public class AssetState : StateBase, ICloneable<AssetState>
+    public class AssetState : ICloneable<AssetState>, ISerializable
     {
         public UInt256 AssetId;
         public AssetType AssetType;
@@ -29,7 +29,7 @@ namespace Bhp.Ledger
         public uint Expiration;
         public bool IsFrozen;
 
-        public override int Size => base.Size + AssetId.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + Available.Size + sizeof(byte) + sizeof(byte) + Fee.Size + FeeAddress.Size + Owner.Size + Admin.Size + Issuer.Size + sizeof(uint) + sizeof(bool);
+        public int Size => AssetId.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + Available.Size + sizeof(byte) + sizeof(byte) + Fee.Size + FeeAddress.Size + Owner.Size + Admin.Size + Issuer.Size + sizeof(uint) + sizeof(bool);
 
         AssetState ICloneable<AssetState>.Clone()
         {
@@ -53,9 +53,8 @@ namespace Bhp.Ledger
             };
         }
 
-        public override void Deserialize(BinaryReader reader)
+        public void Deserialize(BinaryReader reader)
         {
-            base.Deserialize(reader);
             AssetId = reader.ReadSerializable<UInt256>();
             AssetType = (AssetType)reader.ReadByte();
             Name = reader.ReadVarString();
@@ -129,9 +128,8 @@ namespace Bhp.Ledger
 
         private static readonly CultureInfo en = new CultureInfo("en");
 
-        public override void Serialize(BinaryWriter writer)
+        public void Serialize(BinaryWriter writer)
         {
-            base.Serialize(writer);
             writer.Write(AssetId);
             writer.Write((byte)AssetType);
             writer.WriteVarString(Name);
@@ -148,9 +146,9 @@ namespace Bhp.Ledger
             writer.Write(IsFrozen);
         }
 
-        public override JObject ToJson()
+        public JObject ToJson()
         {
-            JObject json = base.ToJson();
+            JObject json = new JObject();
             json["id"] = AssetId.ToString();
             json["type"] = AssetType;
             try

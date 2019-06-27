@@ -1,14 +1,13 @@
 ﻿using System;
 
-namespace Bhp.Ledger
+namespace Bhp.SmartContract.Manifest
 {
     [Flags]
-    public enum ContractPropertyState : byte
+    public enum ContractFeatures : byte
     {
         NoProperty = 0,
 
         HasStorage = 1 << 0,
-        HasDynamicInvoke = 1 << 1,
         Payable = 1 << 2
     }
 }

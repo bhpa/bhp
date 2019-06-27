@@ -247,7 +247,7 @@ namespace Bhp.IO.Caching
             {
                 RwSyncRootLock.ExitReadLock();
             }
-            item = default(TValue);
+            item = default;
             return false;
         }
     }

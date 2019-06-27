@@ -3,6 +3,7 @@ using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
+using Bhp.SmartContract.Native;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -19,12 +20,10 @@ namespace Bhp.Ledger
         private const int BlocksTillRebroadcastHighPriorityPoolTx = 10;
         private int RebroadcastMultiplierThreshold => Capacity / 10;
 
-        private static readonly double MaxSecondsToReverifyHighPrioTx = (double)Blockchain.SecondsPerBlock / 3;
-        private static readonly double MaxSecondsToReverifyLowPrioTx = (double)Blockchain.SecondsPerBlock / 5;
+        private static readonly double MaxSecondsToReverifyTx = (double)Blockchain.SecondsPerBlock / 3;
 
         // These two are not expected to be hit, they are just safegaurds.
-        private static readonly double MaxSecondsToReverifyHighPrioTxPerIdle = (double)Blockchain.SecondsPerBlock / 15;
-        private static readonly double MaxSecondsToReverifyLowPrioTxPerIdle = (double)Blockchain.SecondsPerBlock / 30;
+        private static readonly double MaxSecondsToReverifyTxPerIdle = (double)Blockchain.SecondsPerBlock / 15;
 
         private readonly BhpSystem _system;
 
@@ -42,34 +41,25 @@ namespace Bhp.Ledger
         /// Store all verified unsorted transactions currently in the pool.
         /// </summary>
         private readonly Dictionary<UInt256, PoolItem> _unsortedTransactions = new Dictionary<UInt256, PoolItem>();
-        /// <summary>
-        /// Stores the verified high priority sorted transactins currently in the pool.
+        /// Stores the verified sorted transactins currently in the pool.
         /// </summary>
-        private readonly SortedSet<PoolItem> _sortedHighPrioTransactions = new SortedSet<PoolItem>();
-        /// <summary>
-        ///  Stores the verified low priority sorted transactions currently in the pool.
-        /// </summary>
-        private readonly SortedSet<PoolItem> _sortedLowPrioTransactions = new SortedSet<PoolItem>();
+        private readonly SortedSet<PoolItem> _sortedTransactions = new SortedSet<PoolItem>();
 
         /// <summary>
         /// Store the unverified transactions currently in the pool.
         ///
         /// Transactions in this data structure were valid in some prior block, but may no longer be valid.
         /// The top ones that could make it into the next block get verified and moved into the verified data structures
-        /// (_unsortedTransactions, _sortedLowPrioTransactions, and _sortedHighPrioTransactions) after each block.
+        /// (_unsortedTransactions, and _sortedTransactions) after each block.
         /// </summary>
         private readonly Dictionary<UInt256, PoolItem> _unverifiedTransactions = new Dictionary<UInt256, PoolItem>();
-        private readonly SortedSet<PoolItem> _unverifiedSortedHighPriorityTransactions = new SortedSet<PoolItem>();
-        private readonly SortedSet<PoolItem> _unverifiedSortedLowPriorityTransactions = new SortedSet<PoolItem>();
+        private readonly SortedSet<PoolItem> _unverifiedSortedTransactions = new SortedSet<PoolItem>();
 
         // Internal methods to aid in unit testing
-        internal int SortedHighPrioTxCount => _sortedHighPrioTransactions.Count;
-        internal int SortedLowPrioTxCount => _sortedLowPrioTransactions.Count;
-        internal int UnverifiedSortedHighPrioTxCount => _unverifiedSortedHighPriorityTransactions.Count;
-        internal int UnverifiedSortedLowPrioTxCount => _unverifiedSortedLowPriorityTransactions.Count;
+        internal int SortedTxCount => _sortedTransactions.Count;
+        internal int UnverifiedSortedTxCount => _unverifiedSortedTransactions.Count;
 
         private int _maxTxPerBlock;
-        private int _maxLowPriorityTxPerBlock;
 
         /// <summary>
         /// Total maximum capacity of transactions the pool can hold.
@@ -106,18 +96,11 @@ namespace Bhp.Ledger
         {
             _system = system;
             Capacity = capacity;
-            LoadMaxTxLimitsFromPolicyPlugins();
         }
 
-        public void LoadMaxTxLimitsFromPolicyPlugins()
+        internal void LoadPolicy(Snapshot snapshot)
         {
-            _maxTxPerBlock = int.MaxValue;
-            _maxLowPriorityTxPerBlock = int.MaxValue;
-            foreach (IPolicyPlugin plugin in Plugin.Policies)
-            {
-                _maxTxPerBlock = Math.Min(_maxTxPerBlock, plugin.MaxTxPerBlock);
-                _maxLowPriorityTxPerBlock = Math.Min(_maxLowPriorityTxPerBlock, plugin.MaxLowPriorityTxPerBlock);
-            }
+            _maxTxPerBlock = (int)NativeContract.Policy.GetMaxTransactionsPerBlock(snapshot);
         }
 
         /// <summary>
@@ -132,8 +115,7 @@ namespace Bhp.Ledger
             _txRwLock.EnterReadLock();
             try
             {
-                return _unsortedTransactions.ContainsKey(hash)
-                       || _unverifiedTransactions.ContainsKey(hash);
+                return _unsortedTransactions.ContainsKey(hash) || _unverifiedTransactions.ContainsKey(hash);
             }
             finally
             {
@@ -195,10 +177,8 @@ namespace Bhp.Ledger
             _txRwLock.EnterReadLock();
             try
             {
-                verifiedTransactions = _sortedHighPrioTransactions.Reverse().Select(p => p.Tx)
-                    .Concat(_sortedLowPrioTransactions.Reverse().Select(p => p.Tx)).ToArray();
-                unverifiedTransactions = _unverifiedSortedHighPriorityTransactions.Reverse().Select(p => p.Tx)
-                    .Concat(_unverifiedSortedLowPriorityTransactions.Reverse().Select(p => p.Tx)).ToArray();
+                verifiedTransactions = _sortedTransactions.Reverse().Select(p => p.Tx).ToArray();
+                unverifiedTransactions = _unverifiedSortedTransactions.Reverse().Select(p => p.Tx).ToArray();
             }
             finally
             {
@@ -211,9 +191,7 @@ namespace Bhp.Ledger
             _txRwLock.EnterReadLock();
             try
             {
-                return _sortedHighPrioTransactions.Reverse().Select(p => p.Tx)
-                         .Concat(_sortedLowPrioTransactions.Reverse().Select(p => p.Tx))
-                         .ToArray();
+                return _sortedTransactions.Reverse().Select(p => p.Tx).ToArray();
             }
             finally
             {
@@ -242,25 +220,16 @@ namespace Bhp.Ledger
 
         private PoolItem GetLowestFeeTransaction(out Dictionary<UInt256, PoolItem> unsortedTxPool, out SortedSet<PoolItem> sortedPool)
         {
-            var minItem = GetLowestFeeTransaction(_sortedLowPrioTransactions, _unverifiedSortedLowPriorityTransactions,
-                out sortedPool);
-
-            if (minItem != null)
-            {
-                unsortedTxPool = Object.ReferenceEquals(sortedPool, _unverifiedSortedLowPriorityTransactions)
-                    ? _unverifiedTransactions : _unsortedTransactions;
-                return minItem;
-            }
+            sortedPool = null;
 
             try
             {
-                return GetLowestFeeTransaction(_sortedHighPrioTransactions, _unverifiedSortedHighPriorityTransactions,
-                    out sortedPool);
+                return GetLowestFeeTransaction(_sortedTransactions, _unverifiedSortedTransactions, out sortedPool);
             }
             finally
             {
-                unsortedTxPool = Object.ReferenceEquals(sortedPool, _unverifiedSortedHighPriorityTransactions)
-                    ? _unverifiedTransactions : _unsortedTransactions;
+                unsortedTxPool = Object.ReferenceEquals(sortedPool, _unverifiedSortedTransactions)
+                  ? _unverifiedTransactions : _unsortedTransactions;
             }
         }
 
@@ -273,9 +242,10 @@ namespace Bhp.Ledger
         }
 
         /// <summary>
+        /// Adds an already verified transaction to the memory pool.
         ///
-        /// Note: This must only be called from a single thread (the Blockchain actor) to add a transaction to the pool
-        ///       one should tell the Blockchain actor about the transaction.
+        /// Note: This must only be called from a single thread (the Blockchain actor). To add a transaction to the pool
+        ///       tell the Blockchain actor about the transaction.
         /// </summary>
         /// <param name="hash"></param>
         /// <param name="tx"></param>
@@ -286,32 +256,45 @@ namespace Bhp.Ledger
 
             if (_unsortedTransactions.ContainsKey(hash)) return false;
 
+            List<Transaction> removedTransactions = null;
+
             _txRwLock.EnterWriteLock();
             try
             {
                 _unsortedTransactions.Add(hash, poolItem);
+                _sortedTransactions.Add(poolItem);
 
-                SortedSet<PoolItem> pool = tx.IsLowPriority ? _sortedLowPrioTransactions : _sortedHighPrioTransactions;
-                pool.Add(poolItem);
-                RemoveOverCapacity();
+                if (Count > Capacity)
+                    removedTransactions = RemoveOverCapacity();
             }
             finally
             {
                 _txRwLock.ExitWriteLock();
             }
 
+            foreach (IMemoryPoolTxObserverPlugin plugin in Plugin.TxObserverPlugins)
+            {
+                plugin.TransactionAdded(poolItem.Tx);
+                if (removedTransactions != null)
+                    plugin.TransactionsRemoved(MemoryPoolTxRemovalReason.CapacityExceeded, removedTransactions);
+            }
+
             return _unsortedTransactions.ContainsKey(hash);
         }
 
-        private void RemoveOverCapacity()
+        private List<Transaction> RemoveOverCapacity()
         {
-            while (Count > Capacity)
+            List<Transaction> removedTransactions = new List<Transaction>();
+            do
             {
                 PoolItem minItem = GetLowestFeeTransaction(out var unsortedPool, out var sortedPool);
 
                 unsortedPool.Remove(minItem.Tx.Hash);
                 sortedPool.Remove(minItem);
-            }
+                removedTransactions.Add(minItem.Tx);
+            } while (Count > Capacity);
+
+            return removedTransactions;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -321,25 +304,35 @@ namespace Bhp.Ledger
                 return false;
 
             _unsortedTransactions.Remove(hash);
-            SortedSet<PoolItem> pool = item.Tx.IsLowPriority
-                ? _sortedLowPrioTransactions : _sortedHighPrioTransactions;
-            pool.Remove(item);
+            _sortedTransactions.Remove(item);
+
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryRemoveUnVerified(UInt256 hash, out PoolItem item)
+        internal bool TryRemoveUnVerified(UInt256 hash, out PoolItem item)
         {
             if (!_unverifiedTransactions.TryGetValue(hash, out item))
                 return false;
 
             _unverifiedTransactions.Remove(hash);
-            SortedSet<PoolItem> pool = item.Tx.IsLowPriority
-                ? _unverifiedSortedLowPriorityTransactions : _unverifiedSortedHighPriorityTransactions;
-            pool.Remove(item);
+            _unverifiedSortedTransactions.Remove(item);
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InvalidateVerifiedTransactions()
+        {
+            foreach (PoolItem item in _sortedTransactions)
+            {
+                if (_unverifiedTransactions.TryAdd(item.Tx.Hash, item))
+                    _unverifiedSortedTransactions.Add(item);
+
+                // Clear the verified transactions now, since they all must be reverified.
+                _unsortedTransactions.Clear();
+                _sortedTransactions.Clear();
+            }
+        }
         // Note: this must only be called from a single thread (the Blockchain actor)
         internal void UpdatePoolForBlockPersisted(Block block, Snapshot snapshot)
         {
@@ -354,22 +347,7 @@ namespace Bhp.Ledger
                 }
 
                 // Add all the previously verified transactions back to the unverified transactions
-                foreach (PoolItem item in _sortedHighPrioTransactions)
-                {
-                    if (_unverifiedTransactions.TryAdd(item.Tx.Hash, item))
-                        _unverifiedSortedHighPriorityTransactions.Add(item);
-                }
-
-                foreach (PoolItem item in _sortedLowPrioTransactions)
-                {
-                    if (_unverifiedTransactions.TryAdd(item.Tx.Hash, item))
-                        _unverifiedSortedLowPriorityTransactions.Add(item);
-                }
-
-                // Clear the verified transactions now, since they all must be reverified.
-                _unsortedTransactions.Clear();
-                _sortedHighPrioTransactions.Clear();
-                _sortedLowPrioTransactions.Clear();
+                InvalidateVerifiedTransactions();
             }
             finally
             {
@@ -381,18 +359,25 @@ namespace Bhp.Ledger
             if (block.Index > 0 && block.Index < Blockchain.Singleton.HeaderHeight)
                 return;
 
-            if (Plugin.Policies.Count == 0)
-                return;
+            LoadPolicy(snapshot);
 
-            LoadMaxTxLimitsFromPolicyPlugins();
-
-            ReverifyTransactions(_sortedHighPrioTransactions, _unverifiedSortedHighPriorityTransactions,
-                _maxTxPerBlock, MaxSecondsToReverifyHighPrioTx, snapshot);
-            ReverifyTransactions(_sortedLowPrioTransactions, _unverifiedSortedLowPriorityTransactions,
-                _maxLowPriorityTxPerBlock, MaxSecondsToReverifyLowPrioTx, snapshot);
+            ReverifyTransactions(_sortedTransactions, _unverifiedSortedTransactions,
+               _maxTxPerBlock, MaxSecondsToReverifyTx, snapshot);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InvalidateAllTransactions()
+        {
+            _txRwLock.EnterWriteLock();
+            try
+            {
+                InvalidateVerifiedTransactions();
+            }
+            finally
+            {
+                _txRwLock.ExitWriteLock();
+            }
+        }
+
         private int ReverifyTransactions(SortedSet<PoolItem> verifiedSortedTxPool,
             SortedSet<PoolItem> unverifiedSortedTxPool, int count, double secondsTimeout, Snapshot snapshot)
         {
@@ -414,7 +399,7 @@ namespace Bhp.Ledger
             _txRwLock.EnterWriteLock();
             try
             {
-                int blocksTillRebroadcast = Object.ReferenceEquals(unverifiedSortedTxPool, _sortedHighPrioTransactions)
+                int blocksTillRebroadcast = Object.ReferenceEquals(unverifiedSortedTxPool, _sortedTransactions)
                     ? BlocksTillRebroadcastHighPriorityPoolTx : BlocksTillRebroadcastLowPriorityPoolTx;
 
                 if (Count > RebroadcastMultiplierThreshold)
@@ -450,6 +435,10 @@ namespace Bhp.Ledger
                 _txRwLock.ExitWriteLock();
             }
 
+            var invalidTransactions = invalidItems.Select(p => p.Tx).ToArray();
+            foreach (IMemoryPoolTxObserverPlugin plugin in Plugin.TxObserverPlugins)
+                plugin.TransactionsRemoved(MemoryPoolTxRemovalReason.NoLongerValid, invalidTransactions);
+
             return reverifiedItems.Count;
         }
 
@@ -468,23 +457,11 @@ namespace Bhp.Ledger
             if (Blockchain.Singleton.Height < Blockchain.Singleton.HeaderHeight)
                 return false;
 
-            if (_unverifiedSortedHighPriorityTransactions.Count > 0)
+            if (_unverifiedSortedTransactions.Count > 0)
             {
-                // Always leave at least 1 tx for low priority tx
-                int verifyCount = _sortedHighPrioTransactions.Count > _maxTxPerBlock || maxToVerify == 1
-                    ? 1 : maxToVerify - 1;
-                maxToVerify -= ReverifyTransactions(_sortedHighPrioTransactions, _unverifiedSortedHighPriorityTransactions,
-                    verifyCount, MaxSecondsToReverifyHighPrioTxPerIdle, snapshot);
-
-                if (maxToVerify == 0) maxToVerify++;
-            }
-
-            if (_unverifiedSortedLowPriorityTransactions.Count > 0)
-            {
-                int verifyCount = _sortedLowPrioTransactions.Count > _maxLowPriorityTxPerBlock
-                    ? 1 : maxToVerify;
-                ReverifyTransactions(_sortedLowPrioTransactions, _unverifiedSortedLowPriorityTransactions,
-                    verifyCount, MaxSecondsToReverifyLowPrioTxPerIdle, snapshot);
+                int verifyCount = _sortedTransactions.Count > _maxTxPerBlock ? 1 : maxToVerify;
+                ReverifyTransactions(_sortedTransactions, _unverifiedSortedTransactions,
+                    verifyCount, MaxSecondsToReverifyTxPerIdle, snapshot);
             }
 
             return _unverifiedTransactions.Count > 0;

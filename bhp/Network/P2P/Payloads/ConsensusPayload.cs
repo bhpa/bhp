@@ -1,9 +1,10 @@
-﻿using Bhp.Cryptography;
+﻿using Bhp.Consensus;
+using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.VM;
+using Bhp.SmartContract.Native;
 using System;
 using System.IO;
 
@@ -15,12 +16,30 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 PrevHash;
         public uint BlockIndex;
         public ushort ValidatorIndex;
-        public uint Timestamp;
         public byte[] Data;
         public Witness Witness;
 
+        private ConsensusMessage _deserializedMessage = null;
+        public ConsensusMessage ConsensusMessage
+        {
+            get
+            {
+                if (_deserializedMessage is null)
+                    _deserializedMessage = ConsensusMessage.DeserializeFrom(Data);
+                return _deserializedMessage;
+            }
+            internal set
+            {
+                if (!ReferenceEquals(_deserializedMessage, value))
+                {
+                    _deserializedMessage = value;
+                    Data = value?.ToArray();
+                }
+            }
+        }
+
         private UInt256 _hash = null;
-        UInt256 IInventory.Hash
+        public UInt256 Hash
         {
             get
             {
@@ -33,6 +52,15 @@ namespace Bhp.Network.P2P.Payloads
         }
 
         InventoryType IInventory.InventoryType => InventoryType.Consensus;
+
+        public int Size =>
+            sizeof(uint) +      //Version
+            PrevHash.Size +     //PrevHash
+            sizeof(uint) +      //BlockIndex
+            sizeof(ushort) +    //ValidatorIndex
+            sizeof(uint) +      //Timestamp
+            Data.GetVarSize() + //Data
+            1 + Witness.Size;   //Witness
 
         Witness[] IVerifiable.Witnesses
         {
@@ -47,7 +75,10 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public int Size => sizeof(uint) + PrevHash.Size + sizeof(uint) + sizeof(ushort) + sizeof(uint) + Data.GetVarSize() + 1 + Witness.Size;
+        public T GetDeserializedMessage<T>() where T : ConsensusMessage
+        {
+            return (T)ConsensusMessage;
+        }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
@@ -62,18 +93,12 @@ namespace Bhp.Network.P2P.Payloads
             PrevHash = reader.ReadSerializable<UInt256>();
             BlockIndex = reader.ReadUInt32();
             ValidatorIndex = reader.ReadUInt16();
-            Timestamp = reader.ReadUInt32();
             Data = reader.ReadVarBytes();
-        }
-
-        byte[] IScriptContainer.GetMessage()
-        {
-            return this.GetHashData();
         }
 
         UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
         {
-            ECPoint[] validators = snapshot.GetValidators();
+            ECPoint[] validators = NativeContract.Bhp.GetNextBlockValidators(snapshot);
             if (validators.Length <= ValidatorIndex)
                 throw new InvalidOperationException();
             return new[] { Contract.CreateSignatureRedeemScript(validators[ValidatorIndex]).ToScriptHash() };
@@ -91,7 +116,6 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(PrevHash);
             writer.Write(BlockIndex);
             writer.Write(ValidatorIndex);
-            writer.Write(Timestamp);
             writer.WriteVarBytes(Data);
         }
 
@@ -99,7 +123,7 @@ namespace Bhp.Network.P2P.Payloads
         {
             if (BlockIndex <= snapshot.Height)
                 return false;
-            return this.VerifyWitnesses(snapshot);
+            return this.VerifyWitnesses(snapshot, 0_02000000);
         }
     }
 }

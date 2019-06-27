@@ -37,7 +37,7 @@ namespace Bhp.SmartContract
                     Parameters = ((JArray)json["parameters"]).Select(p => ContractParameter.FromJson(p)).ToArray(),
                     Signatures = json["signatures"]?.Properties.Select(p => new
                     {
-                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256),
+                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256r1),
                         Signature = p.Value.AsString().HexToBytes()
                     }).ToDictionary(p => p.PublicKey, p => p.Signature)
                 };
@@ -102,7 +102,7 @@ namespace Bhp.SmartContract
 
         public bool AddSignature(Contract contract, ECPoint pubkey, byte[] signature)
         {
-            if (contract.Script.IsMultiSigContract())
+            if (contract.Script.IsMultiSigContract(out _, out _))
             {
                 ContextItem item = CreateItem(contract);
                 if (item == null) return false;
@@ -183,8 +183,10 @@ namespace Bhp.SmartContract
 
         public static ContractParametersContext FromJson(JObject json)
         {
-            IVerifiable verifiable = typeof(ContractParametersContext).GetTypeInfo().Assembly.CreateInstance(json["type"].AsString()) as IVerifiable;
-            if (verifiable == null) throw new FormatException();
+            var type = typeof(ContractParametersContext).GetTypeInfo().Assembly.GetType(json["type"].AsString());
+            if (!typeof(IVerifiable).IsAssignableFrom(type)) throw new FormatException();
+
+            var verifiable = (IVerifiable)Activator.CreateInstance(type);
             using (MemoryStream ms = new MemoryStream(json["hex"].AsString().HexToBytes(), false))
             using (BinaryReader reader = new BinaryReader(ms, Encoding.UTF8))
             {
