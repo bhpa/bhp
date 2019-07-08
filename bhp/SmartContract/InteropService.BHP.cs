@@ -18,37 +18,37 @@ namespace Bhp.SmartContract
 {
     static partial class InteropService
     {
-        public static readonly uint Bhp_Native_Deploy = Register("Bhp.Native.Deploy", Native_Deploy, 0);
-        public static readonly uint Bhp_Crypto_CheckSig = Register("Bhp.Crypto.CheckSig", Crypto_CheckSig, 0_01000000);
-        public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig, GetCheckMultiSigPrice);
-        public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 0_00000400);
-        public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 0_00000400);
-        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400);
-        public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 0_00000400);
-        public static readonly uint Bhp_Transaction_GetWitnesses = Register("Bhp.Transaction.GetWitnesses", Transaction_GetWitnesses, 0_00010000);
-        public static readonly uint Bhp_Witness_GetVerificationScript = Register("Bhp.Witness.GetVerificationScript", Witness_GetVerificationScript, 0_00000400);
-        public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 0_00030000);
-        public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create, GetDeploymentPrice);
-        public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update, GetDeploymentPrice);
-        public static readonly uint Bhp_Contract_GetScript = Register("Bhp.Contract.GetScript", Contract_GetScript, 0_00000400);
-        public static readonly uint Bhp_Contract_IsPayable = Register("Bhp.Contract.IsPayable", Contract_IsPayable, 0_00000400);
-        public static readonly uint Bhp_Storage_Find = Register("Bhp.Storage.Find", Storage_Find, 0_01000000);
-        public static readonly uint Bhp_Enumerator_Create = Register("Bhp.Enumerator.Create", Enumerator_Create, 0_00000400);
-        public static readonly uint Bhp_Enumerator_Next = Register("Bhp.Enumerator.Next", Enumerator_Next, 0_01000000);
-        public static readonly uint Bhp_Enumerator_Value = Register("Bhp.Enumerator.Value", Enumerator_Value, 0_00000400);
-        public static readonly uint Bhp_Enumerator_Concat = Register("Bhp.Enumerator.Concat", Enumerator_Concat, 0_00000400);
-        public static readonly uint Bhp_Iterator_Create = Register("Bhp.Iterator.Create", Iterator_Create, 0_00000400);
-        public static readonly uint Bhp_Iterator_Key = Register("Bhp.Iterator.Key", Iterator_Key, 0_00000400);
-        public static readonly uint Bhp_Iterator_Keys = Register("Bhp.Iterator.Keys", Iterator_Keys, 0_00000400);
-        public static readonly uint Bhp_Iterator_Values = Register("Bhp.Iterator.Values", Iterator_Values, 0_00000400);
-        public static readonly uint Bhp_Iterator_Concat = Register("Bhp.Iterator.Concat", Iterator_Concat, 0_00000400);
-        public static readonly uint Bhp_Json_Serialize = Register("Bhp.Json.Serialize", Json_Serialize, 0_00100000);
-        public static readonly uint Bhp_Json_Deserialize = Register("Bhp.Json.Deserialize", Json_Deserialize, 0_00500000);
+        public static readonly uint Bhp_Native_Deploy = Register("Bhp.Native.Deploy", Native_Deploy, 0, TriggerType.Application);
+        public static readonly uint Bhp_Crypto_CheckSig = Register("Bhp.Crypto.CheckSig", Crypto_CheckSig, 0_01000000, TriggerType.All);
+        public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig, GetCheckMultiSigPrice, TriggerType.All);
+        public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 0_00000400, TriggerType.Application);
+        public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 0_00000400, TriggerType.Application);
+        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400, TriggerType.Application);
+        public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Transaction_GetWitnesses = Register("Bhp.Transaction.GetWitnesses", Transaction_GetWitnesses, 0_00010000, TriggerType.All);
+        public static readonly uint Bhp_Witness_GetVerificationScript = Register("Bhp.Witness.GetVerificationScript", Witness_GetVerificationScript, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 0_00030000, TriggerType.All);
+        public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create, GetDeploymentPrice, TriggerType.Application);
+        public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update, GetDeploymentPrice, TriggerType.Application);
+        public static readonly uint Bhp_Contract_GetScript = Register("Bhp.Contract.GetScript", Contract_GetScript, 0_00000400, TriggerType.Application);
+        public static readonly uint Bhp_Contract_IsPayable = Register("Bhp.Contract.IsPayable", Contract_IsPayable, 0_00000400, TriggerType.Application);
+        public static readonly uint Bhp_Storage_Find = Register("Bhp.Storage.Find", Storage_Find, 0_01000000, TriggerType.Application);
+        public static readonly uint Bhp_Enumerator_Create = Register("Bhp.Enumerator.Create", Enumerator_Create, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Enumerator_Next = Register("Bhp.Enumerator.Next", Enumerator_Next, 0_01000000, TriggerType.All);
+        public static readonly uint Bhp_Enumerator_Value = Register("Bhp.Enumerator.Value", Enumerator_Value, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Enumerator_Concat = Register("Bhp.Enumerator.Concat", Enumerator_Concat, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Iterator_Create = Register("Bhp.Iterator.Create", Iterator_Create, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Iterator_Key = Register("Bhp.Iterator.Key", Iterator_Key, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Iterator_Keys = Register("Bhp.Iterator.Keys", Iterator_Keys, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Iterator_Values = Register("Bhp.Iterator.Values", Iterator_Values, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Iterator_Concat = Register("Bhp.Iterator.Concat", Iterator_Concat, 0_00000400, TriggerType.All);
+        public static readonly uint Bhp_Json_Serialize = Register("Bhp.Json.Serialize", Json_Serialize, 0_00100000, TriggerType.All);
+        public static readonly uint Bhp_Json_Deserialize = Register("Bhp.Json.Deserialize", Json_Deserialize, 0_00500000, TriggerType.All);
 
         static InteropService()
         {
             foreach (NativeContract contract in NativeContract.Contracts)
-                Register(contract.ServiceName, contract.Invoke, contract.GetPrice);
+                Register(contract.ServiceName, contract.Invoke, contract.GetPrice, TriggerType.System | TriggerType.Application);
         }
 
         private static long GetCheckMultiSigPrice(RandomAccessStack<StackItem> stack)
@@ -70,7 +70,6 @@ namespace Bhp.SmartContract
 
         private static bool Native_Deploy(ApplicationEngine engine)
         {
-            if (engine.Trigger != TriggerType.Application) return false;
             if (engine.Snapshot.PersistingBlock.Index != 0) return false;
             foreach (NativeContract contract in NativeContract.Contracts)
             {
@@ -244,7 +243,6 @@ namespace Bhp.SmartContract
 
         private static bool Contract_Create(ApplicationEngine engine)
         {
-            if (engine.Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
             if (script.Length > 1024 * 1024) return false;
 
@@ -269,7 +267,6 @@ namespace Bhp.SmartContract
 
         private static bool Contract_Update(ApplicationEngine engine)
         {
-            if (engine.Trigger != TriggerType.Application) return false;
             byte[] script = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
             if (script.Length > 1024 * 1024) return false;
             var manifest = engine.CurrentContext.EvaluationStack.Pop().GetString();
