@@ -1,4 +1,5 @@
-﻿using Akka.Util.Internal;
+﻿using Akka.Actor;
+using Akka.Util.Internal;
 using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
@@ -60,6 +61,7 @@ namespace Bhp.Ledger
         internal int UnverifiedSortedTxCount => _unverifiedSortedTransactions.Count;
 
         private int _maxTxPerBlock;
+        private long _feePerByte;
 
         /// <summary>
         /// Total maximum capacity of transactions the pool can hold.
@@ -98,9 +100,13 @@ namespace Bhp.Ledger
             Capacity = capacity;
         }
 
-        internal void LoadPolicy(Snapshot snapshot)
+        internal bool LoadPolicy(Snapshot snapshot)
         {
             _maxTxPerBlock = (int)NativeContract.Policy.GetMaxTransactionsPerBlock(snapshot);
+            long newFeePerByte = NativeContract.Policy.GetFeePerByte(snapshot);
+            bool policyChanged = newFeePerByte > _feePerByte;
+            _feePerByte = newFeePerByte;
+            return policyChanged;
         }
 
         /// <summary>
@@ -336,6 +342,8 @@ namespace Bhp.Ledger
         // Note: this must only be called from a single thread (the Blockchain actor)
         internal void UpdatePoolForBlockPersisted(Block block, Snapshot snapshot)
         {
+            bool policyChanged = LoadPolicy(snapshot);
+
             _txRwLock.EnterWriteLock();
             try
             {
@@ -348,6 +356,14 @@ namespace Bhp.Ledger
 
                 // Add all the previously verified transactions back to the unverified transactions
                 InvalidateVerifiedTransactions();
+
+                if (policyChanged)
+                {
+                    foreach (PoolItem item in _unverifiedSortedTransactions.Reverse())
+                        _system.Blockchain.Tell(item.Tx, ActorRefs.NoSender);
+                    _unverifiedTransactions.Clear();
+                    _unverifiedSortedTransactions.Clear();
+                }
             }
             finally
             {
@@ -356,10 +372,8 @@ namespace Bhp.Ledger
 
             // If we know about headers of future blocks, no point in verifying transactions from the unverified tx pool
             // until we get caught up.
-            if (block.Index > 0 && block.Index < Blockchain.Singleton.HeaderHeight)
+            if (block.Index > 0 && block.Index < Blockchain.Singleton.HeaderHeight || policyChanged)
                 return;
-
-            LoadPolicy(snapshot);
 
             ReverifyTransactions(_sortedTransactions, _unverifiedSortedTransactions,
                _maxTxPerBlock, MaxSecondsToReverifyTx, snapshot);
@@ -388,7 +402,7 @@ namespace Bhp.Ledger
             // Since unverifiedSortedTxPool is ordered in an ascending manner, we take from the end.
             foreach (PoolItem item in unverifiedSortedTxPool.Reverse().Take(count))
             {
-                if (item.Tx.Verify(snapshot, _unsortedTransactions.Select(p => p.Value.Tx)))
+                if (item.Tx.Reverify(snapshot, _unsortedTransactions.Select(p => p.Value.Tx)))
                     reverifiedItems.Add(item);
                 else // Transaction no longer valid -- it will be removed from unverifiedTxPool.
                     invalidItems.Add(item);

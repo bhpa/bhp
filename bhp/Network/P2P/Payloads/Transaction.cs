@@ -234,6 +234,26 @@ namespace Bhp.Network.P2P.Payloads
             return hashes.OrderBy(p => p).ToArray();
         }
 
+        public virtual bool Reverify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        {
+            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
+                return false;
+            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
+                return false;
+            BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, Sender);
+            BigInteger fee = SystemFee + NetworkFee;
+            if (balance < fee) return false;
+            fee += mempool.Where(p => p != this && p.Sender.Equals(Sender)).Select(p => (BigInteger)(p.SystemFee + p.NetworkFee)).Sum();
+            if (balance < fee) return false;
+            UInt160[] hashes = GetScriptHashesForVerifying(snapshot);
+            for (int i = 0; i < hashes.Length; i++)
+            {
+                if (Witnesses[i].VerificationScript.Length > 0) continue;
+                if (snapshot.Contracts.TryGet(hashes[i]) is null) return false;
+            }
+            return true;
+        }
+
         void ISerializable.Serialize(BinaryWriter writer)
         {
             ((IVerifiable)this).SerializeUnsigned(writer);
@@ -286,73 +306,22 @@ namespace Bhp.Network.P2P.Payloads
         /*
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
-            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
-                return false;
+            if (!Reverify(snapshot, mempool)) return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
             long net_fee = NetworkFee - size * NativeContract.Policy.GetFeePerByte(snapshot);
             if (net_fee < 0) return false;
-            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
-                return false;
-            for (int i = 1; i < Inputs.Length; i++)
-                for (int j = 0; j < i; j++)
-                    if (Inputs[i].PrevHash == Inputs[j].PrevHash && Inputs[i].PrevIndex == Inputs[j].PrevIndex)
-                        return false;
-            if (mempool.Where(p => p != this).SelectMany(p => p.Inputs).Intersect(Inputs).Count() > 0)
-                return false;
-            if (snapshot.IsDoubleSpend(this))
-                return false;
-            foreach (var group in Outputs.GroupBy(p => p.AssetId))
-            {
-                AssetState asset = snapshot.Assets.TryGet(group.Key);
-                if (asset == null) return false;
-                if (asset.Expiration <= snapshot.Height + 1 && asset.AssetType != AssetType.GoverningToken && asset.AssetType != AssetType.UtilityToken)
-                    return false;
-                foreach (TransactionOutput output in group)
-                    if (output.Value.GetData() % (long)Math.Pow(10, 8 - asset.Precision) != 0)
-                        return false;
-            }
-            TransactionResult[] results = GetTransactionResults()?.ToArray();
-            if (results == null) return false;
-            TransactionResult[] results_destroy = results.Where(p => p.Amount > Fixed8.Zero).ToArray();
-            if (results_destroy.Length > 1) return false;
-            if (results_destroy.Length == 1 && results_destroy[0].AssetId != Blockchain.UtilityToken.Hash)
-                return false;
-            if (SystemFee > Fixed8.Zero && (results_destroy.Length == 0 || results_destroy[0].Amount < SystemFee))
-                return false;
-            TransactionResult[] results_issue = results.Where(p => p.Amount < Fixed8.Zero).ToArray();
-            if (Type == TransactionType.MinerTransaction)
-            {                
-                if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
-                    return false;
-            }
-            else
-            {
-                if (results_issue.Length > 0)
-                    return false;
-            }
-            if (Attributes.Count(p => p.Usage == TransactionAttributeUsage.ECDH02 || p.Usage == TransactionAttributeUsage.ECDH03) > 1)
-                return false;
-            if (!VerifyReceivingScripts()) return false;
-             return this.VerifyWitness(snapshot, VerificationGasLimited);
+            return this.VerifyWitnesses(snapshot, net_fee);
         }
         */
 
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
-            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
-                return false;
+            if (!Reverify(snapshot, mempool)) return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
             long net_fee = NetworkFee - size * NativeContract.Policy.GetFeePerByte(snapshot);
             if (net_fee < 0) return false;
-            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
-                return false;
-            BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, Sender);
-            BigInteger fee = SystemFee + NetworkFee;
-            if (balance < fee) return false;
-            fee += mempool.Where(p => p != this && p.Sender.Equals(Sender)).Select(p => (BigInteger)(p.SystemFee + p.NetworkFee)).Sum();
-            if (balance < fee) return false;
             for (int i = 1; i < Inputs.Length; i++)
                 for (int j = 0; j < i; j++)
                     if (Inputs[i].PrevHash == Inputs[j].PrevHash && Inputs[i].PrevIndex == Inputs[j].PrevIndex)
