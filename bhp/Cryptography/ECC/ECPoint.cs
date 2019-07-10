@@ -45,7 +45,7 @@ namespace Bhp.Cryptography.ECC
             ECPoint p = null;
             int expectedLength = (curve.Q.GetBitLength() + 7) / 8;
             switch (encoded[0])
-            {                
+            {
                 case 0x02: // compressed
                 case 0x03: // compressed
                     {
@@ -109,14 +109,24 @@ namespace Bhp.Cryptography.ECC
             byte[] buffer = new byte[1 + expectedLength * 2];
             buffer[0] = reader.ReadByte();
             switch (buffer[0])
-            {               
+            {
                 case 0x02:
                 case 0x03:
-                    reader.Read(buffer, 1, expectedLength);
-                    return DecodePoint(buffer.Take(1 + expectedLength).ToArray(), curve);
+                    {
+                        if (reader.Read(buffer, 1, expectedLength) != expectedLength)
+                        {
+                            throw new FormatException();
+                        }
+                        return DecodePoint(buffer.Take(1 + expectedLength).ToArray(), curve);
+                    }
                 case 0x04:
-                    reader.Read(buffer, 1, expectedLength * 2);
-                    return DecodePoint(buffer, curve);
+                    {
+                        if (reader.Read(buffer, 1, expectedLength) != expectedLength)
+                        {
+                            throw new FormatException();
+                        }
+                        return DecodePoint(buffer.Take(1 + expectedLength).ToArray(), curve);
+                    }
                 default:
                     throw new FormatException("Invalid point encoding " + buffer[0]);
             }
