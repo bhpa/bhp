@@ -360,7 +360,8 @@ namespace Bhp.Ledger
                 if (policyChanged)
                 {
                     foreach (PoolItem item in _unverifiedSortedTransactions.Reverse())
-                        _system.Blockchain.Tell(item.Tx, ActorRefs.NoSender);
+                        if (item.Tx.FeePerByte >= _feePerByte)
+                            _system.Blockchain.Tell(item.Tx, ActorRefs.NoSender);
                     _unverifiedTransactions.Clear();
                     _unverifiedSortedTransactions.Clear();
                 }
