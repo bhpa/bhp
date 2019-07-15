@@ -29,6 +29,7 @@ namespace Bhp.Wallets.BRC6
         public override string Name => name;
         public override Version Version => version;
         public override uint WalletHeight => indexer.IndexHeight;
+        public override string WalletPath => path;
 
         public BRC6Wallet(WalletIndexer indexer, string path, string name = null)
         {
