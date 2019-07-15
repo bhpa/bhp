@@ -28,6 +28,7 @@ namespace Bhp.Wallets.SQLite
 
         public override string Name => Path.GetFileNameWithoutExtension(path);
         public override uint WalletHeight => indexer.IndexHeight;
+        public override string WalletPath => path;
 
         public override Version Version
         {
