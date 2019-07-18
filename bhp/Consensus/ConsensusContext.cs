@@ -170,10 +170,11 @@ namespace Bhp.Consensus
             }
         }
 
-        public ConsensusPayload MakeChangeView()
+        public ConsensusPayload MakeChangeView(ChangeViewReason reason)
         {
             return ChangeViewPayloads[MyIndex] = MakeSignedPayload(new ChangeView
             {
+                Reason = reason,
                 Timestamp = TimeProvider.Current.UtcNow.ToTimestamp()
             });
         }

@@ -65,13 +65,13 @@ namespace Bhp.Consensus
             if (verify && !tx.Verify(context.Snapshot, context.Transactions.Values))
             {
                 Log($"Invalid transaction: {tx.Hash}{Environment.NewLine}{tx.ToArray().ToHexString()}", LogLevel.Warning);
-                RequestChangeView();
+                RequestChangeView(ChangeViewReason.TxInvalid);
                 return false;
             }
             if (!Plugin.CheckPolicy(tx))
             {
                 Log($"reject tx: {tx.Hash}{Environment.NewLine}{tx.ToArray().ToHexString()}", LogLevel.Warning);
-                RequestChangeView();
+                RequestChangeView(ChangeViewReason.TxRejectedByPolicy);
                 return false;
             }
             context.Transactions[tx.Hash] = tx;
@@ -125,7 +125,7 @@ namespace Bhp.Consensus
                     // Communicate the network about my agreement to move to `viewNumber`
                     // if my last change view payload, `message`, has NewViewNumber lower than current view to change
                     if (message is null || message.NewViewNumber < viewNumber)
-                        localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeChangeView() });
+                        localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeChangeView(ChangeViewReason.ChangeAgreement) });
                 }
                 InitializeConsensus(viewNumber);
             }
@@ -549,7 +549,14 @@ namespace Bhp.Consensus
                 }
                 else
                 {
-                    RequestChangeView();
+                    var reason = ChangeViewReason.Timeout;
+
+                    if (context.Block != null && context.TransactionHashes.Count() > context.Transactions.Count)
+                    {
+                        reason = ChangeViewReason.TxNotFound;
+                    }
+
+                    RequestChangeView(reason);
                 }
             }
         }
@@ -578,7 +585,7 @@ namespace Bhp.Consensus
             return Akka.Actor.Props.Create(() => new ConsensusService(localNode, taskManager, store, wallet)).WithMailbox("consensus-service-mailbox");
         }
 
-        private void RequestChangeView()
+        private void RequestChangeView(ChangeViewReason reason)
         {
             if (context.WatchOnly) return;
             // Request for next view is always one view more than the current context.ViewNumber
@@ -594,7 +601,7 @@ namespace Bhp.Consensus
                 return;
             }
             Log($"request change view: height={context.Block.Index} view={context.ViewNumber} nv={expectedView} nc={context.CountCommitted} nf={context.CountFailed}");
-            localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeChangeView() });
+            localNode.Tell(new LocalNode.SendDirectly { Inventory = context.MakeChangeView(reason) });
             CheckExpectedView(expectedView);
         }
 
