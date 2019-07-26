@@ -32,6 +32,43 @@ namespace Bhp.Network.RPC
 {
     public sealed class RpcServer : IDisposable
     {
+        private class CheckWitnessHashes : IVerifiable
+        {
+            private readonly UInt160[] _scriptHashesForVerifying;
+            public Witness[] Witnesses { get; set; }
+            public int Size { get; }
+
+            public CheckWitnessHashes(UInt160[] scriptHashesForVerifying)
+            {
+                _scriptHashesForVerifying = scriptHashesForVerifying;
+            }
+
+            public void Serialize(BinaryWriter writer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Deserialize(BinaryReader reader)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void DeserializeUnsigned(BinaryReader reader)
+            {
+                throw new NotImplementedException();
+            }
+
+            public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
+            {
+                return _scriptHashesForVerifying;
+            }
+
+            public void SerializeUnsigned(BinaryWriter writer)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public Wallet Wallet;
 
         private IWebHost host;
@@ -129,7 +166,13 @@ namespace Bhp.Network.RPC
                     return InvokeFunction(_params);
                 case "invokescript":
                     byte[] script = _params[0].AsString().HexToBytes();
-                    return GetInvokeResult(script);
+                    CheckWitnessHashes checkWitnessHashes = null;
+                    if (_params.Count > 1)
+                    {
+                        UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                        checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                    }
+                    return GetInvokeResult(script, checkWitnessHashes);
                 case "sendrawtransaction":
                     return SendRawTransaction(_params);
                 case "submitblock":
@@ -363,9 +406,9 @@ namespace Bhp.Network.RPC
             return GetInvokeResult(script);
         }
 
-        private JObject GetInvokeResult(byte[] script)
+        private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
         {
-            ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: maxGasInvoke.value);
+            ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke.value);
             JObject json = new JObject();
             json["script"] = script.ToHexString();
             json["state"] = engine.State;
