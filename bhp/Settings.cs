@@ -15,6 +15,7 @@ namespace Bhp
         public string[] SeedList { get; }
         public IReadOnlyDictionary<TransactionType, Fixed8> SystemFee { get; }
         public uint SecondsPerBlock { get; }
+        public int MemoryPoolMaxTransactions { get; }
 
         static ProtocolSettings _default;
 
@@ -84,6 +85,7 @@ namespace Bhp
             }
             this.SystemFee = sys_fee;
             this.SecondsPerBlock = section.GetValue("SecondsPerBlock", 15u);
+            this.MemoryPoolMaxTransactions = Math.Max(1, section.GetValue("MemoryPoolMaxTransactions", 50_000));
         }
     }
 }
