@@ -108,8 +108,7 @@ namespace Bhp.Ledger
                 DeployNativeContracts()
             }
         };
-
-        private const int MemoryPoolMaxTransactions = 50_000;
+        
         private const int MaxTxToReverifyPerIdle = 10;
         private static readonly object lockObj = new object();
         private readonly BhpSystem system;
@@ -145,7 +144,7 @@ namespace Bhp.Ledger
         public Blockchain(BhpSystem system, Store store)
         {
             this.system = system;
-            this.MemPool = new MemoryPool(system, MemoryPoolMaxTransactions);
+            this.MemPool = new MemoryPool(system, ProtocolSettings.Default.MemoryPoolMaxTransactions);
             this.Store = store;
             lock (lockObj)
             {
