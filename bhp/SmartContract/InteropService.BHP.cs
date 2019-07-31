@@ -353,7 +353,7 @@ namespace Bhp.SmartContract
                     while (remain >= 16)
                     {
                         ms.Write(prefix, index, 16);
-                        ms.WriteByte(0);
+                        ms.WriteByte(16);
                         index += 16;
                         remain -= 16;
                     }

@@ -2,6 +2,7 @@
 using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.Ledger;
+using System.Globalization;
 using System.IO;
 
 namespace Bhp.Network.P2P.Payloads
@@ -44,6 +45,14 @@ namespace Bhp.Network.P2P.Payloads
             json["primary"] = PrimaryIndex;
             json["nonce"] = Nonce.ToString("x16");
             return json;
+        }
+
+        public static ConsensusData FromJson(JObject json)
+        {
+            ConsensusData block = new ConsensusData();
+            block.PrimaryIndex = (uint)json["primary"].AsNumber();
+            block.Nonce = ulong.Parse(json["nonce"].AsString(), NumberStyles.HexNumber);
+            return block;
         }
     }
 }
