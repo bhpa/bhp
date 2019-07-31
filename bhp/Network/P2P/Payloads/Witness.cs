@@ -45,5 +45,13 @@ namespace Bhp.Network.P2P.Payloads
             json["verification"] = VerificationScript.ToHexString();
             return json;
         }
+
+        public static Witness FromJson(JObject json)
+        {
+            Witness witness = new Witness();
+            witness.InvocationScript = json["invocation"].AsString().HexToBytes();
+            witness.VerificationScript = json["verification"].AsString().HexToBytes();
+            return witness;
+        }
     }
 }

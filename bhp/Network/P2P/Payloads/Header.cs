@@ -1,4 +1,5 @@
-﻿using Bhp.Ledger;
+﻿using Bhp.IO.Json;
+using Bhp.Ledger;
 using System;
 using System.IO;
 
@@ -50,6 +51,14 @@ namespace Bhp.Network.P2P.Payloads
                 Witness = Witness,
                 Hashes = new UInt256[0]
             };
+        }
+
+        public new static Header FromJson(JObject json)
+        {
+            Header header = new Header();
+            BlockBase blockBase = header;
+            blockBase.FromJson(json);
+            return header;
         }
     }
 }
