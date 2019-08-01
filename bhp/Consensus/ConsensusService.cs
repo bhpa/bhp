@@ -175,6 +175,7 @@ namespace Bhp.Consensus
 
         private void Log(string message, LogLevel level = LogLevel.Info)
         {
+            Console.WriteLine($"[{DateTime.UtcNow}] {message}");
             Plugin.Log(nameof(ConsensusService), level, message);
         }
 
