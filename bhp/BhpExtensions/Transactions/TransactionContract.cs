@@ -26,7 +26,7 @@ namespace Bhp.BhpExtensions.Transactions
             }
         }
 
-        public T MakeTransaction<T>(Wallet wallet, T tx, UInt160 from = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8), Fixed8 transaction_fee = default(Fixed8)) where T : Transaction
+        public T MakeTransaction<T>(Wallet wallet, T tx, UInt160 from = null, UInt160 fee_address = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8), Fixed8 transaction_fee = default(Fixed8)) where T : Transaction
         {
             if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
             if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
@@ -153,6 +153,47 @@ namespace Bhp.BhpExtensions.Transactions
 
             tx.Inputs = pay_coins.Values.SelectMany(p => p.Unspents).Select(p => p.Reference).ToArray();
             tx.Outputs = outputs_new.ToArray();
+
+            return EstimateFee(wallet, tx, from, fee_address);//BHP
+        }
+
+        /// <summary>
+        /// caluate tx fee (token and share)
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="wallet"></param>
+        /// <param name="tx"></param>
+        /// <param name="from"></param>
+        /// <param name="fee_address"></param>
+        /// <returns></returns>
+        public static T EstimateFee<T>(Wallet wallet, T tx, UInt160 from, UInt160 fee_address) where T : Transaction
+        {
+            if (!ExtensionSettings.Default.WalletConfig.IsBhpFee) return tx;
+            if (!tx.Outputs.Any(p => p.AssetId == Blockchain.GoverningToken.Hash))//without bhp
+            {
+                if (tx.Outputs.Any(p => p.AssetId != Blockchain.GoverningToken.Hash && p.AssetId != Blockchain.UtilityToken.Hash))//except bhp and gas
+                {
+                    Fixed8 bhp_fee = BhpTxFee.EstimateTxFee(tx);
+                    if (fee_address == null && from != null)
+                    {
+                        fee_address = from;
+                    }
+                    Coin[] feeCoins = fee_address == null ? wallet.FindUnspentCoins(Blockchain.GoverningToken.Hash, bhp_fee) :
+                                                            wallet.FindUnspentCoins(Blockchain.GoverningToken.Hash, bhp_fee, fee_address);
+                    if (feeCoins == null) return null;
+                    tx.Inputs = tx.Inputs.Concat(feeCoins.Select(p => { return p.Reference; })).ToArray();
+                    Fixed8 coin_value = feeCoins.Sum(p => p.Output.Value);
+                    if (coin_value > bhp_fee)
+                    {
+                        tx.Outputs = tx.Outputs.Concat(new[] { new TransactionOutput()
+                        {
+                            AssetId = Blockchain.GoverningToken.Hash,
+                            ScriptHash = fee_address == null ? wallet.GetChangeAddress() : fee_address,
+                            Value = coin_value - bhp_fee
+                        }}).ToArray();
+                    }
+                }
+            }
 
             return tx;
         }
