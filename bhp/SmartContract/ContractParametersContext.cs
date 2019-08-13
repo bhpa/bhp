@@ -72,7 +72,14 @@ namespace Bhp.SmartContract
             }
         }
 
+        /// <summary>
+        /// Cache for public ScriptHashes field
+        /// </summary>
         private UInt160[] _ScriptHashes = null;
+        /// <summary>
+        /// ScriptHashes are the verifiable ScriptHashes from Verifiable element
+        /// Equivalent to: Verifiable.GetScriptHashesForVerifying(Blockchain.Singleton.GetSnapshot())
+        /// </summary>
         public IReadOnlyList<UInt160> ScriptHashes
         {
             get

@@ -207,6 +207,7 @@ namespace Bhp.Ledger
                 Version = 1,
                 Script = script,
                 Attributes = new TransactionAttribute[0],
+                Cosigners = new Cosigner[0],
                 Inputs = new CoinReference[0],
                 Outputs = new TransactionOutput[0],
                 Witnesses = new[]
