@@ -27,7 +27,10 @@ namespace Bhp.Network.P2P.Payloads
         /// Maximum number of attributes that can be contained within a transaction
         /// </summary>
         private const int MaxTransactionAttributes = 16;
-
+        /// <summary>
+        /// Maximum number of cosigners that can be contained within a transaction
+        /// </summary>
+        private const int MaxCosigners = 16;
         /// <summary>
         /// Reflection cache for TransactionType
         /// </summary>
@@ -47,6 +50,7 @@ namespace Bhp.Network.P2P.Payloads
         public long NetworkFee;
         public uint ValidUntilBlock;
         public TransactionAttribute[] Attributes;
+        public Cosigner[] Cosigners { get; set; }
         public CoinReference[] Inputs;
         public TransactionOutput[] Outputs;
         public byte[] Script;
@@ -124,6 +128,7 @@ namespace Bhp.Network.P2P.Payloads
 
         public int Size => HeaderSize +
                    Attributes.GetVarSize() +   //Attributes
+                   Cosigners.GetVarSize() +    //Cosigners
                    Script.GetVarSize() +       //Script
                    Witnesses.GetVarSize();     //Witnesses
 
@@ -180,6 +185,8 @@ namespace Bhp.Network.P2P.Payloads
             if (SystemFee + NetworkFee < SystemFee) throw new FormatException();
             ValidUntilBlock = reader.ReadUInt32();
             Attributes = reader.ReadSerializableArray<TransactionAttribute>(MaxTransactionAttributes);
+            Cosigners = reader.ReadSerializableArray<Cosigner>(MaxCosigners);
+            if (Cosigners.Select(u => u.Account).Distinct().Count() != Cosigners.Length) throw new FormatException();
             Inputs = reader.ReadSerializableArray<CoinReference>();
             Outputs = reader.ReadSerializableArray<TransactionOutput>(ushort.MaxValue + 1);
             var cosigners = Attributes.Where(p => p.Usage == TransactionAttributeUsage.Cosigner).Select(p => new UInt160(p.Data)).ToArray();
@@ -230,7 +237,7 @@ namespace Bhp.Network.P2P.Payloads
         public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
         {
             var hashes = new HashSet<UInt160> { Sender };
-            hashes.UnionWith(Attributes.Where(p => p.Usage == TransactionAttributeUsage.Cosigner).Select(p => new UInt160(p.Data)));
+            hashes.UnionWith(Cosigners.Select(p => p.Account));
             return hashes.OrderBy(p => p).ToArray();
         }
 
@@ -273,6 +280,7 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(ValidUntilBlock);
             SerializeExclusiveData(writer);
             writer.Write(Attributes);
+            writer.Write(Cosigners);
             writer.Write(Inputs);
             writer.Write(Outputs);
         }
@@ -287,6 +295,7 @@ namespace Bhp.Network.P2P.Payloads
             json["nonce"] = Nonce;
             json["sender"] = Sender.ToAddress();
             json["attributes"] = Attributes.Select(p => p.ToJson()).ToArray();
+            json["cosigners"] = Cosigners.Select(p => p.ToJson()).ToArray();
             json["vin"] = Inputs.Select(p => p.ToJson()).ToArray();
             json["vout"] = Outputs.Select((p, i) => p.ToJson((ushort)i)).ToArray();
             json["sys_fee"] = new BigDecimal(SystemFee, NativeContract.GAS.Decimals).ToString();
@@ -404,6 +413,7 @@ namespace Bhp.Network.P2P.Payloads
             tx.NetworkFee = long.Parse(json["net_fee"].AsString());
             tx.ValidUntilBlock = uint.Parse(json["valid_until_block"].AsString());
             tx.Attributes = ((JArray)json["attributes"]).Select(p => TransactionAttribute.FromJson(p)).ToArray();
+            tx.Cosigners = ((JArray)json["cosigners"]).Select(p => Cosigner.FromJson(p)).ToArray();
             tx.Script = json["script"].AsString().HexToBytes();
             tx.Witnesses = ((JArray)json["witnesses"]).Select(p => Witness.FromJson(p)).ToArray();
             return tx;
