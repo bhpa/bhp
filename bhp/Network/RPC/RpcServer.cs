@@ -165,14 +165,7 @@ namespace Bhp.Network.RPC
                 case "invokefunction":
                     return InvokeFunction(_params);
                 case "invokescript":
-                    byte[] script = _params[0].AsString().HexToBytes();
-                    CheckWitnessHashes checkWitnessHashes = null;
-                    if (_params.Count > 1)
-                    {
-                        UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
-                        checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
-                    }
-                    return GetInvokeResult(script, checkWitnessHashes);
+                    return InvokeScript(_params);
                 case "sendrawtransaction":
                     return SendRawTransaction(_params);
                 case "submitblock":
@@ -404,6 +397,18 @@ namespace Bhp.Network.RPC
                 script = sb.EmitAppCall(script_hash, operation, args).ToArray();
             }
             return GetInvokeResult(script);
+        }
+
+        private JObject InvokeScript(JArray _params)
+        {
+            byte[] script = _params[0].AsString().HexToBytes();
+            CheckWitnessHashes checkWitnessHashes = null;
+            if (_params.Count > 1)
+            {
+                UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+            }
+            return GetInvokeResult(script, checkWitnessHashes);
         }
 
         private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
