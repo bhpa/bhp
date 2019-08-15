@@ -11,7 +11,7 @@ namespace Bhp
     {
         public const int Length = 32;
         public static readonly UInt256 Zero = new UInt256();
-        
+
         /// <summary>
         /// The empty constructor stores a null byte array
         /// </summary>
