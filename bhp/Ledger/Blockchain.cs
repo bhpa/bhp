@@ -122,9 +122,9 @@ namespace Bhp.Ledger
         public Store Store { get; }
         public MemoryPool MemPool { get; }
         public uint Height => currentSnapshot.Height;
-        public uint HeaderHeight => (uint)header_index.Count - 1;
+        public uint HeaderHeight => currentSnapshot.HeaderHeight;
         public UInt256 CurrentBlockHash => currentSnapshot.CurrentBlockHash;
-        public UInt256 CurrentHeaderHash => header_index[header_index.Count - 1];
+        public UInt256 CurrentHeaderHash => currentSnapshot.CurrentHeaderHash;
 
         private static Blockchain singleton;
         public static Blockchain Singleton
