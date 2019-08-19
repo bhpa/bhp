@@ -306,9 +306,9 @@ namespace Bhp.Wallets.BRC6
             return account;
         }
 
-        public override WalletAccount Import(string brc2, string passphrase)
+        public override WalletAccount Import(string brc2, string passphrase, int N = 16384, int r = 8, int p = 8)
         {
-            KeyPair key = new KeyPair(GetPrivateKeyFromBRC2(brc2, passphrase));
+            KeyPair key = new KeyPair(GetPrivateKeyFromBRC2(brc2, passphrase, N, r, p));
             BRC6Contract contract = new BRC6Contract
             {
                 Script = Contract.CreateSignatureRedeemScript(key.PublicKey),
