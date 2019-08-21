@@ -10,6 +10,7 @@ using Bhp.Network.P2P;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
+using Bhp.SmartContract.Native;
 using Bhp.Wallets;
 using System;
 using System.Collections.Generic;
@@ -80,6 +81,14 @@ namespace Bhp.Consensus
                 // if we are the primary for this view, but acting as a backup because we recovered our own
                 // previously sent prepare request, then we don't want to send a prepare response.
                 if (context.IsPrimary || context.WatchOnly) return true;
+                
+                // Check maximum block size via Native Contract policy
+                if (context.GetExpectedBlockSize() > NativeContract.Policy.GetMaxBlockSize(context.Snapshot))
+                {
+                    Log($"rejected block: {context.Block.Index}{Environment.NewLine} The size exceed the policy", LogLevel.Warning);
+                    RequestChangeView(ChangeViewReason.BlockRejectedByPolicy);
+                    return false;
+                }
 
                 // Timeout extension due to prepare response sent
                 // around 2*15/M=30.0/5 ~ 40% block time (for M=5)

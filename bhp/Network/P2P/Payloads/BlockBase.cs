@@ -34,7 +34,15 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + NextConsensus.Size + 1 + Witness.Size;
+        public virtual int Size =>
+            sizeof(uint) +       //Version
+            UInt256.Length +     //PrevHash
+            UInt256.Length +     //MerkleRoot
+            sizeof(ulong) +      //Timestamp
+            sizeof(uint) +       //Index
+            UInt160.Length +     //NextConsensus
+            1 +                  //
+            Witness.Size;        //Witness   
 
         Witness[] IVerifiable.Witnesses
         {

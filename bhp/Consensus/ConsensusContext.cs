@@ -9,6 +9,7 @@ using Bhp.Persistence;
 using Bhp.Plugins;
 using Bhp.SmartContract;
 using Bhp.SmartContract.Native;
+using Bhp.VM;
 using Bhp.Wallets;
 using System;
 using System.Collections.Generic;
@@ -41,6 +42,7 @@ namespace Bhp.Consensus
 
         public Snapshot Snapshot { get; private set; }
         private KeyPair keyPair;
+        private int _witnessSize;
         private readonly Wallet wallet;
         private readonly Store store;
         private readonly Random random = new Random();
@@ -216,26 +218,88 @@ namespace Bhp.Consensus
             }
             payload.Witness = sc.GetWitnesses()[0];
         }
+        /// <summary>
+        /// Return the expected block size
+        /// </summary>
+        internal int GetExpectedBlockSize()
+        {
+            return GetExpectedBlockSizeWithoutTransactions(Transactions.Count) + // Base size
+                Transactions.Values.Sum(u => u.Size);   // Sum Txs
+        }
+
+        /// <summary>
+        /// Return the expected block size without txs
+        /// </summary>
+        /// <param name="expectedTransactions">Expected transactions</param>
+        internal int GetExpectedBlockSizeWithoutTransactions(int expectedTransactions)
+        {
+            var blockSize =
+                // BlockBase
+                sizeof(uint) +       //Version
+                UInt256.Length +     //PrevHash
+                UInt256.Length +     //MerkleRoot
+                sizeof(ulong) +      //Timestamp
+                sizeof(uint) +       //Index
+                UInt160.Length +     //NextConsensus
+                1 +                  //
+                _witnessSize;        //Witness
+
+            blockSize +=
+                // Block
+                Block.ConsensusData.Size +                      //ConsensusData
+                IO.Helper.GetVarSize(expectedTransactions + 1); //Transactions count
+
+            return blockSize;
+        }
+
+        /// <summary>
+        /// Prevent that block exceed the max size
+        /// </summary>
+        /// <param name="txs">Ordered transactions</param>
+        internal void EnsureMaxBlockSize(IEnumerable<Transaction> txs)
+        {
+            uint maxBlockSize = NativeContract.Policy.GetMaxBlockSize(Snapshot);
+            uint maxTransactionsPerBlock = NativeContract.Policy.GetMaxTransactionsPerBlock(Snapshot);
+
+            // Limit Speaker proposal to the limit `MaxTransactionsPerBlock` or all available transactions of the mempool
+            txs = txs.Take((int)maxTransactionsPerBlock);
+            List<UInt256> hashes = new List<UInt256>();
+            Transactions = new Dictionary<UInt256, Transaction>();
+            Block.Transactions = new Transaction[0];
+
+            // We need to know the expected block size
+
+            var blockSize = GetExpectedBlockSizeWithoutTransactions(txs.Count());
+
+            // Iterate transaction until reach the size
+
+            foreach (Transaction tx in txs)
+            {
+                // Check if maximum block size has been already exceeded with the current selected set
+                blockSize += tx.Size;
+                if (blockSize > maxBlockSize) break;
+
+                hashes.Add(tx.Hash);
+                Transactions.Add(tx.Hash, tx);
+            }
+
+            TransactionHashes = hashes.ToArray();
+        }
 
         public ConsensusPayload MakePrepareRequest()
         {
             byte[] buffer = new byte[sizeof(ulong)];
             random.NextBytes(buffer);
             Fill();
-            IEnumerable<Transaction> memoryPoolTransactions = Blockchain.Singleton.MemPool.GetSortedVerifiedTransactions();
-            foreach (IPolicyPlugin plugin in Plugin.Policies)
-                memoryPoolTransactions = plugin.FilterForBlock(memoryPoolTransactions);
-            List<Transaction> transactions = memoryPoolTransactions.ToList();
-            TransactionHashes = transactions.Select(p => p.Hash).ToArray();
-            Transactions = transactions.ToDictionary(p => p.Hash);
-            Block.Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), PrevHeader.Timestamp + 1);
             Block.ConsensusData.Nonce = BitConverter.ToUInt64(buffer, 0);
+            EnsureMaxBlockSize(Blockchain.Singleton.MemPool.GetSortedVerifiedTransactions());
+            Block.Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), PrevHeader.Timestamp + 1);
+
             return PreparationPayloads[MyIndex] = MakeSignedPayload(new PrepareRequest
             {
                 Timestamp = Block.Timestamp,
                 Nonce = Block.ConsensusData.Nonce,
-                TransactionHashes = TransactionHashes,
-                MinerTransaction = (MinerTransaction)Transactions[TransactionHashes[0]]
+                TransactionHashes = TransactionHashes
             });
         }
 
@@ -295,7 +359,24 @@ namespace Bhp.Consensus
                     NextConsensus = Blockchain.GetConsensusAddress(NativeContract.Bhp.GetValidators(Snapshot).ToArray()),
                     ConsensusData = new ConsensusData()
                 };
+                var pv = Validators;
                 Validators = NativeContract.Bhp.GetNextBlockValidators(Snapshot);
+                if (_witnessSize == 0 || (pv != null && pv.Length != Validators.Length))
+                {
+                    // Compute the expected size of the witness
+                    using (ScriptBuilder sb = new ScriptBuilder())
+                    {
+                        for (int x = 0; x < M; x++)
+                        {
+                            sb.EmitPush(new byte[64]);
+                        }
+                        _witnessSize = new Witness
+                        {
+                            InvocationScript = sb.ToArray(),
+                            VerificationScript = Contract.CreateMultiSigRedeemScript(M, Validators)
+                        }.Size;
+                    }
+                }
                 MyIndex = -1;
                 ChangeViewPayloads = new ConsensusPayload[Validators.Length];
                 LastChangeViewPayloads = new ConsensusPayload[Validators.Length];
