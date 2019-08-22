@@ -28,8 +28,8 @@ namespace Bhp.Network.P2P.Payloads
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
-            InvocationScript = reader.ReadVarBytes(65536);
-            VerificationScript = reader.ReadVarBytes(65536);
+            InvocationScript = reader.ReadVarBytes(664);
+            VerificationScript = reader.ReadVarBytes(360);
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
