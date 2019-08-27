@@ -108,7 +108,8 @@ namespace Bhp.Ledger
                 DeployNativeContracts()
             }
         };
-        
+
+        private readonly static byte[] onPersistNativeContractScript;
         private const int MaxTxToReverifyPerIdle = 10;
         private static readonly object lockObj = new object();
         private readonly BhpSystem system;
@@ -139,6 +140,14 @@ namespace Bhp.Ledger
         static Blockchain()
         {
             GenesisBlock.RebuildMerkleRoot();
+            NativeContract[] contracts = { NativeContract.GAS, NativeContract.Bhp };
+            using (ScriptBuilder sb = new ScriptBuilder())
+            {
+                foreach (NativeContract contract in contracts)
+                    sb.EmitAppCall(contract.Hash, "onPersist");
+
+                onPersistNativeContractScript = sb.ToArray();
+            }
         }
 
         public Blockchain(BhpSystem system, Store store)
@@ -473,15 +482,9 @@ namespace Bhp.Ledger
                 snapshot.PersistingBlock = block;
                 if (block.Index > 0)
                 {
-                    NativeContract[] contracts = { NativeContract.GAS, NativeContract.Bhp };
                     using (ApplicationEngine engine = new ApplicationEngine(TriggerType.System, null, snapshot, 0, true))
                     {
-                        using (ScriptBuilder sb = new ScriptBuilder())
-                        {
-                            foreach (NativeContract contract in contracts)
-                                sb.EmitAppCall(contract.Hash, "onPersist");
-                            engine.LoadScript(sb.ToArray());
-                        }
+                        engine.LoadScript(onPersistNativeContractScript);
                         if (engine.Execute() != VMState.HALT) throw new InvalidOperationException();
                         ApplicationExecuted application_executed = new ApplicationExecuted(engine);
                         Context.System.EventStream.Publish(application_executed);
@@ -508,13 +511,11 @@ namespace Bhp.Ledger
                         all_application_executed.Add(application_executed);
                     }
                 }
-                snapshot.BlockHashIndex.GetAndChange().Hash = block.Hash;
-                snapshot.BlockHashIndex.GetAndChange().Index = block.Index;
+                snapshot.BlockHashIndex.GetAndChange().Set(block);
                 if (block.Index == header_index.Count)
                 {
                     header_index.Add(block.Hash);
-                    snapshot.HeaderHashIndex.GetAndChange().Hash = block.Hash;
-                    snapshot.HeaderHashIndex.GetAndChange().Index = block.Index;
+                    snapshot.HeaderHashIndex.GetAndChange().Set(block);
                 }
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
                     plugin.OnPersist(snapshot, all_application_executed);
