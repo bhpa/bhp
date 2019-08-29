@@ -25,7 +25,7 @@ namespace Bhp.BhpExtensions.Transactions
                 UnspentCoinState state = snapshot.UnspentCoins.TryGet(group.Key);
                 if (state == null) return "utxo is not exists.";
                 if (group.Any(p => p.PrevIndex >= state.Items.Length || state.Items[p.PrevIndex].HasFlag(CoinState.Spent)))
-                    return "utox was spent.";
+                    return "utxo was spent.";
             }
             return "success";
         }
