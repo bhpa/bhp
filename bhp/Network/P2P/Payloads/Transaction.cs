@@ -298,8 +298,8 @@ namespace Bhp.Network.P2P.Payloads
             json["cosigners"] = Cosigners.Select(p => p.ToJson()).ToArray();
             json["vin"] = Inputs.Select(p => p.ToJson()).ToArray();
             json["vout"] = Outputs.Select((p, i) => p.ToJson((ushort)i)).ToArray();
-            json["sys_fee"] = new BigDecimal(SystemFee, NativeContract.GAS.Decimals).ToString();
-            json["net_fee"] = new BigDecimal(NetworkFee, NativeContract.GAS.Decimals).ToString();
+            json["sys_fee"] = SystemFee.ToString();
+            json["net_fee"] = NetworkFee.ToString();
             json["valid_until_block"] = ValidUntilBlock;
             json["tx_fee"] = TxFee.ToString();
             json["script"] = Script.ToHexString();
