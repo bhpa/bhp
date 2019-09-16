@@ -131,6 +131,9 @@ namespace Bhp.Consensus
             LastChangeViewPayloads = new ConsensusPayload[reader.ReadVarInt(Blockchain.MaxValidators)];
             for (int i = 0; i < LastChangeViewPayloads.Length; i++)
                 LastChangeViewPayloads[i] = reader.ReadBoolean() ? reader.ReadSerializable<ConsensusPayload>() : null;
+            if (TransactionHashes.Length == 0 && !RequestSentOrReceived)
+                TransactionHashes = null;
+            Transactions = transactions.Length == 0 && !RequestSentOrReceived ? null : transactions.ToDictionary(p => p.Hash);
         }
 
         public void Dispose()
@@ -356,8 +359,7 @@ namespace Bhp.Consensus
                 {
                     PrevHash = Snapshot.CurrentBlockHash,
                     Index = Snapshot.Height + 1,
-                    NextConsensus = Blockchain.GetConsensusAddress(NativeContract.Bhp.GetValidators(Snapshot).ToArray()),
-                    ConsensusData = new ConsensusData()
+                    NextConsensus = Blockchain.GetConsensusAddress(NativeContract.Bhp.GetValidators(Snapshot).ToArray())
                 };
                 var pv = Validators;
                 Validators = NativeContract.Bhp.GetNextBlockValidators(Snapshot);
@@ -406,7 +408,10 @@ namespace Bhp.Consensus
                         LastChangeViewPayloads[i] = null;
             }
             ViewNumber = viewNumber;
-            Block.ConsensusData.PrimaryIndex = GetPrimaryIndex(viewNumber);
+            Block.ConsensusData = new ConsensusData
+            {
+                PrimaryIndex = GetPrimaryIndex(viewNumber)
+            };
             Block.MerkleRoot = null;
             Block.Timestamp = 0;
             Block.Transactions = null;
