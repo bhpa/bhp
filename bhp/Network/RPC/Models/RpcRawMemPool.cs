@@ -20,12 +20,16 @@ namespace Bhp.Network.RPC.Models
             return json;
         }
 
-        public static RpcRawMemPool FromJson(JObject json)
+        public static RpcRawMemPool FromJson(JObject json, bool shouldGetUnverified)
         {
             RpcRawMemPool rawMemPool = new RpcRawMemPool();
             rawMemPool.Height = uint.Parse(json["height"].AsString());
             rawMemPool.Verified = ((JArray)json["verified"]).Select(p => p.AsString()).ToArray();
             rawMemPool.UnVerified = ((JArray)json["unverified"]).Select(p => p.AsString()).ToArray();
+            if (shouldGetUnverified)
+            {
+                rawMemPool.Verified = ((JArray)json["verified"]).Select(p => p.AsString()).ToArray();
+            }
             return rawMemPool;
         }
     }
