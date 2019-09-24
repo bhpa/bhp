@@ -319,7 +319,7 @@ namespace Bhp.Wallets
             return account;
         }
 
-        public T MakeTransaction<T>(T tx, UInt160 from = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8)) where T : Transaction
+        public T MakeTransaction<T>(T tx, UInt160 from = null, UInt160 fee_address = null, UInt160 change_address = null, Fixed8 fee = default(Fixed8)) where T : Transaction
         {
             if (tx.Outputs == null) tx.Outputs = new TransactionOutput[0];
             if (tx.Attributes == null) tx.Attributes = new TransactionAttribute[0];
