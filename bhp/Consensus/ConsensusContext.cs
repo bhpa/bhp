@@ -44,8 +44,7 @@ namespace Bhp.Consensus
         private KeyPair keyPair;
         private int _witnessSize;
         private readonly Wallet wallet;
-        private readonly Store store;
-        private readonly Random random = new Random();
+        private readonly Store store;        
 
         public int F => (Validators.Length - 1) / 3;
         public int M => Validators.Length - F;
@@ -283,6 +282,7 @@ namespace Bhp.Consensus
 
         public ConsensusPayload MakePrepareRequest()
         {
+            var random = new Random();
             byte[] buffer = new byte[sizeof(ulong)];
             random.NextBytes(buffer);
             Fill();
