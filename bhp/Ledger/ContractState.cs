@@ -2,11 +2,13 @@
 using Bhp.IO.Json;
 using Bhp.SmartContract;
 using Bhp.SmartContract.Manifest;
+using Bhp.VM;
+using Bhp.VM.Types;
 using System.IO;
 
 namespace Bhp.Ledger
 {
-    public class ContractState : ICloneable<ContractState>, ISerializable
+    public class ContractState : ICloneable<ContractState>, ISerializable, IInteroperable
     {
         public byte[] Script;
         public ContractManifest Manifest;
@@ -40,7 +42,7 @@ namespace Bhp.Ledger
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
-            Script = reader.ReadVarBytes();           
+            Script = reader.ReadVarBytes();
             Manifest = reader.ReadSerializable<ContractManifest>();
         }
 
@@ -71,6 +73,19 @@ namespace Bhp.Ledger
             contractState.Script = json["script"].AsString().HexToBytes();
             contractState.Manifest = ContractManifest.FromJson(json["manifest"]);
             return contractState;
+        }
+
+        public StackItem ToStackItem()
+        {
+            return new VM.Types.Array
+           (
+               new StackItem[]
+               {
+                    new ByteArray(Script),
+                    new Boolean(HasStorage),
+                    new Boolean(Payable),
+               }
+           );
         }
     }
 }

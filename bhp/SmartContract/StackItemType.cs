@@ -9,5 +9,6 @@
         Array = 0x80,
         Struct = 0x81,
         Map = 0x82,
+        Null = 0xff
     }
 }

@@ -16,10 +16,11 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using Bhp.VM;
+using Bhp.VM.Types;
 
 namespace Bhp.Network.P2P.Payloads
 {
-    public class Transaction : IEquatable<Transaction>, IInventory
+    public class Transaction : IEquatable<Transaction>, IInventory, IInteroperable
     {
         public const int MaxTransactionSize = 102400;
         public const uint MaxValidUntilBlockIncrement = 2102400;
@@ -109,7 +110,7 @@ namespace Bhp.Network.P2P.Payloads
             sizeof(byte) +  //Version
             sizeof(uint) +  //Nonce
             20 +            //Sender
-            sizeof(long) +  //Gas
+            sizeof(long) +  //SystemFee
             sizeof(long) +  //NetworkFee
             sizeof(uint);   //ValidUntilBlock
 
@@ -418,6 +419,30 @@ namespace Bhp.Network.P2P.Payloads
             tx.Script = json["script"].AsString().HexToBytes();
             tx.Witnesses = ((JArray)json["witnesses"]).Select(p => Witness.FromJson(p)).ToArray();
             return tx;
+        }
+
+        public StackItem ToStackItem()
+        {
+            return new VM.Types.Array
+            (
+                new StackItem[]
+                {
+                    // Computed properties
+                    new ByteArray(Hash.ToArray()),
+
+                    // Transaction properties
+                    new Integer(Version),
+                    new Integer(Nonce),
+                    new ByteArray(Sender.ToArray()),
+                    new Integer(SystemFee),
+                    new Integer(NetworkFee),
+                    new Integer(ValidUntilBlock),
+                    // Attributes
+                    // Cosigners
+                    new ByteArray(Script),
+                    // Witnesses
+                }
+            );
         }
     }
 }
