@@ -2,7 +2,6 @@
 using Bhp.IO.Json;
 using Bhp.Ledger;
 using Bhp.Network.P2P;
-using Bhp.Network.P2P.Payloads;
 using Bhp.SmartContract.Enumerators;
 using Bhp.SmartContract.Iterators;
 using Bhp.SmartContract.Manifest;
@@ -20,17 +19,9 @@ namespace Bhp.SmartContract
         public static readonly uint Bhp_Native_Deploy = Register("Bhp.Native.Deploy", Native_Deploy, 0, TriggerType.Application);
         public static readonly uint Bhp_Crypto_CheckSig = Register("Bhp.Crypto.CheckSig", Crypto_CheckSig, 0_01000000, TriggerType.All);
         public static readonly uint Bhp_Crypto_CheckMultiSig = Register("Bhp.Crypto.CheckMultiSig", Crypto_CheckMultiSig, GetCheckMultiSigPrice, TriggerType.All);
-        public static readonly uint Bhp_Header_GetVersion = Register("Bhp.Header.GetVersion", Header_GetVersion, 0_00000400, TriggerType.Application);
-        public static readonly uint Bhp_Header_GetMerkleRoot = Register("Bhp.Header.GetMerkleRoot", Header_GetMerkleRoot, 0_00000400, TriggerType.Application);
-        public static readonly uint Bhp_Header_GetNextConsensus = Register("Bhp.Header.GetNextConsensus", Header_GetNextConsensus, 0_00000400, TriggerType.Application);
-        public static readonly uint Bhp_Transaction_GetScript = Register("Bhp.Transaction.GetScript", Transaction_GetScript, 0_00000400, TriggerType.All);
-        public static readonly uint Bhp_Transaction_GetWitnesses = Register("Bhp.Transaction.GetWitnesses", Transaction_GetWitnesses, 0_00010000, TriggerType.All);
-        public static readonly uint Bhp_Witness_GetVerificationScript = Register("Bhp.Witness.GetVerificationScript", Witness_GetVerificationScript, 0_00000400, TriggerType.All);
         public static readonly uint Bhp_Account_IsStandard = Register("Bhp.Account.IsStandard", Account_IsStandard, 0_00030000, TriggerType.All);
         public static readonly uint Bhp_Contract_Create = Register("Bhp.Contract.Create", Contract_Create, GetDeploymentPrice, TriggerType.Application);
         public static readonly uint Bhp_Contract_Update = Register("Bhp.Contract.Update", Contract_Update, GetDeploymentPrice, TriggerType.Application);
-        public static readonly uint Bhp_Contract_GetScript = Register("Bhp.Contract.GetScript", Contract_GetScript, 0_00000400, TriggerType.Application);
-        public static readonly uint Bhp_Contract_IsPayable = Register("Bhp.Contract.IsPayable", Contract_IsPayable, 0_00000400, TriggerType.Application);
         public static readonly uint Bhp_Storage_Find = Register("Bhp.Storage.Find", Storage_Find, 0_01000000, TriggerType.Application);
         public static readonly uint Bhp_Enumerator_Create = Register("Bhp.Enumerator.Create", Enumerator_Create, 0_00000400, TriggerType.All);
         public static readonly uint Bhp_Enumerator_Next = Register("Bhp.Enumerator.Next", Enumerator_Next, 0_01000000, TriggerType.All);
@@ -157,80 +148,6 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        private static bool Header_GetVersion(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                BlockBase header = _interface.GetInterface<BlockBase>();
-                if (header == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(header.Version);
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Header_GetMerkleRoot(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                BlockBase header = _interface.GetInterface<BlockBase>();
-                if (header == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(header.MerkleRoot.ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Header_GetNextConsensus(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                BlockBase header = _interface.GetInterface<BlockBase>();
-                if (header == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(header.NextConsensus.ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Transaction_GetScript(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                Transaction tx = _interface.GetInterface<Transaction>();
-                if (tx == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(tx.GetHashData());
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Transaction_GetWitnesses(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                Transaction tx = _interface.GetInterface<Transaction>();
-                if (tx == null) return false;
-                if (tx.Witnesses.Length > engine.MaxArraySize)
-                    return false;
-                engine.CurrentContext.EvaluationStack.Push(WitnessWrapper.Create(tx, engine.Snapshot).Select(p => StackItem.FromInterface(p)).ToArray());
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Witness_GetVerificationScript(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                WitnessWrapper witness = _interface.GetInterface<WitnessWrapper>();
-                if (witness == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(witness.VerificationScript);
-                return true;
-            }
-            return false;
-        }
-
         private static bool Account_IsStandard(ApplicationEngine engine)
         {
             UInt160 hash = new UInt160(engine.CurrentContext.EvaluationStack.Pop().GetByteArray());
@@ -311,30 +228,6 @@ namespace Bhp.SmartContract
             }
 
             return true;
-        }
-
-        private static bool Contract_GetScript(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                ContractState contract = _interface.GetInterface<ContractState>();
-                if (contract == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(contract.Script);
-                return true;
-            }
-            return false;
-        }
-
-        private static bool Contract_IsPayable(ApplicationEngine engine)
-        {
-            if (engine.CurrentContext.EvaluationStack.Pop() is InteropInterface _interface)
-            {
-                ContractState contract = _interface.GetInterface<ContractState>();
-                if (contract == null) return false;
-                engine.CurrentContext.EvaluationStack.Push(contract.Payable);
-                return true;
-            }
-            return false;
         }
 
         private static bool Storage_Find(ApplicationEngine engine)

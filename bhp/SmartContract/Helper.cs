@@ -67,6 +67,9 @@ namespace Bhp.SmartContract
                             undeserialized += count * 2;
                         }
                         break;
+                    case StackItemType.Null:
+                        deserialized.Push(StackItem.Null);
+                        break;
                     default:
                         throw new FormatException();
                 }
@@ -230,6 +233,9 @@ namespace Bhp.SmartContract
                             unserialized.Push(pair.Value);
                             unserialized.Push(pair.Key);
                         }
+                        break;
+                    case Null _:
+                        writer.Write((byte)StackItemType.Null);
                         break;
                 }
             }
