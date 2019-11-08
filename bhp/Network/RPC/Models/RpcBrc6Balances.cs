@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace Bhp.Network.RPC.Models
 {
-    public class RpcBrc6Balances
+    public class RpcBrc5Balances
     {
         public string Address { get; set; }
 
@@ -18,9 +18,9 @@ namespace Bhp.Network.RPC.Models
             return json;
         }
 
-        public static RpcBrc6Balances FromJson(JObject json)
+        public static RpcBrc5Balances FromJson(JObject json)
         {
-            RpcBrc6Balances brc6Balance = new RpcBrc6Balances();
+            RpcBrc5Balances brc6Balance = new RpcBrc5Balances();
             brc6Balance.Address = json["address"].AsString();
             //List<Balance> listBalance = new List<Balance>();
             brc6Balance.Balances = ((JArray)json["balance"]).Select(p => RpcBrc6Balance.FromJson(p)).ToArray();
@@ -39,7 +39,7 @@ namespace Bhp.Network.RPC.Models
         public JObject ToJson()
         {
             JObject json = new JObject();
-            json["asset_hash"] = AssetHash.ToArray().ToHexString();
+            json["asset_hash"] = AssetHash.ToString();
             json["amount"] = Amount.ToString();
             json["last_updated_block"] = LastUpdatedBlock.ToString();
             return json;

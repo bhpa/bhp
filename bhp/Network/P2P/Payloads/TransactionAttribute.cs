@@ -20,7 +20,7 @@ namespace Bhp.Network.P2P.Payloads
             if (Usage == TransactionAttributeUsage.ContractHash || Usage == TransactionAttributeUsage.Vote || (Usage >= TransactionAttributeUsage.Hash1 && Usage <= TransactionAttributeUsage.Hash15))
                 Data = reader.ReadBytes(32);
             else if (Usage == TransactionAttributeUsage.ECDH02 || Usage == TransactionAttributeUsage.ECDH03)
-                Data = new[] { (byte)Usage }.Concat(reader.ReadBytes(32)).ToArray();            
+                Data = new[] { (byte)Usage }.Concat(reader.ReadBytes(32)).ToArray();
             else if (Usage == TransactionAttributeUsage.DescriptionUrl)
                 Data = reader.ReadBytes(reader.ReadByte());
             else if (Usage == TransactionAttributeUsage.Description || Usage >= TransactionAttributeUsage.Remark)
@@ -34,7 +34,7 @@ namespace Bhp.Network.P2P.Payloads
 
         void ISerializable.Serialize(BinaryWriter writer)
         {
-            writer.Write((byte)Usage);           
+            writer.Write((byte)Usage);
             if (Usage == TransactionAttributeUsage.DescriptionUrl)
                 writer.Write((byte)Data.Length);
             else if (Usage == TransactionAttributeUsage.Description || Usage >= TransactionAttributeUsage.Remark)
@@ -52,7 +52,7 @@ namespace Bhp.Network.P2P.Payloads
         {
             JObject json = new JObject();
             json["usage"] = Usage;
-            json["data"] = Data.ToHexString();
+            json["data"] = Convert.ToBase64String(Data);
             return json;
         }
 
@@ -60,7 +60,7 @@ namespace Bhp.Network.P2P.Payloads
         {
             TransactionAttribute transactionAttribute = new TransactionAttribute();
             transactionAttribute.Usage = (TransactionAttributeUsage)(byte.Parse(json["usage"].AsString()));
-            transactionAttribute.Data = json["data"].AsString().HexToBytes();
+            transactionAttribute.Data = Convert.FromBase64String(json["data"].AsString());
             return transactionAttribute;
         }
     }
