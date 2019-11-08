@@ -50,8 +50,8 @@ namespace Bhp.Network.P2P
             get
             {
                 var allowedConnecting = MinDesiredConnections * 4;
-                allowedConnecting = MaxConnections != -1 && allowedConnecting > MaxConnections 
-                    ? MaxConnections : allowedConnecting; 
+                allowedConnecting = MaxConnections != -1 && allowedConnecting > MaxConnections
+                    ? MaxConnections : allowedConnecting;
                 return allowedConnecting - ConnectedPeers.Count;
             }
         }
@@ -65,7 +65,7 @@ namespace Bhp.Network.P2P
         {
             if (UnconnectedPeers.Count < UnconnectedMax)
             {
-                peers = peers.Where(p => p.Port != ListenerTcpPort || !localAddresses.Contains(p.Address));
+                peers = peers.Where(p => (p.Port != ListenerTcpPort || !localAddresses.Contains(p.Address)) && !ConnectedPeers.Values.Contains(p));
                 ImmutableInterlocked.Update(ref UnconnectedPeers, p => p.Union(peers));
             }
         }
@@ -181,7 +181,7 @@ namespace Bhp.Network.P2P
                 Sender.Tell(Tcp.Abort.Instance);
                 return;
             }
-            
+
             ConnectedAddresses.TryGetValue(remote.Address, out int count);
             if (count >= MaxConnectionsPerAddress)
             {
