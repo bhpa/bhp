@@ -4,6 +4,7 @@ using Bhp.SmartContract;
 using Bhp.SmartContract.Manifest;
 using Bhp.VM;
 using Bhp.VM.Types;
+using System;
 using System.IO;
 
 namespace Bhp.Ledger
@@ -62,7 +63,7 @@ namespace Bhp.Ledger
         {
             JObject json = new JObject();
             json["hash"] = ScriptHash.ToString();
-            json["script"] = Script.ToHexString();
+            json["script"] = Convert.ToBase64String(Script);
             json["manifest"] = Manifest.ToJson();
             return json;
         }
@@ -70,7 +71,7 @@ namespace Bhp.Ledger
         public static ContractState FromJson(JObject json)
         {
             ContractState contractState = new ContractState();
-            contractState.Script = json["script"].AsString().HexToBytes();
+            contractState.Script = Convert.FromBase64String(json["script"].AsString());
             contractState.Manifest = ContractManifest.FromJson(json["manifest"]);
             return contractState;
         }
@@ -82,8 +83,8 @@ namespace Bhp.Ledger
                new StackItem[]
                {
                     new ByteArray(Script),
-                    new Boolean(HasStorage),
-                    new Boolean(Payable),
+                    new VM.Types.Boolean(HasStorage),
+                    new VM.Types.Boolean(Payable)
                }
            );
         }

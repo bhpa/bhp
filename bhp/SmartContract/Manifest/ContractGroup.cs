@@ -1,6 +1,7 @@
 ﻿using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO.Json;
+using System;
 
 namespace Bhp.SmartContract.Manifest
 {
@@ -30,7 +31,7 @@ namespace Bhp.SmartContract.Manifest
             return new ContractGroup
             {
                 PubKey = ECPoint.Parse(json["pubKey"].AsString(), ECCurve.Secp256r1),
-                Signature = json["signature"].AsString().HexToBytes(),
+                Signature = Convert.FromBase64String(json["signature"].AsString())
             };
         }
 
@@ -48,7 +49,7 @@ namespace Bhp.SmartContract.Manifest
         {
             var json = new JObject();
             json["pubKey"] = PubKey.ToString();
-            json["signature"] = Signature.ToHexString();
+            json["signature"] = Convert.ToBase64String(Signature);
             return json;
         }
     }
