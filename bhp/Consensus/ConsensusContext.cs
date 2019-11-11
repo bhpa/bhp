@@ -40,11 +40,16 @@ namespace Bhp.Consensus
         // if this node never heard from validator i, LastSeenMessage[i] will be -1.
         public int[] LastSeenMessage;
 
+        /// <summary>
+        /// Store all verified unsorted transactions' senders' fee currently in the consensus context.
+        /// </summary>
+        public SendersFeeMonitor SendersFeeMonitor = new SendersFeeMonitor();
+
         public Snapshot Snapshot { get; private set; }
         private KeyPair keyPair;
         private int _witnessSize;
         private readonly Wallet wallet;
-        private readonly Store store;        
+        private readonly Store store;
 
         public int F => (Validators.Length - 1) / 3;
         public int M => Validators.Length - F;
@@ -125,6 +130,12 @@ namespace Bhp.Consensus
             if (TransactionHashes.Length == 0 && !RequestSentOrReceived)
                 TransactionHashes = null;
             Transactions = transactions.Length == 0 && !RequestSentOrReceived ? null : transactions.ToDictionary(p => p.Hash);
+            SendersFeeMonitor = new SendersFeeMonitor();
+            if (Transactions != null)
+            {
+                foreach (Transaction tx in Transactions.Values)
+                    SendersFeeMonitor.AddSenderFee(tx);
+            }
         }
 
         public void Dispose()
@@ -260,6 +271,7 @@ namespace Bhp.Consensus
             List<UInt256> hashes = new List<UInt256>();
             Transactions = new Dictionary<UInt256, Transaction>();
             Block.Transactions = new Transaction[0];
+            SendersFeeMonitor = new SendersFeeMonitor();
 
             // We need to know the expected block size
 
@@ -275,6 +287,7 @@ namespace Bhp.Consensus
 
                 hashes.Add(tx.Hash);
                 Transactions.Add(tx.Hash, tx);
+                SendersFeeMonitor.AddSenderFee(tx);
             }
 
             TransactionHashes = hashes.ToArray();

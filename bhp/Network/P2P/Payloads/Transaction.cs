@@ -314,17 +314,34 @@ namespace Bhp.Network.P2P.Payloads
             return Verify(snapshot, Enumerable.Empty<Transaction>());
         }
 
-        /*
-        public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        public virtual bool Reverify(Snapshot snapshot, BigInteger totalSenderFeeFromPool)
         {
-            if (!Reverify(snapshot, mempool)) return false;
+            if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
+                return false;
+            if (NativeContract.Policy.GetBlockedAccounts(snapshot).Intersect(GetScriptHashesForVerifying(snapshot)).Count() > 0)
+                return false;
+            BigInteger balance = NativeContract.GAS.BalanceOf(snapshot, Sender);
+            BigInteger fee = SystemFee + NetworkFee + totalSenderFeeFromPool;
+            if (balance < fee) return false;
+            UInt160[] hashes = GetScriptHashesForVerifying(snapshot);
+            if (hashes.Length != Witnesses.Length) return false;
+            for (int i = 0; i < hashes.Length; i++)
+            {
+                if (Witnesses[i].VerificationScript.Length > 0) continue;
+                if (snapshot.Contracts.TryGet(hashes[i]) is null) return false;
+            }
+            return true;
+        }
+
+        public virtual bool Verify(Snapshot snapshot, BigInteger totalSenderFeeFromPool)
+        {
+            if (!Reverify(snapshot, totalSenderFeeFromPool)) return false;
             int size = Size;
             if (size > MaxTransactionSize) return false;
             long net_fee = NetworkFee - size * NativeContract.Policy.GetFeePerByte(snapshot);
             if (net_fee < 0) return false;
             return this.VerifyWitnesses(snapshot, net_fee);
         }
-        */
 
         public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
