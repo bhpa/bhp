@@ -63,7 +63,7 @@ namespace Bhp.Consensus
 
         private bool AddTransaction(Transaction tx, bool verify)
         {
-            if (verify && !tx.Verify(context.Snapshot, context.Transactions.Values))
+            if (verify && !tx.Verify(context.Snapshot, context.SendersFeeMonitor.GetSenderFee(tx.Sender)))
             {
                 Log($"Invalid transaction: {tx.Hash}{Environment.NewLine}{tx.ToArray().ToHexString()}", LogLevel.Warning);
                 RequestChangeView(ChangeViewReason.TxInvalid);
@@ -76,12 +76,13 @@ namespace Bhp.Consensus
                 return false;
             }
             context.Transactions[tx.Hash] = tx;
+            context.SendersFeeMonitor.AddSenderFee(tx);
             if (context.TransactionHashes.Length == context.Transactions.Count)
             {
                 // if we are the primary for this view, but acting as a backup because we recovered our own
                 // previously sent prepare request, then we don't want to send a prepare response.
                 if (context.IsPrimary || context.WatchOnly) return true;
-                
+
                 // Check maximum block size via Native Contract policy
                 if (context.GetExpectedBlockSize() > NativeContract.Policy.GetMaxBlockSize(context.Snapshot))
                 {
@@ -420,6 +421,7 @@ namespace Bhp.Consensus
             context.Block.ConsensusData.Nonce = message.Nonce;
             context.TransactionHashes = message.TransactionHashes;
             context.Transactions = new Dictionary<UInt256, Transaction>();
+            context.SendersFeeMonitor = new SendersFeeMonitor();
             for (int i = 0; i < context.PreparationPayloads.Length; i++)
                 if (context.PreparationPayloads[i] != null)
                     if (!context.PreparationPayloads[i].GetDeserializedMessage<PrepareResponse>().PreparationHash.Equals(payload.Hash))
