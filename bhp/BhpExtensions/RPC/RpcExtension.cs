@@ -288,6 +288,5 @@ namespace Bhp.BhpExtensions.RPC
             }
             return jsonRes;
         }
-
     }
 }
