@@ -131,11 +131,11 @@ namespace Bhp.Network.RPC
                 case "getassetstate":
                     return GetAssetState(_params);
                 case "getbestblockhash":
-                    return Blockchain.Singleton.CurrentBlockHash.ToString();
+                    return GetBestBlockHash();
                 case "getblock":
                     return GetBlock(_params);
                 case "getblockcount":
-                    return Blockchain.Singleton.Height + 1;
+                    return GetBlockCount();
                 case "getblockhash":
                     return GetBlockHash(_params);
                 case "getblockheader":
@@ -143,7 +143,7 @@ namespace Bhp.Network.RPC
                 case "getblocksysfee":
                     return GetBlockSysFee(_params);
                 case "getconnectioncount":
-                    return LocalNode.Singleton.ConnectedCount;
+                    return GetConnectionCount();
                 case "getcontractstate":
                     return GetContractState(_params);
                 case "getpeers":
@@ -177,6 +177,21 @@ namespace Bhp.Network.RPC
                 default:
                     return rpcExtension.Process(method, _params);
             }
+        }
+
+        private static JObject GetConnectionCount()
+        {
+            return LocalNode.Singleton.ConnectedCount;
+        }
+
+        private static JObject GetBlockCount()
+        {
+            return Blockchain.Singleton.Height + 1;
+        }
+
+        private static JObject GetBestBlockHash()
+        {
+            return Blockchain.Singleton.CurrentBlockHash.ToString();
         }
 
         private JObject GetAssetState(JArray _params)
