@@ -273,11 +273,11 @@ namespace Bhp.Network.P2P
             switch (payload.Type)
             {
                 case InventoryType.Block:
-                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
                         hashes = hashes.Where(p => !snapshot.ContainsBlock(p)).ToArray();
                     break;
                 case InventoryType.TX:
-                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
                         hashes = hashes.Where(p => !snapshot.ContainsTransaction(p)).ToArray();
                     break;
             }

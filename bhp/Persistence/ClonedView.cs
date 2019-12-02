@@ -4,7 +4,7 @@ using Bhp.Ledger;
 
 namespace Bhp.Persistence
 {
-    internal class CloneSnapshot : Snapshot
+    internal class ClonedView : StoreView
     {
         public override DataCache<UInt256, TrimmedBlock> Blocks { get; }
         public override DataCache<UInt256, TransactionState> Transactions { get; }
@@ -16,18 +16,18 @@ namespace Bhp.Persistence
         public override MetaDataCache<HashIndexState> BlockHashIndex { get; }
         public override MetaDataCache<HashIndexState> HeaderHashIndex { get; }
 
-        public CloneSnapshot(Snapshot snapshot)
+        public ClonedView(StoreView view)
         {
-            this.PersistingBlock = snapshot.PersistingBlock;
-            this.Blocks = snapshot.Blocks.CreateSnapshot();
-            this.Transactions = snapshot.Transactions.CreateSnapshot();
-            this.UnspentCoins = snapshot.UnspentCoins.CreateSnapshot();
-            this.Assets = snapshot.Assets.CreateSnapshot();
-            this.Contracts = snapshot.Contracts.CreateSnapshot();
-            this.Storages = snapshot.Storages.CreateSnapshot();
-            this.HeaderHashList = snapshot.HeaderHashList.CreateSnapshot();
-            this.BlockHashIndex = snapshot.BlockHashIndex.CreateSnapshot();
-            this.HeaderHashIndex = snapshot.HeaderHashIndex.CreateSnapshot();
+            this.PersistingBlock = view.PersistingBlock;
+            this.Blocks = view.Blocks.CreateSnapshot();
+            this.Transactions = view.Transactions.CreateSnapshot();
+            this.UnspentCoins = view.UnspentCoins.CreateSnapshot();
+            this.Assets = view.Assets.CreateSnapshot();
+            this.Contracts = view.Contracts.CreateSnapshot();
+            this.Storages = view.Storages.CreateSnapshot();
+            this.HeaderHashList = view.HeaderHashList.CreateSnapshot();
+            this.BlockHashIndex = view.BlockHashIndex.CreateSnapshot();
+            this.HeaderHashIndex = view.HeaderHashIndex.CreateSnapshot();
         }
     }
 }

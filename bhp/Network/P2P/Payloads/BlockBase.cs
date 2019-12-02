@@ -81,7 +81,7 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(new Witness[] { Witness });
         }
 
-        UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
+        UInt160[] IVerifiable.GetScriptHashesForVerifying(StoreView snapshot)
         {
             if (PrevHash == UInt256.Zero) return new[] { Witness.ScriptHash };
             Header prev_header = snapshot.GetHeader(PrevHash);
@@ -125,7 +125,7 @@ namespace Bhp.Network.P2P.Payloads
             Witness = ((JArray)json["witnesses"]).Select(p => Witness.FromJson(p)).FirstOrDefault();
         }
 
-        public virtual bool Verify(Snapshot snapshot)
+        public virtual bool Verify(StoreView snapshot)
         {
             Header prev_header = snapshot.GetHeader(PrevHash);
             if (prev_header == null) return false;

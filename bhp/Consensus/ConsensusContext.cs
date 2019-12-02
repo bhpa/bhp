@@ -45,7 +45,7 @@ namespace Bhp.Consensus
         /// </summary>
         public SendersFeeMonitor SendersFeeMonitor = new SendersFeeMonitor();
 
-        public Snapshot Snapshot { get; private set; }
+        public StoreView Snapshot { get; private set; }
         private KeyPair keyPair;
         private int _witnessSize;
         private readonly Wallet wallet;
@@ -471,7 +471,7 @@ namespace Bhp.Consensus
                     Outputs = outputs,
                     Witnesses = new Witness[0]
                 };
-                if (!Snapshot.ContainsTransaction(tx.Hash))
+                if (!StoreView.ContainsTransaction(tx.Hash))
                 {
                     Nonce = nonce;
                     transactions.Insert(0, tx);
@@ -480,7 +480,7 @@ namespace Bhp.Consensus
             }
             TransactionHashes = transactions.Select(p => p.Hash).ToArray();
             Transactions = transactions.ToDictionary(p => p.Hash);
-            NextConsensus = Blockchain.GetConsensusAddress(Snapshot.GetValidators().ToArray());
+            NextConsensus = Blockchain.GetConsensusAddress(StoreView.GetValidators().ToArray());
             Timestamp = Math.Max(TimeProvider.Current.UtcNow.ToTimestamp(), PrevHeader.Timestamp + 1);
         }
         */

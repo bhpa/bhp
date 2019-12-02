@@ -93,7 +93,7 @@ namespace Bhp.SmartContract
                         return _ScriptHashes;
                     }
 
-                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
                     {
                         _ScriptHashes = Verifiable.GetScriptHashesForVerifying(snapshot);
                     }

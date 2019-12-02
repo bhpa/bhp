@@ -235,14 +235,14 @@ namespace Bhp.Network.P2P.Payloads
         {
         }
 
-        public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
+        public UInt160[] GetScriptHashesForVerifying(StoreView snapshot)
         {
             var hashes = new HashSet<UInt160> { Sender };
             hashes.UnionWith(Cosigners.Select(p => p.Account));
             return hashes.OrderBy(p => p).ToArray();
         }
 
-        public virtual bool Reverify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        public virtual bool Reverify(StoreView snapshot, IEnumerable<Transaction> mempool)
         {
             if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
                 return false;
@@ -309,12 +309,12 @@ namespace Bhp.Network.P2P.Payloads
             return json;
         }
 
-        bool IInventory.Verify(Snapshot snapshot)
+        bool IInventory.Verify(StoreView snapshot)
         {
             return Verify(snapshot, Enumerable.Empty<Transaction>());
         }
 
-        public virtual bool Reverify(Snapshot snapshot, BigInteger totalSenderFeeFromPool)
+        public virtual bool Reverify(StoreView snapshot, BigInteger totalSenderFeeFromPool)
         {
             if (ValidUntilBlock <= snapshot.Height || ValidUntilBlock > snapshot.Height + MaxValidUntilBlockIncrement)
                 return false;
@@ -333,7 +333,7 @@ namespace Bhp.Network.P2P.Payloads
             return true;
         }
 
-        public virtual bool Verify(Snapshot snapshot, BigInteger totalSenderFeeFromPool)
+        public virtual bool Verify(StoreView snapshot, BigInteger totalSenderFeeFromPool)
         {
             if (!Reverify(snapshot, totalSenderFeeFromPool)) return false;
             int size = Size;
@@ -343,7 +343,7 @@ namespace Bhp.Network.P2P.Payloads
             return this.VerifyWitnesses(snapshot, net_fee);
         }
 
-        public virtual bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        public virtual bool Verify(StoreView snapshot, IEnumerable<Transaction> mempool)
         {
             if (!Reverify(snapshot, mempool)) return false;
             int size = Size;

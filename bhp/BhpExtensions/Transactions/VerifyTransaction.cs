@@ -17,7 +17,7 @@ namespace Bhp.BhpExtensions.Transactions
         /// <param name="persistence"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static string IsDoubleSpend(Snapshot snapshot, Transaction tx)
+        public static string IsDoubleSpend(StoreView snapshot, Transaction tx)
         {
             if (tx.Inputs.Length == 0) return "Input is empty.";
             foreach (var group in tx.Inputs.GroupBy(p => p.PrevHash))
@@ -36,7 +36,7 @@ namespace Bhp.BhpExtensions.Transactions
         /// <param name="snapshot"></param>
         /// <param name="mempool"></param>
         /// <returns></returns>
-        public static string Verify(Snapshot snapshot, IEnumerable<Transaction> mempool,
+        public static string Verify(StoreView snapshot, IEnumerable<Transaction> mempool,
              Transaction tx)
         {
             if (tx.Size > Transaction.MaxTransactionSize) return "The size of the free transaction must be less than 102400 bytes";

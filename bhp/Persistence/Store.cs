@@ -30,6 +30,6 @@ namespace Bhp.Persistence
         public abstract void Put(byte[] key, byte[] value);
         public abstract void PutSync(byte[] key, byte[] value);
 
-        public abstract Snapshot GetSnapshot();
+        public abstract StoreView GetSnapshot();
     }
 }

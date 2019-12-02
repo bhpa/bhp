@@ -118,7 +118,7 @@ namespace Bhp.Ledger
         private readonly Dictionary<UInt256, Block> block_cache = new Dictionary<UInt256, Block>();
         private readonly Dictionary<uint, LinkedList<Block>> block_cache_unverified = new Dictionary<uint, LinkedList<Block>>();
         internal readonly RelayCache ConsensusRelayCache = new RelayCache(100);
-        private Snapshot currentSnapshot;
+        private StoreView currentSnapshot;
 
         public Store Store { get; }
         public MemoryPool MemPool { get; }
@@ -248,7 +248,7 @@ namespace Bhp.Ledger
             return Contract.CreateMultiSigRedeemScript(validators.Length - (validators.Length - 1) / 3, validators).ToScriptHash();
         }
 
-        public Snapshot GetSnapshot()
+        public StoreView GetSnapshot()
         {
             return Store.GetSnapshot();
         }
@@ -374,7 +374,7 @@ namespace Bhp.Ledger
                 if (block.Index == header_index.Count)
                 {
                     header_index.Add(block.Hash);
-                    using (Snapshot snapshot = GetSnapshot())
+                    using (StoreView snapshot = GetSnapshot())
                     {
                         snapshot.Blocks.Add(block.Hash, block.Header.Trim());
                         snapshot.HeaderHashIndex.GetAndChange().Hash = block.Hash;
@@ -399,7 +399,7 @@ namespace Bhp.Ledger
 
         private void OnNewHeaders(Header[] headers)
         {
-            using (Snapshot snapshot = GetSnapshot())
+            using (StoreView snapshot = GetSnapshot())
             {
                 foreach (Header header in headers)
                 {
@@ -483,7 +483,7 @@ namespace Bhp.Ledger
 
         private void Persist(Block block)
         {
-            using (Snapshot snapshot = GetSnapshot())
+            using (StoreView snapshot = GetSnapshot())
             {
                 List<ApplicationExecuted> all_application_executed = new List<ApplicationExecuted>();
                 snapshot.PersistingBlock = block;
@@ -562,7 +562,7 @@ namespace Bhp.Ledger
             return Akka.Actor.Props.Create(() => new Blockchain(system, store)).WithMailbox("blockchain-mailbox");
         }
 
-        private void SaveHeaderHashList(Snapshot snapshot = null)
+        private void SaveHeaderHashList(StoreView snapshot = null)
         {
             if ((header_index.Count - stored_header_count < 2000))
                 return;

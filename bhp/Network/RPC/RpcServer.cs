@@ -58,7 +58,7 @@ namespace Bhp.Network.RPC
                 throw new NotImplementedException();
             }
 
-            public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
+            public UInt160[] GetScriptHashesForVerifying(StoreView snapshot)
             {
                 return _scriptHashesForVerifying;
             }
@@ -378,7 +378,7 @@ namespace Bhp.Network.RPC
 
         private JObject GetValidators()
         {
-            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
+            using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 var validators = NativeContract.Bhp.GetValidators(snapshot);
                 return NativeContract.Bhp.GetRegisteredValidators(snapshot).Select(p =>
