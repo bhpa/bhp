@@ -57,7 +57,7 @@ namespace Bhp.Persistence.LevelDB
             return new DbCache<UInt160, ContractState>(db, null, null, Prefixes.ST_Contract);
         }
 
-        public override Snapshot GetSnapshot()
+        public override StoreView GetSnapshot()
         {
             return new DbSnapshot(db);
         }

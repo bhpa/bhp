@@ -61,7 +61,7 @@ namespace Bhp.Network.P2P.Payloads
             return json;
         }
 
-        public override bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        public override bool Verify(StoreView snapshot, IEnumerable<Transaction> mempool)
         {
             if (Gas.GetData() % 100000000 != 0) return false;
             return base.Verify(snapshot, mempool);

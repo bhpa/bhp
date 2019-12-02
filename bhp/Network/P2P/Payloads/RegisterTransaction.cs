@@ -104,7 +104,7 @@ namespace Bhp.Network.P2P.Payloads
             return json;
         }
 
-        public override bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
+        public override bool Verify(StoreView snapshot, IEnumerable<Transaction> mempool)
         {
             return false;
         }

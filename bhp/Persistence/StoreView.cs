@@ -13,7 +13,7 @@ using VMArray = Bhp.VM.Types.Array;
 
 namespace Bhp.Persistence
 {
-    public abstract class Snapshot : IDisposable, IPersistence
+    public abstract class StoreView: IDisposable, IPersistence
     {
         public Block PersistingBlock { get; internal set; }
         public abstract DataCache<UInt256, TrimmedBlock> Blocks { get; }
@@ -31,9 +31,9 @@ namespace Bhp.Persistence
         public UInt256 CurrentBlockHash => BlockHashIndex.Get().Hash;
         public UInt256 CurrentHeaderHash => HeaderHashIndex.Get().Hash;
 
-        public Snapshot Clone()
+        public StoreView Clone()
         {
-            return new CloneSnapshot(this);
+            return new ClonedView(this);
         }
 
         public virtual void Commit()

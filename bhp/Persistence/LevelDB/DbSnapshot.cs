@@ -7,7 +7,7 @@ using LSnapshot = Bhp.IO.Data.LevelDB.Snapshot;
 
 namespace Bhp.Persistence.LevelDB
 {
-    internal class DbSnapshot : Snapshot
+    internal class DbSnapshot : StoreView
     {
         private readonly DB db;
         private readonly LSnapshot snapshot;
