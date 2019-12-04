@@ -19,15 +19,15 @@ namespace Bhp.IO.Caching
             innerCache.Add(key, value);
         }
 
-        protected override void DeleteInternal(TKey key)
+        public override void DeleteInternal(TKey key)
         {
             innerCache.Delete(key);
         }
 
-        protected override IEnumerable<(TKey, TValue)> FindInternal(byte[] key_prefix)
+        protected override IEnumerable<KeyValuePair<TKey, TValue>> FindInternal(byte[] key_prefix)
         {
-            foreach (var (key, value) in innerCache.Find(key_prefix))
-                yield return (key, value.Clone());
+            foreach (KeyValuePair<TKey, TValue> pair in innerCache.Find(key_prefix))
+                yield return new KeyValuePair<TKey, TValue>(pair.Key, pair.Value.Clone());
         }
 
         protected override TValue GetInternal(TKey key)
