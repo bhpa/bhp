@@ -107,7 +107,7 @@ namespace Bhp.IO.Caching
             }
         }
 
-        public abstract void DeleteInternal(TKey key);
+        protected abstract void DeleteInternal(TKey key);
 
         public void DeleteWhere(Func<TKey, TValue, bool> predicate)
         {

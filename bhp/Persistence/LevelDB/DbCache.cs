@@ -28,7 +28,7 @@ namespace Bhp.Persistence.LevelDB
             batch?.Put(prefix, key, value);
         }
 
-        public override void DeleteInternal(TKey key)
+        protected override void DeleteInternal(TKey key)
         {
             batch?.Delete(prefix, key);
         }
