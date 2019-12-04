@@ -19,7 +19,7 @@ namespace Bhp.IO.Caching
             innerCache.Add(key, value);
         }
 
-        public override void DeleteInternal(TKey key)
+        protected override void DeleteInternal(TKey key)
         {
             innerCache.Delete(key);
         }
