@@ -238,7 +238,8 @@ namespace Bhp.SmartContract
                 if (!CheckStorageContext(engine, context)) return false;
                 byte[] prefix = engine.CurrentContext.EvaluationStack.Pop().GetByteArray();
                 byte[] prefix_key = StorageKey.CreateSearchPrefix(context.ScriptHash, prefix);
-                StorageIterator iterator = engine.AddDisposable(new StorageIterator(engine.Snapshot.Storages.Find(prefix_key).Where(p => p.Key.Key.Take(prefix.Length).SequenceEqual(prefix)).GetEnumerator()));
+                System.Collections.Generic.IEnumerator<(StorageKey, StorageItem)> storageIterator = (System.Collections.Generic.IEnumerator<(StorageKey, StorageItem)>)engine.Snapshot.Storages.Find(prefix_key).Where(p => p.Key.Key.Take(prefix.Length).SequenceEqual(prefix)).GetEnumerator();
+                StorageIterator iterator = engine.AddDisposable(new StorageIterator(storageIterator));
                 engine.CurrentContext.EvaluationStack.Push(StackItem.FromInterface(iterator));
                 return true;
             }

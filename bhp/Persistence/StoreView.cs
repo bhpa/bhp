@@ -13,7 +13,7 @@ using VMArray = Bhp.VM.Types.Array;
 
 namespace Bhp.Persistence
 {
-    public abstract class StoreView: IDisposable, IPersistence
+    public abstract class StoreView : IDisposable, IPersistence
     {
         public Block PersistingBlock { get; internal set; }
         public abstract DataCache<UInt256, TrimmedBlock> Blocks { get; }
@@ -66,6 +66,37 @@ namespace Bhp.Persistence
             {
                 return ((VMArray)engine.ResultStack.Peek()).Select(p => p.GetByteArray().AsSerializable<ECPoint>()).ToArray();
             }
+        }
+
+        public bool ContainsBlock(UInt256 hash)
+        {
+            TrimmedBlock state = Blocks.TryGet(hash);
+            if (state == null) return false;
+            return state.IsBlock;
+        }
+
+        public bool ContainsTransaction(UInt256 hash)
+        {
+            TransactionState state = Transactions.TryGet(hash);
+            return state != null;
+        }
+
+        public Block GetBlock(UInt256 hash)
+        {
+            TrimmedBlock state = Blocks.TryGet(hash);
+            if (state == null) return null;
+            if (!state.IsBlock) return null;
+            return state.GetBlock(Transactions);
+        }
+
+        public Header GetHeader(UInt256 hash)
+        {
+            return Blocks.TryGet(hash)?.Header;
+        }
+
+        public Transaction GetTransaction(UInt256 hash)
+        {
+            return Transactions.TryGet(hash)?.Transaction;
         }
     }
 }
