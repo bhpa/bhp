@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VMArray = Bhp.VM.Types.Array;
-using VMBoolean = Bhp.VM.Types.Boolean;
 
 namespace Bhp.VM
 {
@@ -217,13 +216,6 @@ namespace Bhp.VM
                         context.Add(new Tuple<StackItem, ContractParameter>(item, parameter));
                         parameter.Value = map.Select(p => new KeyValuePair<ContractParameter, ContractParameter>(ToParameter(p.Key, context), ToParameter(p.Value, context))).ToList();
                     }
-                    break;
-                case VMBoolean _:
-                    parameter = new ContractParameter
-                    {
-                        Type = ContractParameterType.Boolean,
-                        Value = item.GetBoolean()
-                    };
                     break;
                 case ByteArray _:
                     parameter = new ContractParameter

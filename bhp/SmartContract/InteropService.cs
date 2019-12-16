@@ -15,7 +15,6 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using Array = Bhp.VM.Types.Array;
-using Boolean = Bhp.VM.Types.Boolean;
 
 namespace Bhp.SmartContract
 {
@@ -80,7 +79,6 @@ namespace Bhp.SmartContract
                                 items_unchecked.Enqueue(item);
                         }
                         break;
-                    case Boolean _:
                     case ByteArray _:
                     case Integer _:
                         size += state.GetByteLength();
