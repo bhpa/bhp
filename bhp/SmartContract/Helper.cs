@@ -11,7 +11,6 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using VMArray = Bhp.VM.Types.Array;
-using VMBoolean = Bhp.VM.Types.Boolean;
 
 namespace Bhp.SmartContract
 {
@@ -39,7 +38,7 @@ namespace Bhp.SmartContract
                         deserialized.Push(new ByteArray(reader.ReadVarBytes((int)maxItemSize)));
                         break;
                     case StackItemType.Boolean:
-                        deserialized.Push(new VMBoolean(reader.ReadBoolean()));
+                        deserialized.Push(reader.ReadBoolean());
                         break;
                     case StackItemType.Integer:
                         deserialized.Push(new Integer(new BigInteger(reader.ReadVarBytes(ExecutionEngine.MaxSizeForBigInteger))));
@@ -199,10 +198,6 @@ namespace Bhp.SmartContract
                     case ByteArray _:
                         writer.Write((byte)StackItemType.ByteArray);
                         writer.WriteVarBytes(item.GetByteArray());
-                        break;
-                    case VMBoolean _:
-                        writer.Write((byte)StackItemType.Boolean);
-                        writer.Write(item.GetBoolean());
                         break;
                     case Integer _:
                         writer.Write((byte)StackItemType.Integer);

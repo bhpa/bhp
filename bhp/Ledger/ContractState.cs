@@ -83,8 +83,8 @@ namespace Bhp.Ledger
                new StackItem[]
                {
                     new ByteArray(Script),
-                    new VM.Types.Boolean(HasStorage),
-                    new VM.Types.Boolean(Payable)
+                    HasStorage,
+                    Payable
                }
            );
         }

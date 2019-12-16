@@ -5,7 +5,6 @@ using System;
 using System.Linq;
 using System.Numerics;
 using VMArray = Bhp.VM.Types.Array;
-using VMBoolean = Bhp.VM.Types.Boolean;
 
 namespace Bhp.SmartContract
 {
@@ -34,10 +33,6 @@ namespace Bhp.SmartContract
                         if (integer > JNumber.MAX_SAFE_INTEGER || integer < JNumber.MIN_SAFE_INTEGER)
                             return integer.ToString();
                         return (double)num.GetBigInteger();
-                    }
-                case VMBoolean boolean:
-                    {
-                        return boolean.GetBoolean();
                     }
                 case Map map:
                     {
@@ -90,7 +85,7 @@ namespace Bhp.SmartContract
                     }
                 case JBoolean boolean:
                     {
-                        return new VMBoolean(boolean.Value);
+                        return boolean.Value;
                     }
                 case JObject obj:
                     {
