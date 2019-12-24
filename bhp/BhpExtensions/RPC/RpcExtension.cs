@@ -95,7 +95,13 @@ namespace Bhp.BhpExtensions.RPC
             if (ExtensionSettings.Default.WalletConfig.Path.Trim().Length < 1) throw new RpcException(-500, "Wallet file is exists.");
 
             if (_params.Count < 2) throw new RpcException(-501, "parameter is error.");
+
             string password = _params[0].AsString();
+            if (!RpcExtension.VerifyPW(password))
+            {
+                throw new RpcException(-501, $"password max length {RpcExtension.MaxPWLength}");
+            }
+
             int duration = (int)_params[1].AsNumber();
 
             if (Unlocking) { throw new RpcException(-502, "wallet is unlocking...."); }
@@ -287,6 +293,19 @@ namespace Bhp.BhpExtensions.RPC
                 backStream.Close();
             }
             return jsonRes;
+        }
+
+        /// <summary>
+        /// 密码长度限制128
+        /// </summary>
+        public const int MaxPWLength = 128;
+        public static bool VerifyPW(string password)
+        {
+            if (password.Length > MaxPWLength)
+            {
+                return false;
+            }
+            return true;
         }
     }
 }
