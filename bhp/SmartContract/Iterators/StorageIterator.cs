@@ -6,9 +6,9 @@ namespace Bhp.SmartContract.Iterators
 {
     internal class StorageIterator : IIterator
     {
-        private readonly IEnumerator<(StorageKey Key, StorageItem Value)> enumerator;
+        private readonly IEnumerator<KeyValuePair<StorageKey, StorageItem>> enumerator;
 
-        public StorageIterator(IEnumerator<(StorageKey, StorageItem)> enumerator)
+        public StorageIterator(IEnumerator<KeyValuePair<StorageKey, StorageItem>> enumerator)
         {
             this.enumerator = enumerator;
         }

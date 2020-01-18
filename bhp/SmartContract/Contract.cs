@@ -46,20 +46,6 @@ namespace Bhp.SmartContract
             };
         }
 
-        /// <summary>
-        /// Construct special Contract with empty Script, will get the Script with scriptHash from blockchain when doing the Verify
-        /// verification = snapshot.Contracts.TryGet(hashes[i])?.Script;
-        /// </summary>
-        public static Contract Create(UInt160 scriptHash, params ContractParameterType[] parameterList)
-        {
-            return new Contract
-            {
-                Script = new byte[0],
-                _scriptHash = scriptHash,
-                ParameterList = parameterList
-            };
-        }
-
         public static Contract CreateMultiSigContract(int m, params ECPoint[] publicKeys)
         {
             return new Contract
@@ -81,7 +67,7 @@ namespace Bhp.SmartContract
                     sb.EmitPush(publicKey.EncodePoint(true));
                 }
                 sb.EmitPush(publicKeys.Length);
-                sb.EmitSysCall(InteropService.Bhp_Crypto_CheckMultiSig);
+                sb.Emit(OpCode.CHECKMULTISIG);
                 return sb.ToArray();
             }
         }
@@ -100,7 +86,7 @@ namespace Bhp.SmartContract
             using (ScriptBuilder sb = new ScriptBuilder())
             {
                 sb.EmitPush(publicKey.EncodePoint(true));
-                sb.EmitSysCall(InteropService.Bhp_Crypto_CheckSig);
+                sb.Emit(OpCode.CHECKSIG);
                 return sb.ToArray();
             }
         }

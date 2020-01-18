@@ -89,19 +89,20 @@ namespace Bhp.IO
         }
 
         public static byte[] ReadBytesWithGrouping(this BinaryReader reader)
-        {            
+        {
             using (MemoryStream ms = new MemoryStream())
             {
-                int count;
+                int padding = 0;
                 do
                 {
                     byte[] group = reader.ReadBytes(GroupingSizeInBytes);
-                    count = reader.ReadByte();
-                    if (count > GroupingSizeInBytes)
+                    padding = reader.ReadByte();
+                    if (padding > GroupingSizeInBytes)
                         throw new FormatException();
+                    int count = GroupingSizeInBytes - padding;
                     if (count > 0)
                         ms.Write(group, 0, count);
-                } while (count == GroupingSizeInBytes);
+                } while (padding == 0);
                 return ms.ToArray();
             }
         }
@@ -110,14 +111,6 @@ namespace Bhp.IO
         {
             byte[] data = reader.ReadBytes(length);
             return Encoding.UTF8.GetString(data.TakeWhile(p => p != 0).ToArray());
-        }
-
-        public static T[] ReadNullableArray<T>(this BinaryReader reader, int max = 0x1000000) where T : class, ISerializable, new()
-        {
-            T[] array = new T[reader.ReadVarInt((ulong)max)];
-            for (int i = 0; i < array.Length; i++)
-                array[i] = reader.ReadBoolean() ? reader.ReadSerializable<T>() : null;
-            return array;
         }
 
         public static T ReadSerializable<T>(this BinaryReader reader) where T : ISerializable, new()
@@ -201,13 +194,13 @@ namespace Bhp.IO
         }
 
         public static void WriteBytesWithGrouping(this BinaryWriter writer, byte[] value)
-        {            
+        {
             int index = 0;
             int remain = value.Length;
             while (remain >= GroupingSizeInBytes)
             {
                 writer.Write(value, index, GroupingSizeInBytes);
-                writer.Write((byte)GroupingSizeInBytes);
+                writer.Write((byte)0);
                 index += GroupingSizeInBytes;
                 remain -= GroupingSizeInBytes;
             }
@@ -216,7 +209,7 @@ namespace Bhp.IO
             int padding = GroupingSizeInBytes - remain;
             for (int i = 0; i < padding; i++)
                 writer.Write((byte)0);
-            writer.Write((byte)remain);
+            writer.Write((byte)padding);
         }
 
         public static void WriteFixedString(this BinaryWriter writer, string value, int length)
@@ -231,18 +224,6 @@ namespace Bhp.IO
             writer.Write(bytes);
             if (bytes.Length < length)
                 writer.Write(new byte[length - bytes.Length]);
-        }
-
-        public static void WriteNullableArray<T>(this BinaryWriter writer, T[] value) where T : class, ISerializable
-        {
-            writer.WriteVarInt(value.Length);
-            foreach (var item in value)
-            {
-                bool isNull = item is null;
-                writer.Write(!isNull);
-                if (isNull) continue;
-                item.Serialize(writer);
-            }
         }
 
         public static void WriteVarBytes(this BinaryWriter writer, byte[] value)

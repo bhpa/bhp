@@ -1,9 +1,12 @@
 using Akka.Actor;
 using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
+using Bhp.Persistence;
 using Bhp.SmartContract;
 using Bhp.Wallets;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Bhp.BhpExtensions.RPC
 {
@@ -21,9 +24,7 @@ namespace Bhp.BhpExtensions.RPC
 
         public Fixed8 UnavailableBonus()
         {
-            return Fixed8.Zero;
-            /*
-            using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 uint height = snapshot.Height + 1;
                 Fixed8 unavailable;
@@ -39,21 +40,16 @@ namespace Bhp.BhpExtensions.RPC
 
                 return unavailable;
             }
-            */
         }
-
 
         public Fixed8 AvailableBonus()
         {
-            return Fixed8.Zero;
-            /*
-            using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 return snapshot.CalculateBonus(current_wallet.GetUnclaimedCoins().Select(p => p.Reference));
             }
-            */
         }
-        /*
+
         public ClaimTransaction Claim(UInt160 change_address = null)
         {
 
@@ -66,7 +62,7 @@ namespace Bhp.BhpExtensions.RPC
             CoinReference[] claims = current_wallet.GetUnclaimedCoins().Select(p => p.Reference).ToArray();
             if (claims.Length == 0) return null;
 
-            using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 ClaimTransaction tx = new ClaimTransaction
                 {
@@ -78,8 +74,8 @@ namespace Bhp.BhpExtensions.RPC
                         new TransactionOutput
                         {
                             AssetId = Blockchain.UtilityToken.Hash,
-                            Value = snapshot.CalculateBonus(claims.Take(MAX_CLAIMS_AMOUNT)),                            
-                            Hash = change_address ?? current_wallet.GetChangeAddress()
+                            Value = snapshot.CalculateBonus(claims.Take(MAX_CLAIMS_AMOUNT)),
+                            ScriptHash = change_address ?? current_wallet.GetChangeAddress()
                         }
                     }
 
@@ -89,9 +85,8 @@ namespace Bhp.BhpExtensions.RPC
             }
         }
 
-
         public ClaimTransaction[] ClaimAll(UInt160 change_address = null)
-        {            
+        {
             if (this.AvailableBonus() == Fixed8.Zero)
             {
                 Console.WriteLine($"no gas to claim");
@@ -101,7 +96,7 @@ namespace Bhp.BhpExtensions.RPC
             CoinReference[] claims = current_wallet.GetUnclaimedCoins().Select(p => p.Reference).ToArray();
             if (claims.Length == 0) return null;
 
-            using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+            using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
             {
                 int claim_count = (claims.Length - 1) / MAX_CLAIMS_AMOUNT + 1;
                 List<ClaimTransaction> txs = new List<ClaimTransaction>();
@@ -126,7 +121,7 @@ namespace Bhp.BhpExtensions.RPC
                             {
                                 AssetId = Blockchain.UtilityToken.Hash,
                                 Value = snapshot.CalculateBonus(claims.Skip(i * MAX_CLAIMS_AMOUNT).Take(MAX_CLAIMS_AMOUNT)),
-                                Hash = change_address ?? current_wallet.GetChangeAddress()
+                                ScriptHash = change_address ?? current_wallet.GetChangeAddress()
                             }
                         }
                     };
@@ -144,7 +139,6 @@ namespace Bhp.BhpExtensions.RPC
                 return txs.ToArray();
             }
         }
-        */
 
         private Transaction SignTransaction(Transaction tx)
         {
@@ -178,7 +172,7 @@ namespace Bhp.BhpExtensions.RPC
                     return null;
                 }
 
-                //current_wallet.ApplyTransaction(tx);
+                current_wallet.ApplyTransaction(tx);
 
                 bool relay_result = system.Blockchain.Ask<RelayResultReason>(tx).Result == RelayResultReason.Succeed;
 

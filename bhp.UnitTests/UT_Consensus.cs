@@ -38,9 +38,8 @@ namespace Bhp.UnitTests
             mockConsensusContext.SetupProperty(mr => mr.Nonce);
             mockConsensusContext.SetupProperty(mr => mr.NextConsensus);
             mockConsensusContext.Object.NextConsensus = UInt160.Zero;
-            mockConsensusContext.Setup(mr => mr.GetPrimaryIndex(It.IsAny<byte>())).Returns(2);
-            mockConsensusContext.SetupProperty(mr => mr.State);  // allows get and set to update mock state on Initialize method
-            mockConsensusContext.Object.State = ConsensusState.Initial;
+            mockConsensusContext.SetupGet(mr => mr.PreparationPayloads).Returns(new ConsensusPayload[7]);
+            mockConsensusContext.SetupGet(mr => mr.CommitPayloads).Returns(new ConsensusPayload[7]);
 
             int timeIndex = 0;
             var timeValues = new[] {
@@ -99,8 +98,7 @@ namespace Bhp.UnitTests
                 Nonce = mockConsensusContext.Object.Nonce,
                 NextConsensus = mockConsensusContext.Object.NextConsensus,
                 TransactionHashes = new UInt256[0],
-                MinerTransaction = minerTx, //(MinerTransaction)Transactions[TransactionHashes[0]],
-                Signature = new byte[64]//Signatures[MyIndex]
+                MinerTransaction = minerTx //(MinerTransaction)Transactions[TransactionHashes[0]],
             };
 
             ConsensusMessage mprep = prep;
@@ -112,8 +110,7 @@ namespace Bhp.UnitTests
                 PrevHash = mockConsensusContext.Object.PrevHash,
                 BlockIndex = mockConsensusContext.Object.BlockIndex,
                 ValidatorIndex = (ushort)mockConsensusContext.Object.MyIndex,
-                Timestamp = mockConsensusContext.Object.Timestamp,
-                Data = prepData
+                ConsensusMessage = prep
             };
 
             mockConsensusContext.Setup(mr => mr.MakePrepareRequest()).Returns(prepPayload);

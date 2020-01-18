@@ -7,8 +7,8 @@ namespace Bhp.Plugins
 {
     public interface IPersistencePlugin
     {
-        void OnPersist(StoreView snapshot, IReadOnlyList<ApplicationExecuted> applicationExecutedList);
-        void OnCommit(StoreView snapshot);
+        void OnPersist(Snapshot snapshot, IReadOnlyList<ApplicationExecuted> applicationExecutedList);
+        void OnCommit(Snapshot snapshot);
         bool ShouldThrowExceptionFromCommit(Exception ex);
     }
 }

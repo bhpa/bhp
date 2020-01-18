@@ -35,20 +35,20 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public new int Size => base.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + sizeof(byte) + Owner.Size + Admin.Size;
+        public override int Size => base.Size + sizeof(AssetType) + Name.GetVarSize() + Amount.Size + sizeof(byte) + Owner.Size + Admin.Size;
 
-        public new Fixed8 SystemFee
+        public override Fixed8 SystemFee
         {
             get
             {
                 if (AssetType == AssetType.GoverningToken || AssetType == AssetType.UtilityToken)
                     return Fixed8.Zero;
-                return Fixed8.Parse(base.SystemFee.ToString());
+                return base.SystemFee;
             }
         }
 
         public RegisterTransaction()
-            : base()
+            : base(TransactionType.RegisterTransaction)
         {
         }
 
@@ -63,6 +63,12 @@ namespace Bhp.Network.P2P.Payloads
             if (Owner.IsInfinity && AssetType != AssetType.GoverningToken && AssetType != AssetType.UtilityToken)
                 throw new FormatException();
             Admin = reader.ReadSerializable<UInt160>();
+        }
+
+        public override UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
+        {
+            UInt160 owner = Contract.CreateSignatureRedeemScript(Owner).ToScriptHash();
+            return base.GetScriptHashesForVerifying(snapshot).Union(new[] { owner }).OrderBy(p => p).ToArray();
         }
 
         protected override void OnDeserialized()
@@ -104,7 +110,7 @@ namespace Bhp.Network.P2P.Payloads
             return json;
         }
 
-        public override bool Verify(StoreView snapshot, IEnumerable<Transaction> mempool)
+        public override bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
             return false;
         }

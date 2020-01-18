@@ -8,7 +8,7 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class MerkleBlockPayload : BlockBase
     {
-        public int ContentCount;
+        public int TxCount;
         public UInt256[] Hashes;
         public byte[] Flags;
 
@@ -16,7 +16,8 @@ namespace Bhp.Network.P2P.Payloads
 
         public static MerkleBlockPayload Create(Block block, BitArray flags)
         {
-            MerkleTree tree = new MerkleTree(new[] { block.ConsensusData.Hash }.Concat(block.Transactions.Select(p => p.Hash)).ToArray());
+            MerkleTree tree = new MerkleTree(block.Transactions.Select(p => p.Hash).ToArray());
+            tree.Trim(flags);
             byte[] buffer = new byte[(flags.Length + 7) / 8];
             flags.CopyTo(buffer, 0);
             return new MerkleBlockPayload
@@ -25,10 +26,11 @@ namespace Bhp.Network.P2P.Payloads
                 PrevHash = block.PrevHash,
                 MerkleRoot = block.MerkleRoot,
                 Timestamp = block.Timestamp,
-                Index = block.Index,                
+                Index = block.Index,
+                ConsensusData = block.ConsensusData,
                 NextConsensus = block.NextConsensus,
                 Witness = block.Witness,
-                ContentCount = block.Transactions.Length + 1,
+                TxCount = block.Transactions.Length,
                 Hashes = tree.ToHashArray(),
                 Flags = buffer
             };
@@ -37,7 +39,7 @@ namespace Bhp.Network.P2P.Payloads
         public override void Deserialize(BinaryReader reader)
         {
             base.Deserialize(reader);
-            ContentCount = (int)reader.ReadVarInt(int.MaxValue);
+            TxCount = (int)reader.ReadVarInt(int.MaxValue);
             Hashes = reader.ReadSerializableArray<UInt256>();
             Flags = reader.ReadVarBytes();
         }
@@ -45,7 +47,7 @@ namespace Bhp.Network.P2P.Payloads
         public override void Serialize(BinaryWriter writer)
         {
             base.Serialize(writer);
-            writer.WriteVarInt(ContentCount);
+            writer.WriteVarInt(TxCount);
             writer.Write(Hashes);
             writer.WriteVarBytes(Flags);
         }

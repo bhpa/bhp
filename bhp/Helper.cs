@@ -1,5 +1,4 @@
 ﻿using Bhp.IO.Caching;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -109,7 +108,6 @@ namespace Bhp
                 result[i] = byte.Parse(value.Substring(i * 2, 2), NumberStyles.AllowHexSpecifier);
             return result;
         }
-
         internal static byte[] ToByteArrayUnsigned(this BigInteger i, bool bigEndian)
         {
             byte[] bytes = i.ToByteArray();
@@ -120,7 +118,6 @@ namespace Bhp
 
             return bytes;
         }
-
         internal static BigInteger ToBigIntegerUnsigned(this byte[] bytes, bool bigEndian)
         {
             byte[] clone;
@@ -146,7 +143,6 @@ namespace Bhp
             Buffer.BlockCopy(bytes, 0, clone, 0, bytes.Length);
             return new BigInteger(clone);
         }
-
         internal static BigInteger Mod(this BigInteger x, BigInteger y)
         {
             x %= y;
@@ -202,6 +198,31 @@ namespace Bhp
             return new BigInteger(b);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe internal static bool NotZero(this byte[] x)
+        {
+            if (x is null)
+                throw new ArgumentNullException(nameof(x));
+            int len = x.Length;
+            if (len == 0) return false;
+            fixed (byte* xp = x)
+            {
+                long* xlp = (long*)xp;
+                for (; len >= 8; len -= 8)
+                {
+                    if (*xlp != 0) return true;
+                    xlp++;
+                }
+                byte* xbp = (byte*)xlp;
+                for (; len > 0; len--)
+                {
+                    if (*xbp != 0) return true;
+                    xbp++;
+                }
+            }
+            return false;
+        }
+
         public static Fixed8 Sum(this IEnumerable<Fixed8> source)
         {
             long sum = 0;
@@ -213,13 +234,6 @@ namespace Bhp
                 }
             }
             return new Fixed8(sum);
-        }
-
-        public static BigInteger Sum(this IEnumerable<BigInteger> source)
-        {
-            var sum = BigInteger.Zero;
-            foreach (var bi in source) sum += bi;
-            return sum;
         }
 
         public static Fixed8 Sum<TSource>(this IEnumerable<TSource> source, Func<TSource, Fixed8> selector)
@@ -300,10 +314,6 @@ namespace Bhp
             }
         }
 
-        /// <summary>
-        /// Checks if address is IPv4 Maped to IPv6 format, if so, Map to IPv4.
-        /// Otherwise, return current address.
-        /// </summary>
         internal static IPAddress Unmap(this IPAddress address)
         {
             if (address.IsIPv4MappedToIPv6)
@@ -311,10 +321,6 @@ namespace Bhp
             return address;
         }
 
-        /// <summary>
-        /// Checks if IPEndPoint is IPv4 Maped to IPv6 format, if so, unmap to IPv4.
-        /// Otherwise, return current endpoint.
-        /// </summary>
         internal static IPEndPoint Unmap(this IPEndPoint endPoint)
         {
             if (!endPoint.Address.IsIPv4MappedToIPv6)
@@ -322,21 +328,21 @@ namespace Bhp
             return new IPEndPoint(endPoint.Address.Unmap(), endPoint.Port);
         }
 
-        internal static BigInteger WeightedAverage<T>(this IEnumerable<T> source, Func<T, BigInteger> valueSelector, Func<T, BigInteger> weightSelector)
+        internal static long WeightedAverage<T>(this IEnumerable<T> source, Func<T, long> valueSelector, Func<T, long> weightSelector)
         {
-            BigInteger sum_weight = BigInteger.Zero;
-            BigInteger sum_value = BigInteger.Zero;
+            long sum_weight = 0;
+            long sum_value = 0;
             foreach (T item in source)
             {
-                BigInteger weight = weightSelector(item);
+                long weight = weightSelector(item);
                 sum_weight += weight;
                 sum_value += valueSelector(item) * weight;
             }
-            if (sum_value == BigInteger.Zero) return BigInteger.Zero;
+            if (sum_value == 0) return 0;
             return sum_value / sum_weight;
         }
 
-        internal static IEnumerable<TResult> WeightedFilter<T, TResult>(this IList<T> source, double start, double end, Func<T, BigInteger> weightSelector, Func<T, BigInteger, TResult> resultSelector)
+        internal static IEnumerable<TResult> WeightedFilter<T, TResult>(this IList<T> source, double start, double end, Func<T, long> weightSelector, Func<T, long, TResult> resultSelector)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             if (start < 0 || start > 1) throw new ArgumentOutOfRangeException(nameof(start));
@@ -344,16 +350,16 @@ namespace Bhp
             if (weightSelector == null) throw new ArgumentNullException(nameof(weightSelector));
             if (resultSelector == null) throw new ArgumentNullException(nameof(resultSelector));
             if (source.Count == 0 || start == end) yield break;
-            double amount = (double)source.Select(weightSelector).Sum();
-            BigInteger sum = 0;
+            double amount = source.Sum(weightSelector);
+            long sum = 0;
             double current = 0;
             foreach (T item in source)
             {
                 if (current >= end) break;
-                BigInteger weight = weightSelector(item);
+                long weight = weightSelector(item);
                 sum += weight;
                 double old = current;
-                current = (double)sum / amount;
+                current = sum / amount;
                 if (current <= start) continue;
                 if (old < start)
                 {
@@ -372,20 +378,6 @@ namespace Bhp
                 }
                 yield return resultSelector(item, weight);
             }
-        }
-
-        /// <summary>
-        /// Load configuration with different Environment Variable
-        /// </summary>
-        /// <param name="config">Configuration</param>
-        /// <returns>IConfigurationRoot</returns>
-        public static IConfigurationRoot LoadConfig(string config)
-        {
-            var env = Environment.GetEnvironmentVariable("BHP_NETWORK");
-            var configFile = string.IsNullOrWhiteSpace(env) ? $"{config}.json" : $"{config}.{env}.json";
-            return new ConfigurationBuilder()
-                .AddJsonFile(configFile, true)
-                .Build();
         }
     }
 }

@@ -1,13 +1,15 @@
 ﻿using Bhp.IO;
+using Bhp.IO.Json;
 using System.IO;
+using System.Linq;
 
 namespace Bhp.Ledger
 {
-    public class HeaderHashList : ICloneable<HeaderHashList>, ISerializable
+    public class HeaderHashList : StateBase, ICloneable<HeaderHashList>
     {
         public UInt256[] Hashes;
 
-        int ISerializable.Size => Hashes.GetVarSize();
+        public override int Size => base.Size + Hashes.GetVarSize();
 
         HeaderHashList ICloneable<HeaderHashList>.Clone()
         {
@@ -17,8 +19,9 @@ namespace Bhp.Ledger
             };
         }
 
-        void ISerializable.Deserialize(BinaryReader reader)
+        public override void Deserialize(BinaryReader reader)
         {
+            base.Deserialize(reader);
             Hashes = reader.ReadSerializableArray<UInt256>();
         }
 
@@ -27,9 +30,17 @@ namespace Bhp.Ledger
             Hashes = replica.Hashes;
         }
 
-        void ISerializable.Serialize(BinaryWriter writer)
+        public override void Serialize(BinaryWriter writer)
         {
+            base.Serialize(writer);
             writer.Write(Hashes);
+        }
+
+        public override JObject ToJson()
+        {
+            JObject json = base.ToJson();
+            json["hashes"] = Hashes.Select(p => (JObject)p.ToString()).ToArray();
+            return json;
         }
     }
 }

@@ -1,36 +1,34 @@
 ﻿using Bhp.IO;
-using System;
 using System.IO;
 
 namespace Bhp.Network.P2P.Payloads
 {
     public class GetBlocksPayload : ISerializable
     {
-        public UInt256 HashStart;
-        public short Count;
+        public UInt256[] HashStart;
+        public UInt256 HashStop;
 
-        public int Size => sizeof(short) + HashStart.Size;
+        public int Size => HashStart.GetVarSize() + HashStop.Size;
 
-        public static GetBlocksPayload Create(UInt256 hash_start, short count = -1)
+        public static GetBlocksPayload Create(UInt256 hash_start, UInt256 hash_stop = null)
         {
             return new GetBlocksPayload
             {
-                HashStart = hash_start,
-                Count = count
+                HashStart = new[] { hash_start },
+                HashStop = hash_stop ?? UInt256.Zero
             };
         }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
-            HashStart = reader.ReadSerializable<UInt256>();
-            Count = reader.ReadInt16();
-            if (Count < -1 || Count == 0) throw new FormatException();
+            HashStart = reader.ReadSerializableArray<UInt256>(16);
+            HashStop = reader.ReadSerializable<UInt256>();
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
         {
             writer.Write(HashStart);
-            writer.Write(Count);
+            writer.Write(HashStop);
         }
     }
 }

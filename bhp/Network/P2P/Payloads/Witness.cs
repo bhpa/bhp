@@ -1,7 +1,7 @@
 ﻿using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.SmartContract;
-using System;
+using Bhp.VM;
 using System.IO;
 
 namespace Bhp.Network.P2P.Payloads
@@ -28,8 +28,8 @@ namespace Bhp.Network.P2P.Payloads
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
-            InvocationScript = reader.ReadVarBytes(664);
-            VerificationScript = reader.ReadVarBytes(360);
+            InvocationScript = reader.ReadVarBytes(65536);
+            VerificationScript = reader.ReadVarBytes(65536);
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
@@ -41,17 +41,9 @@ namespace Bhp.Network.P2P.Payloads
         public JObject ToJson()
         {
             JObject json = new JObject();
-            json["invocation"] = Convert.ToBase64String(InvocationScript);
-            json["verification"] = Convert.ToBase64String(VerificationScript);
+            json["invocation"] = InvocationScript.ToHexString();
+            json["verification"] = VerificationScript.ToHexString();
             return json;
-        }
-
-        public static Witness FromJson(JObject json)
-        {
-            Witness witness = new Witness();
-            witness.InvocationScript = Convert.FromBase64String(json["invocation"].AsString());
-            witness.VerificationScript = Convert.FromBase64String(json["verification"].AsString());
-            return witness;
         }
     }
 }

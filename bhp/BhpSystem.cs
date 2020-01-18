@@ -14,7 +14,8 @@ namespace Bhp
 {
     public class BhpSystem : IDisposable
     {
-        private ChannelsConfig start_message = null;
+        private readonly Store store;
+        private Peer.Start start_message = null;
         private bool suspend = false;
 
         public ActorSystem ActorSystem { get; } = ActorSystem.Create(nameof(BhpSystem),
@@ -24,12 +25,12 @@ namespace Bhp
             $"remote-node-mailbox {{ mailbox-type: \"{typeof(RemoteNodeMailbox).AssemblyQualifiedName}\" }}" +
             $"protocol-handler-mailbox {{ mailbox-type: \"{typeof(ProtocolHandlerMailbox).AssemblyQualifiedName}\" }}" +
             $"consensus-service-mailbox {{ mailbox-type: \"{typeof(ConsensusServiceMailbox).AssemblyQualifiedName}\" }}");
+
         public IActorRef Blockchain { get; }
         public IActorRef LocalNode { get; }
         internal IActorRef TaskManager { get; }
         public IActorRef Consensus { get; private set; }
         public RpcServer RpcServer { get; private set; }
-        private readonly Store store;
 
         public BhpSystem(Store store)
         {
@@ -41,10 +42,17 @@ namespace Bhp
             Plugin.NotifyPluginsLoadedAfterSystemConstructed();
         }
 
+        //By BHP
         public void Dispose()
         {
-            foreach (var p in Plugin.Plugins)
-                p.Dispose();
+            RpcServer?.Dispose();
+            ActorSystem.Stop(LocalNode);
+            ActorSystem.Dispose();
+        }
+
+        /* //exit akka error
+        public void Dispose()
+        {
             RpcServer?.Dispose();
             EnsureStoped(LocalNode);
             // Dispose will call ActorSystem.Terminate()
@@ -59,6 +67,7 @@ namespace Bhp
             ActorSystem.Stop(actor);
             inbox.Receive(TimeSpan.FromMinutes(5));
         }
+        */
 
         internal void ResumeNodeStartup()
         {
@@ -71,10 +80,10 @@ namespace Bhp
         }
 
         /*
-        public void StartConsensus(Wallet wallet)
+        public void StartConsensus(Wallet wallet, Store consensus_store = null, bool ignoreRecoveryLogs = false)
         {
             Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
-            Consensus.Tell(new ConsensusService.Start());
+            Consensus.Tell(new ConsensusService.Start { IgnoreRecoveryLogs = ignoreRecoveryLogs }, Blockchain);
         }
         */
 
@@ -103,14 +112,21 @@ namespace Bhp
             if (found)
             {
                 Consensus = ActorSystem.ActorOf(ConsensusService.Props(this.LocalNode, this.TaskManager, consensus_store ?? store, wallet));
-                Consensus.Tell(new ConsensusService.Start());
+                Consensus.Tell(new ConsensusService.Start { IgnoreRecoveryLogs = ignoreRecoveryLogs }, Blockchain);
             }
         }
 
-        public void StartNode(ChannelsConfig config)
+        public void StartNode(int port = 0, int wsPort = 0, int minDesiredConnections = Peer.DefaultMinDesiredConnections,
+            int maxConnections = Peer.DefaultMaxConnections, int maxConnectionsPerAddress = 3)
         {
-            start_message = config;
-
+            start_message = new Peer.Start
+            {
+                Port = port,
+                WsPort = wsPort,
+                MinDesiredConnections = minDesiredConnections,
+                MaxConnections = maxConnections,
+                MaxConnectionsPerAddress = maxConnectionsPerAddress
+            };
             if (!suspend)
             {
                 LocalNode.Tell(start_message);

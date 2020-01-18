@@ -12,7 +12,20 @@ namespace Bhp.Network.P2P.Payloads
         public TransactionAttributeUsage Usage;
         public byte[] Data;
 
-        public int Size => sizeof(TransactionAttributeUsage) + Data.GetVarSize();
+        public int Size
+        {
+            get
+            {
+                if (Usage == TransactionAttributeUsage.ContractHash || Usage == TransactionAttributeUsage.ECDH02 || Usage == TransactionAttributeUsage.ECDH03 || Usage == TransactionAttributeUsage.Vote || (Usage >= TransactionAttributeUsage.Hash1 && Usage <= TransactionAttributeUsage.Hash15))
+                    return sizeof(TransactionAttributeUsage) + 32;
+                else if (Usage == TransactionAttributeUsage.Script)
+                    return sizeof(TransactionAttributeUsage) + 20;
+                else if (Usage == TransactionAttributeUsage.DescriptionUrl)
+                    return sizeof(TransactionAttributeUsage) + sizeof(byte) + Data.Length;
+                else
+                    return sizeof(TransactionAttributeUsage) + Data.GetVarSize();
+            }
+        }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
@@ -21,6 +34,8 @@ namespace Bhp.Network.P2P.Payloads
                 Data = reader.ReadBytes(32);
             else if (Usage == TransactionAttributeUsage.ECDH02 || Usage == TransactionAttributeUsage.ECDH03)
                 Data = new[] { (byte)Usage }.Concat(reader.ReadBytes(32)).ToArray();
+            else if (Usage == TransactionAttributeUsage.Script)
+                Data = reader.ReadBytes(20);
             else if (Usage == TransactionAttributeUsage.DescriptionUrl)
                 Data = reader.ReadBytes(reader.ReadByte());
             else if (Usage == TransactionAttributeUsage.Description || Usage >= TransactionAttributeUsage.Remark)
@@ -52,16 +67,8 @@ namespace Bhp.Network.P2P.Payloads
         {
             JObject json = new JObject();
             json["usage"] = Usage;
-            json["data"] = Convert.ToBase64String(Data);
+            json["data"] = Data.ToHexString();
             return json;
-        }
-
-        public static TransactionAttribute FromJson(JObject json)
-        {
-            TransactionAttribute transactionAttribute = new TransactionAttribute();
-            transactionAttribute.Usage = (TransactionAttributeUsage)(byte.Parse(json["usage"].AsString()));
-            transactionAttribute.Data = Convert.FromBase64String(json["data"].AsString());
-            return transactionAttribute;
         }
     }
 }

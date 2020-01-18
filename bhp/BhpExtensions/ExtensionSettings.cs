@@ -26,7 +26,7 @@ namespace Bhp.BhpExtensions
             public WalletIndexer Indexer { get; set; }
             public string Path { get; set; }
             public string Index { get; set; }
-            public bool AutoLock { get; set; }
+            public bool AutoLock { get; set; } 
             public bool IsBhpFee { get; set; }
 
             public void Set(WalletIndexer Indexer, string Path, string Index, bool AutoLock, bool IsBhpFee)

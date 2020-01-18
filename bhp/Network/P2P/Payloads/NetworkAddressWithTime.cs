@@ -1,5 +1,4 @@
 ﻿using Bhp.IO;
-using Bhp.Network.P2P.Capabilities;
 using System;
 using System.IO;
 using System.Linq;
@@ -9,45 +8,43 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class NetworkAddressWithTime : ISerializable
     {
+        public const ulong NODE_NETWORK = 1;
+
         public uint Timestamp;
-        public IPAddress Address;
-        public NodeCapability[] Capabilities;
+        public ulong Services;
+        public IPEndPoint EndPoint;
 
-        public IPEndPoint EndPoint => new IPEndPoint(Address, Capabilities.Where(p => p.Type == NodeCapabilityType.TcpServer).Select(p => (ServerCapability)p).FirstOrDefault()?.Port ?? 0);
-        public int Size => sizeof(uint) + 16 + Capabilities.GetVarSize();
+        public int Size => sizeof(uint) + sizeof(ulong) + 16 + sizeof(ushort);
 
-        public static NetworkAddressWithTime Create(IPAddress address, uint timestamp, params NodeCapability[] capabilities)
+        public static NetworkAddressWithTime Create(IPEndPoint endpoint, ulong services, uint timestamp)
         {
             return new NetworkAddressWithTime
             {
                 Timestamp = timestamp,
-                Address = address,
-                Capabilities = capabilities
+                Services = services,
+                EndPoint = endpoint
             };
         }
 
         void ISerializable.Deserialize(BinaryReader reader)
         {
             Timestamp = reader.ReadUInt32();
-
-            // Address
+            Services = reader.ReadUInt64();
             byte[] data = reader.ReadBytes(16);
             if (data.Length != 16) throw new FormatException();
-            Address = new IPAddress(data).Unmap();
-
-            // Capabilities
-            Capabilities = new NodeCapability[reader.ReadVarInt(VersionPayload.MaxCapabilities)];
-            for (int x = 0, max = Capabilities.Length; x < max; x++)
-                Capabilities[x] = NodeCapability.DeserializeFrom(reader);
-            if (Capabilities.Select(p => p.Type).Distinct().Count() != Capabilities.Length)
-                throw new FormatException();
+            IPAddress address = new IPAddress(data).Unmap();
+            data = reader.ReadBytes(2);
+            if (data.Length != 2) throw new FormatException();
+            ushort port = data.Reverse().ToArray().ToUInt16(0);
+            EndPoint = new IPEndPoint(address, port);
         }
 
         void ISerializable.Serialize(BinaryWriter writer)
         {
             writer.Write(Timestamp);
-            writer.Write(Address.MapToIPv6().GetAddressBytes());
-            writer.Write(Capabilities);
+            writer.Write(Services);
+            writer.Write(EndPoint.Address.MapToIPv6().GetAddressBytes());
+            writer.Write(BitConverter.GetBytes((ushort)EndPoint.Port).Reverse().ToArray());
         }
     }
 }

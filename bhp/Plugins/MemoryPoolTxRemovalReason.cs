@@ -9,6 +9,6 @@
         /// <summary>
         /// The transaction was ejected due to failing re-validation after a block was persisted.
         /// </summary>
-        NoLongerValid
+        NoLongerValid,
     }
 }

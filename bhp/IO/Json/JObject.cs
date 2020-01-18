@@ -1,5 +1,4 @@
-﻿using Bhp.IO.Caching;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -8,52 +7,80 @@ namespace Bhp.IO.Json
 {
     public class JObject
     {
-        protected const char BEGIN_ARRAY = '[';
-        protected const char BEGIN_OBJECT = '{';
-        protected const char END_ARRAY = ']';
-        protected const char END_OBJECT = '}';
-        protected const char NAME_SEPARATOR = ':';
-        protected const char VALUE_SEPARATOR = ',';
-        protected const char QUOTATION_MARK = '"';
-        protected const string WS = " \t\n\r";
-        protected const string LITERAL_FALSE = "false";
-        protected const string LITERAL_NULL = "null";
-        protected const string LITERAL_TRUE = "true";
-
         public static readonly JObject Null = null;
-        public IDictionary<string, JObject> Properties { get; } = new OrderedDictionary<string, JObject>();
+        private Dictionary<string, JObject> properties = new Dictionary<string, JObject>();
 
         public JObject this[string name]
         {
             get
             {
-                Properties.TryGetValue(name, out JObject value);
+                properties.TryGetValue(name, out JObject value);
                 return value;
             }
             set
             {
-                Properties[name] = value;
+                properties[name] = value;
             }
         }
-        
+
+        public IReadOnlyDictionary<string, JObject> Properties => properties;
+
         public virtual bool AsBoolean()
         {
-            return true;
+            throw new InvalidCastException();
+        }
+
+        public bool AsBooleanOrDefault(bool value = false)
+        {
+            if (!CanConvertTo(typeof(bool)))
+                return value;
+            return AsBoolean();
+        }
+
+        public virtual T AsEnum<T>(bool ignoreCase = false)
+        {
+            throw new InvalidCastException();
+        }
+
+        public T AsEnumOrDefault<T>(T value = default(T), bool ignoreCase = false)
+        {
+            if (!CanConvertTo(typeof(T)))
+                return value;
+            return AsEnum<T>(ignoreCase);
         }
 
         public virtual double AsNumber()
         {
-            return double.NaN;
+            throw new InvalidCastException();
+        }
+
+        public double AsNumberOrDefault(double value = 0)
+        {
+            if (!CanConvertTo(typeof(double)))
+                return value;
+            return AsNumber();
         }
 
         public virtual string AsString()
         {
-            return ToString();
+            throw new InvalidCastException();
+        }
+
+        public string AsStringOrDefault(string value = null)
+        {
+            if (!CanConvertTo(typeof(string)))
+                return value;
+            return AsString();
+        }
+
+        public virtual bool CanConvertTo(Type type)
+        {
+            return false;
         }
 
         public bool ContainsProperty(string key)
         {
-            return Properties.ContainsKey(key);
+            return properties.ContainsKey(key);
         }
 
         public static JObject Parse(TextReader reader, int max_nest = 100)
@@ -61,75 +88,71 @@ namespace Bhp.IO.Json
             if (max_nest < 0) throw new FormatException();
             SkipSpace(reader);
             char firstChar = (char)reader.Peek();
-            if (firstChar == LITERAL_FALSE[0])
-                return JBoolean.ParseFalse(reader);
-            if (firstChar == LITERAL_NULL[0])
-                return ParseNull(reader);
-            if (firstChar == LITERAL_TRUE[0])
-                return JBoolean.ParseTrue(reader);
-            if (firstChar == BEGIN_OBJECT)
-                return ParseObject(reader, max_nest);
-            if (firstChar == BEGIN_ARRAY)
-                return JArray.Parse(reader, max_nest);
-            if ((firstChar >= '0' && firstChar <= '9') || firstChar == '-')
-                return JNumber.Parse(reader);
-            if (firstChar == QUOTATION_MARK)
+            if (firstChar == '\"' || firstChar == '\'')
+            {
                 return JString.Parse(reader);
-            throw new FormatException();
+            }
+            if (firstChar == '[')
+            {
+                return JArray.Parse(reader, max_nest);
+            }
+            if ((firstChar >= '0' && firstChar <= '9') || firstChar == '-')
+            {
+                return JNumber.Parse(reader);
+            }
+            if (firstChar == 't' || firstChar == 'f')
+            {
+                return JBoolean.Parse(reader);
+            }
+            if (firstChar == 'n')
+            {
+                return ParseNull(reader);
+            }
+            if (reader.Read() != '{') throw new FormatException();
+            SkipSpace(reader);
+            JObject obj = new JObject();
+            while (reader.Peek() != '}')
+            {
+                if (reader.Peek() == ',') reader.Read();
+                SkipSpace(reader);
+                string name = JString.Parse(reader).Value;
+                SkipSpace(reader);
+                if (reader.Read() != ':') throw new FormatException();
+                JObject value = Parse(reader, max_nest - 1);
+                obj.properties.Add(name, value);
+                SkipSpace(reader);
+            }
+            reader.Read();
+            return obj;
         }
 
         public static JObject Parse(string value, int max_nest = 100)
         {
             using (StringReader reader = new StringReader(value))
             {
-                JObject json = Parse(reader, max_nest);
-                SkipSpace(reader);
-                if (reader.Read() != -1) throw new FormatException();
-                return json;
+                return Parse(reader, max_nest);
             }
         }
 
         private static JObject ParseNull(TextReader reader)
         {
-            for (int i = 0; i < LITERAL_NULL.Length; i++)
-                if ((char)reader.Read() != LITERAL_NULL[i])
-                    throw new FormatException();
-            return null;
-        }
-
-        private static JObject ParseObject(TextReader reader, int max_nest)
-        {
-            SkipSpace(reader);
-            if (reader.Read() != BEGIN_OBJECT) throw new FormatException();
-            JObject obj = new JObject();
-            SkipSpace(reader);
-            if (reader.Peek() != END_OBJECT)
+            char firstChar = (char)reader.Read();
+            if (firstChar == 'n')
             {
-                while (true)
+                int c2 = reader.Read();
+                int c3 = reader.Read();
+                int c4 = reader.Read();
+                if (c2 == 'u' && c3 == 'l' && c4 == 'l')
                 {
-                    string name = JString.Parse(reader).Value;
-                    if (obj.Properties.ContainsKey(name)) throw new FormatException();
-                    SkipSpace(reader);
-                    if (reader.Read() != NAME_SEPARATOR) throw new FormatException();
-                    JObject value = Parse(reader, max_nest - 1);
-                    obj.Properties.Add(name, value);
-                    SkipSpace(reader);
-                    char nextchar = (char)reader.Read();
-                    if (nextchar == VALUE_SEPARATOR) continue;
-                    if (nextchar == END_OBJECT) break;
-                    throw new FormatException();
+                    return null;
                 }
             }
-            else
-            {
-                reader.Read();
-            }
-            return obj;
+            throw new FormatException();
         }
 
         protected static void SkipSpace(TextReader reader)
         {
-            while (WS.IndexOf((char)reader.Peek()) >= 0)
+            while (reader.Peek() == ' ' || reader.Peek() == '\t' || reader.Peek() == '\r' || reader.Peek() == '\n')
             {
                 reader.Read();
             }
@@ -138,35 +161,32 @@ namespace Bhp.IO.Json
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append(BEGIN_OBJECT);
-            foreach (KeyValuePair<string, JObject> pair in Properties)
+            sb.Append('{');
+            foreach (KeyValuePair<string, JObject> pair in properties)
             {
-                sb.Append((JObject)pair.Key);
-                sb.Append(NAME_SEPARATOR);
+                sb.Append('"');
+                sb.Append(pair.Key);
+                sb.Append('"');
+                sb.Append(':');
                 if (pair.Value == null)
                 {
-                    sb.Append(LITERAL_NULL);
+                    sb.Append("null");
                 }
                 else
                 {
                     sb.Append(pair.Value);
                 }
-                sb.Append(VALUE_SEPARATOR);
+                sb.Append(',');
             }
-            if (Properties.Count == 0)
+            if (properties.Count == 0)
             {
-                sb.Append(END_OBJECT);
+                sb.Append('}');
             }
             else
             {
-                sb[sb.Length - 1] = END_OBJECT;
+                sb[sb.Length - 1] = '}';
             }
             return sb.ToString();
-        }
-
-        public virtual T TryGetEnum<T>(T defaultValue = default, bool ignoreCase = false) where T : Enum
-        {
-            return defaultValue;
         }
 
         public static implicit operator JObject(Enum value)

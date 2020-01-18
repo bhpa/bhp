@@ -3,11 +3,10 @@ using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.Persistence;
 using Bhp.SmartContract;
+using Bhp.VM;
 using Bhp.Wallets;
 using System;
 using System.IO;
-using System.Linq;
-
 
 namespace Bhp.Network.P2P.Payloads
 {
@@ -18,6 +17,7 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 MerkleRoot;
         public uint Timestamp;
         public uint Index;
+        public ulong ConsensusData;
         public UInt160 NextConsensus;
         public Witness Witness;
 
@@ -34,35 +34,21 @@ namespace Bhp.Network.P2P.Payloads
             }
         }
 
-        public virtual int Size =>
-            sizeof(uint) +       //Version
-            UInt256.Length +     //PrevHash
-            UInt256.Length +     //MerkleRoot
-            sizeof(ulong) +      //Timestamp
-            sizeof(uint) +       //Index
-            UInt160.Length +     //NextConsensus
-            1 +                  //Witness array count
-            Witness.Size;        //Witness   
-
         Witness[] IVerifiable.Witnesses
         {
             get
             {
                 return new[] { Witness };
             }
-            set
-            {
-                if (value.Length != 1) throw new ArgumentException();
-                Witness = value[0];
-            }
         }
+
+        public virtual int Size => sizeof(uint) + PrevHash.Size + MerkleRoot.Size + sizeof(uint) + sizeof(uint) + sizeof(ulong) + NextConsensus.Size + 1 + Witness.Size;
 
         public virtual void Deserialize(BinaryReader reader)
         {
             ((IVerifiable)this).DeserializeUnsigned(reader);
-            Witness[] witnesses = reader.ReadSerializableArray<Witness>(1);
-            if (witnesses.Length != 1) throw new FormatException();
-            Witness = witnesses[0];
+            if (reader.ReadByte() != 1) throw new FormatException();
+            Witness = reader.ReadSerializable<Witness>();
         }
 
         void IVerifiable.DeserializeUnsigned(BinaryReader reader)
@@ -72,21 +58,28 @@ namespace Bhp.Network.P2P.Payloads
             MerkleRoot = reader.ReadSerializable<UInt256>();
             Timestamp = reader.ReadUInt32();
             Index = reader.ReadUInt32();
+            ConsensusData = reader.ReadUInt64();
             NextConsensus = reader.ReadSerializable<UInt160>();
+        }
+
+        byte[] IScriptContainer.GetMessage()
+        {
+            return this.GetHashData();
+        }
+
+        UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
+        {
+            if (PrevHash == UInt256.Zero)
+                return new[] { Witness.ScriptHash };
+            Header prev_header = snapshot.GetHeader(PrevHash);
+            if (prev_header == null) throw new InvalidOperationException();
+            return new UInt160[] { prev_header.NextConsensus };
         }
 
         public virtual void Serialize(BinaryWriter writer)
         {
             ((IVerifiable)this).SerializeUnsigned(writer);
-            writer.Write(new Witness[] { Witness });
-        }
-
-        UInt160[] IVerifiable.GetScriptHashesForVerifying(StoreView snapshot)
-        {
-            if (PrevHash == UInt256.Zero) return new[] { Witness.ScriptHash };
-            Header prev_header = snapshot.GetHeader(PrevHash);
-            if (prev_header == null) throw new InvalidOperationException();
-            return new[] { prev_header.NextConsensus };
+            writer.Write((byte)1); writer.Write(Witness);
         }
 
         void IVerifiable.SerializeUnsigned(BinaryWriter writer)
@@ -96,6 +89,7 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(MerkleRoot);
             writer.Write(Timestamp);
             writer.Write(Index);
+            writer.Write(ConsensusData);
             writer.Write(NextConsensus);
         }
 
@@ -109,29 +103,19 @@ namespace Bhp.Network.P2P.Payloads
             json["merkleroot"] = MerkleRoot.ToString();
             json["time"] = Timestamp;
             json["index"] = Index;
+            json["nonce"] = ConsensusData.ToString("x16");
             json["nextconsensus"] = NextConsensus.ToAddress();
-            json["witnesses"] = new JArray(Witness.ToJson());
+            json["script"] = Witness.ToJson();
             return json;
         }
 
-        public void FromJson(JObject json)
-        {
-            Version = (uint)json["version"].AsNumber();
-            PrevHash = UInt256.Parse(json["previousblockhash"].AsString());
-            MerkleRoot = UInt256.Parse(json["merkleroot"].AsString());
-            Timestamp = (uint)json["time"].AsNumber();
-            Index = (uint)json["index"].AsNumber();
-            NextConsensus = json["nextconsensus"].AsString().ToScriptHash();
-            Witness = ((JArray)json["witnesses"]).Select(p => Witness.FromJson(p)).FirstOrDefault();
-        }
-
-        public virtual bool Verify(StoreView snapshot)
+        public virtual bool Verify(Snapshot snapshot)
         {
             Header prev_header = snapshot.GetHeader(PrevHash);
             if (prev_header == null) return false;
             if (prev_header.Index + 1 != Index) return false;
             if (prev_header.Timestamp >= Timestamp) return false;
-            if (!this.VerifyWitnesses(snapshot, 1_00000000)) return false;
+            if (!this.VerifyWitnesses(snapshot)) return false;
             return true;
         }
     }

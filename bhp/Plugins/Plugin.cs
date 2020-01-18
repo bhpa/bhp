@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace Bhp.Plugins
 {
-    public abstract class Plugin : IDisposable
+    public abstract class Plugin
     {
         public static readonly List<Plugin> Plugins = new List<Plugin>();
         private static readonly List<ILogPlugin> Loggers = new List<ILogPlugin>();
@@ -69,6 +69,10 @@ namespace Bhp.Plugins
 
         public abstract void Configure();
 
+        protected virtual void OnPluginsLoaded()
+        {
+        }
+
         private static void ConfigWatcher_Changed(object sender, FileSystemEventArgs e)
         {
             foreach (var plugin in Plugins)
@@ -117,10 +121,6 @@ namespace Bhp.Plugins
         {
             foreach (var plugin in Plugins)
                 plugin.OnPluginsLoaded();
-        }
-
-        protected virtual void OnPluginsLoaded()
-        {
         }
 
         protected void Log(string message, LogLevel level = LogLevel.Info)
@@ -179,10 +179,6 @@ namespace Bhp.Plugins
                 Log(nameof(Plugin), LogLevel.Error, $"Failed to resolve assembly or its dependency: {ex.Message}");
                 return null;
             }
-        }
-
-        public virtual void Dispose()
-        {
         }
     }
 }

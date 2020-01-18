@@ -1,15 +1,15 @@
 ﻿using Bhp.IO;
-using Bhp.Network.P2P.Payloads;
+using Bhp.IO.Json;
 using System.IO;
 
 namespace Bhp.Ledger
 {
-    public class HashIndexState : ICloneable<HashIndexState>, ISerializable
+    public class HashIndexState : StateBase, ICloneable<HashIndexState>
     {
         public UInt256 Hash = UInt256.Zero;
         public uint Index = uint.MaxValue;
 
-        int ISerializable.Size => Hash.Size + sizeof(uint);
+        public override int Size => base.Size + Hash.Size + sizeof(uint);
 
         HashIndexState ICloneable<HashIndexState>.Clone()
         {
@@ -20,8 +20,9 @@ namespace Bhp.Ledger
             };
         }
 
-        void ISerializable.Deserialize(BinaryReader reader)
+        public override void Deserialize(BinaryReader reader)
         {
+            base.Deserialize(reader);
             Hash = reader.ReadSerializable<UInt256>();
             Index = reader.ReadUInt32();
         }
@@ -32,16 +33,19 @@ namespace Bhp.Ledger
             Index = replica.Index;
         }
 
-        void ISerializable.Serialize(BinaryWriter writer)
+        public override void Serialize(BinaryWriter writer)
         {
+            base.Serialize(writer);
             writer.Write(Hash);
             writer.Write(Index);
         }
 
-        internal void Set(BlockBase block)
+        public override JObject ToJson()
         {
-            Hash = block.Hash;
-            Index = block.Index;
+            JObject json = base.ToJson();
+            json["hash"] = Hash.ToString();
+            json["index"] = Index;
+            return json;
         }
     }
 }

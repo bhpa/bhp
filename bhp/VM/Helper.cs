@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VMArray = Bhp.VM.Types.Array;
+using VMBoolean = Bhp.VM.Types.Boolean;
 
 namespace Bhp.VM
 {
@@ -19,13 +20,23 @@ namespace Bhp.VM
             return sb;
         }
 
+        public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, bool useTailCall = false)
+        {
+            return sb.EmitAppCall(scriptHash.ToArray(), useTailCall);
+        }
+
+        public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, params ContractParameter[] parameters)
+        {
+            for (int i = parameters.Length - 1; i >= 0; i--)
+                sb.EmitPush(parameters[i]);
+            return sb.EmitAppCall(scriptHash);
+        }
+
         public static ScriptBuilder EmitAppCall(this ScriptBuilder sb, UInt160 scriptHash, string operation)
         {
-            sb.EmitPush(0);
-            sb.Emit(OpCode.NEWARRAY);
+            sb.EmitPush(false);
             sb.EmitPush(operation);
-            sb.EmitPush(scriptHash);
-            sb.EmitSysCall(InteropService.System_Contract_Call);
+            sb.EmitAppCall(scriptHash);
             return sb;
         }
 
@@ -36,8 +47,7 @@ namespace Bhp.VM
             sb.EmitPush(args.Length);
             sb.Emit(OpCode.PACK);
             sb.EmitPush(operation);
-            sb.EmitPush(scriptHash);
-            sb.EmitSysCall(InteropService.System_Contract_Call);
+            sb.EmitAppCall(scriptHash);
             return sb;
         }
 
@@ -48,8 +58,7 @@ namespace Bhp.VM
             sb.EmitPush(args.Length);
             sb.Emit(OpCode.PACK);
             sb.EmitPush(operation);
-            sb.EmitPush(scriptHash);
-            sb.EmitSysCall(InteropService.System_Contract_Call);
+            sb.EmitAppCall(scriptHash);
             return sb;
         }
 
@@ -148,39 +157,17 @@ namespace Bhp.VM
                 case Enum data:
                     sb.EmitPush(BigInteger.Parse(data.ToString("d")));
                     break;
-                case null:
-                    sb.Emit(OpCode.PUSHNULL);
-                    break;
                 default:
                     throw new ArgumentException();
             }
             return sb;
         }
 
-        public static ScriptBuilder EmitSysCall(this ScriptBuilder sb, uint method, params object[] args)
+        public static ScriptBuilder EmitSysCall(this ScriptBuilder sb, string api, params object[] args)
         {
             for (int i = args.Length - 1; i >= 0; i--)
                 EmitPush(sb, args[i]);
-            return sb.EmitSysCall(method);
-        }
-
-        /// <summary>
-        /// Generate scripts to call a specific method from a specific contract.
-        /// </summary>
-        /// <param name="scriptHash">contract script hash</param>
-        /// <param name="operation">contract operation</param>
-        /// <param name="args">operation arguments</param>
-        /// <returns></returns>
-        public static byte[] MakeScript(this UInt160 scriptHash, string operation, params object[] args)
-        {
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                if (args.Length > 0)
-                    sb.EmitAppCall(scriptHash, operation, args);
-                else
-                    sb.EmitAppCall(scriptHash, operation);
-                return sb.ToArray();
-            }
+            return sb.EmitSysCall(api);
         }
 
         public static ContractParameter ToParameter(this StackItem item)
@@ -217,6 +204,13 @@ namespace Bhp.VM
                         parameter.Value = map.Select(p => new KeyValuePair<ContractParameter, ContractParameter>(ToParameter(p.Key, context), ToParameter(p.Value, context))).ToList();
                     }
                     break;
+                case VMBoolean _:
+                    parameter = new ContractParameter
+                    {
+                        Type = ContractParameterType.Boolean,
+                        Value = item.GetBoolean()
+                    };
+                    break;
                 case ByteArray _:
                     parameter = new ContractParameter
                     {
@@ -237,72 +231,10 @@ namespace Bhp.VM
                         Type = ContractParameterType.InteropInterface
                     };
                     break;
-                default: // Null included
+                default:
                     throw new ArgumentException();
             }
             return parameter;
-        }
-
-        public static StackItem ToStackItem(this ContractParameter parameter)
-        {
-            return ToStackItem(parameter, null);
-        }
-
-        private static StackItem ToStackItem(ContractParameter parameter, List<Tuple<StackItem, ContractParameter>> context)
-        {
-            StackItem stackItem = null;
-            switch (parameter.Type)
-            {
-                case ContractParameterType.Array:
-                    if (context is null)
-                        context = new List<Tuple<StackItem, ContractParameter>>();
-                    else
-                        stackItem = context.FirstOrDefault(p => ReferenceEquals(p.Item2, parameter))?.Item1;
-                    if (stackItem is null)
-                    {
-                        stackItem = ((IList<ContractParameter>)parameter.Value).Select(p => ToStackItem(p, context)).ToList();
-                        context.Add(new Tuple<StackItem, ContractParameter>(stackItem, parameter));
-                    }
-                    break;
-                case ContractParameterType.Map:
-                    if (context is null)
-                        context = new List<Tuple<StackItem, ContractParameter>>();
-                    else
-                        stackItem = context.FirstOrDefault(p => ReferenceEquals(p.Item2, parameter))?.Item1;
-                    if (stackItem is null)
-                    {
-                        stackItem = new Map(((IList<KeyValuePair<ContractParameter, ContractParameter>>)parameter.Value).ToDictionary(p => ToStackItem(p.Key, context), p => ToStackItem(p.Value, context)));
-                        context.Add(new Tuple<StackItem, ContractParameter>(stackItem, parameter));
-                    }
-                    break;
-                case ContractParameterType.Boolean:
-                    stackItem = (bool)parameter.Value;
-                    break;
-                case ContractParameterType.ByteArray:
-                case ContractParameterType.Signature:
-                    stackItem = (byte[])parameter.Value;
-                    break;
-                case ContractParameterType.Integer:
-                    stackItem = (BigInteger)parameter.Value;
-                    break;
-                case ContractParameterType.Hash160:
-                    stackItem = ((UInt160)parameter.Value).ToArray();
-                    break;
-                case ContractParameterType.Hash256:
-                    stackItem = ((UInt256)parameter.Value).ToArray();
-                    break;
-                case ContractParameterType.PublicKey:
-                    stackItem = ((ECPoint)parameter.Value).EncodePoint(true);
-                    break;
-                case ContractParameterType.String:
-                    stackItem = (string)parameter.Value;
-                    break;
-                case ContractParameterType.InteropInterface:
-                    break;
-                default:
-                    throw new ArgumentException($"ContractParameterType({parameter.Type}) is not supported to StackItem.");
-            }
-            return stackItem;
         }
     }
 }

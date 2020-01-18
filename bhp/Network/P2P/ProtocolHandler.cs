@@ -11,6 +11,7 @@ using Bhp.Plugins;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net;
 
@@ -19,103 +20,130 @@ namespace Bhp.Network.P2P
     internal class ProtocolHandler : UntypedActor
     {
         public class SetFilter { public BloomFilter Filter; }
+        internal class Timer { }
+
+        private class PendingKnownHashesCollection : KeyedCollection<UInt256, (UInt256, DateTime)>
+        {
+            protected override UInt256 GetKeyForItem((UInt256, DateTime) item)
+            {
+                return item.Item1;
+            }
+        }
 
         private readonly BhpSystem system;
+        private readonly PendingKnownHashesCollection pendingKnownHashes;
         private readonly FIFOSet<UInt256> knownHashes;
         private readonly FIFOSet<UInt256> sentHashes;
         private VersionPayload version;
         private bool verack = false;
         private BloomFilter bloom_filter;
 
+        private static readonly TimeSpan TimerInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan PendingTimeout = TimeSpan.FromMinutes(1);
+
+        private readonly ICancelable timer = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(TimerInterval, TimerInterval, Context.Self, new Timer(), ActorRefs.NoSender);
+
         public ProtocolHandler(BhpSystem system)
         {
             this.system = system;
+            this.pendingKnownHashes = new PendingKnownHashesCollection();
             this.knownHashes = new FIFOSet<UInt256>(Blockchain.Singleton.MemPool.Capacity * 2);
             this.sentHashes = new FIFOSet<UInt256>(Blockchain.Singleton.MemPool.Capacity * 2);
         }
 
         protected override void OnReceive(object message)
         {
-            if (!(message is Message msg)) return;
+            switch (message)
+            {
+                case Message msg:
+                    OnMessage(msg);
+                    break;
+                case Timer _:
+                    OnTimer();
+                    break;
+            }
+        }
+
+        private void OnMessage(Message msg)
+        {
             foreach (IP2PPlugin plugin in Plugin.P2PPlugins)
                 if (!plugin.OnP2PMessage(msg))
                     return;
             if (version == null)
             {
-                if (msg.Command != MessageCommand.Version)
+                if (msg.Command != "version")
                     throw new ProtocolViolationException();
-                OnVersionMessageReceived((VersionPayload)msg.Payload);
+                OnVersionMessageReceived(msg.GetPayload<VersionPayload>());
                 return;
             }
             if (!verack)
             {
-                if (msg.Command != MessageCommand.Verack)
+                if (msg.Command != "verack")
                     throw new ProtocolViolationException();
                 OnVerackMessageReceived();
                 return;
             }
             switch (msg.Command)
             {
-                case MessageCommand.Addr:
-                    OnAddrMessageReceived((AddrPayload)msg.Payload);
+                case "addr":
+                    OnAddrMessageReceived(msg.GetPayload<AddrPayload>());
                     break;
-                case MessageCommand.Block:
-                    OnInventoryReceived((Block)msg.Payload);
+                case "block":
+                    OnInventoryReceived(msg.GetPayload<Block>());
                     break;
-                case MessageCommand.Consensus:
-                    OnInventoryReceived((ConsensusPayload)msg.Payload);
+                case "consensus":
+                    OnInventoryReceived(msg.GetPayload<ConsensusPayload>());
                     break;
-                case MessageCommand.FilterAdd:
-                    OnFilterAddMessageReceived((FilterAddPayload)msg.Payload);
+                case "filteradd":
+                    OnFilterAddMessageReceived(msg.GetPayload<FilterAddPayload>());
                     break;
-                case MessageCommand.FilterClear:
+                case "filterclear":
                     OnFilterClearMessageReceived();
                     break;
-                case MessageCommand.FilterLoad:
-                    OnFilterLoadMessageReceived((FilterLoadPayload)msg.Payload);
+                case "filterload":
+                    OnFilterLoadMessageReceived(msg.GetPayload<FilterLoadPayload>());
                     break;
-                case MessageCommand.GetAddr:
+                case "getaddr":
                     OnGetAddrMessageReceived();
                     break;
-                case MessageCommand.GetBlocks:
-                    OnGetBlocksMessageReceived((GetBlocksPayload)msg.Payload);
+                case "getblocks":
+                    OnGetBlocksMessageReceived(msg.GetPayload<GetBlocksPayload>());
                     break;
-                case MessageCommand.GetBlockData:
-                    OnGetBlockDataMessageReceived((GetBlockDataPayload)msg.Payload);
+                case "getdata":
+                    OnGetDataMessageReceived(msg.GetPayload<InvPayload>());
                     break;
-                case MessageCommand.GetData:
-                    OnGetDataMessageReceived((InvPayload)msg.Payload);
+                case "getheaders":
+                    OnGetHeadersMessageReceived(msg.GetPayload<GetBlocksPayload>());
                     break;
-                case MessageCommand.GetHeaders:
-                    OnGetHeadersMessageReceived((GetBlocksPayload)msg.Payload);
+                case "headers":
+                    OnHeadersMessageReceived(msg.GetPayload<HeadersPayload>());
                     break;
-                case MessageCommand.Headers:
-                    OnHeadersMessageReceived((HeadersPayload)msg.Payload);
+                case "inv":
+                    OnInvMessageReceived(msg.GetPayload<InvPayload>());
                     break;
-                case MessageCommand.Inv:
-                    OnInvMessageReceived((InvPayload)msg.Payload);
-                    break;
-                case MessageCommand.Mempool:
+                case "mempool":
                     OnMemPoolMessageReceived();
                     break;
-                case MessageCommand.Ping:
-                    OnPingMessageReceived((PingPayload)msg.Payload);
+                case "ping":
+                    OnPingMessageReceived(msg.GetPayload<PingPayload>());
                     break;
-                case MessageCommand.Pong:
-                    OnPongMessageReceived((PingPayload)msg.Payload);
+                case "pong":
+                    OnPongMessageReceived(msg.GetPayload<PingPayload>());
                     break;
-                case MessageCommand.Transaction:
-                    if (msg.Payload.Size <= Transaction.MaxTransactionSize)
-                        OnInventoryReceived((Transaction)msg.Payload);
+                case "tx":
+                    if (msg.Payload.Length <= Transaction.MaxTransactionSize)
+                        OnInventoryReceived(msg.GetTransaction());
                     break;
-                case MessageCommand.Verack:
-                case MessageCommand.Version:
+                case "verack":
+                case "version":
                     throw new ProtocolViolationException();
-                case MessageCommand.Alert:
-                case MessageCommand.MerkleBlock:
-                case MessageCommand.NotFound:
-                case MessageCommand.Reject:
-                default: break;
+                case "alert":
+                case "merkleblock":
+                case "notfound":
+                case "reject":
+                default:
+                    //暂时忽略
+                    break;
             }
         }
 
@@ -123,7 +151,7 @@ namespace Bhp.Network.P2P
         {
             system.LocalNode.Tell(new Peer.Peers
             {
-                EndPoints = payload.AddressList.Select(p => p.EndPoint).Where(p => p.Port > 0)
+                EndPoints = payload.AddressList.Select(p => p.EndPoint)
             });
         }
 
@@ -145,137 +173,98 @@ namespace Bhp.Network.P2P
             Context.Parent.Tell(new SetFilter { Filter = bloom_filter });
         }
 
-        /// <summary>
-        /// Will be triggered when a MessageCommand.GetAddr message is received.
-        /// Randomly select nodes from the local RemoteNodes and tells to RemoteNode actors a MessageCommand.Addr message.
-        /// The message contains a list of networkAddresses from those selected random peers.
-        /// </summary>
         private void OnGetAddrMessageReceived()
         {
             Random rand = new Random();
             IEnumerable<RemoteNode> peers = LocalNode.Singleton.RemoteNodes.Values
-                .Where(p => p.ListenerTcpPort > 0)
+                .Where(p => p.ListenerPort > 0)
                 .GroupBy(p => p.Remote.Address, (k, g) => g.First())
                 .OrderBy(p => rand.Next())
                 .Take(AddrPayload.MaxCountToSend);
-            NetworkAddressWithTime[] networkAddresses = peers.Select(p => NetworkAddressWithTime.Create(p.Listener.Address, p.Version.Timestamp, p.Version.Capabilities)).ToArray();
+            NetworkAddressWithTime[] networkAddresses = peers.Select(p => NetworkAddressWithTime.Create(p.Listener, p.Version.Services, p.Version.Timestamp)).ToArray();
             if (networkAddresses.Length == 0) return;
-            Context.Parent.Tell(Message.Create(MessageCommand.Addr, AddrPayload.Create(networkAddresses)));
+            Context.Parent.Tell(Message.Create("addr", AddrPayload.Create(networkAddresses)));
         }
 
-        /// <summary>
-        /// Will be triggered when a MessageCommand.GetBlocks message is received.
-        /// Tell the specified number of blocks' hashes starting with the requested HashStart until payload.Count or MaxHashesCount
-        /// Responses are sent to RemoteNode actor as MessageCommand.Inv Message.
-        /// </summary>
-        /// <param name="payload">A GetBlocksPayload including start block Hash and number of blocks requested.</param>
         private void OnGetBlocksMessageReceived(GetBlocksPayload payload)
         {
-            UInt256 hash = payload.HashStart;
-            // The default value of payload.Count is -1
-            int count = payload.Count < 0 || payload.Count > InvPayload.MaxHashesCount ? InvPayload.MaxHashesCount : payload.Count;
-            TrimmedBlock state = Blockchain.Singleton.Store.GetBlocks().TryGet(hash);
+            UInt256 hash = payload.HashStart[0];
+            if (hash == payload.HashStop) return;
+            BlockState state = Blockchain.Singleton.Store.GetBlocks().TryGet(hash);
             if (state == null) return;
             List<UInt256> hashes = new List<UInt256>();
-            for (uint i = 1; i <= count; i++)
+            for (uint i = 1; i <= InvPayload.MaxHashesCount; i++)
             {
-                uint index = state.Index + i;
+                uint index = state.TrimmedBlock.Index + i;
                 if (index > Blockchain.Singleton.Height)
                     break;
                 hash = Blockchain.Singleton.GetBlockHash(index);
                 if (hash == null) break;
+                if (hash == payload.HashStop) break;
                 hashes.Add(hash);
             }
             if (hashes.Count == 0) return;
-            Context.Parent.Tell(Message.Create(MessageCommand.Inv, InvPayload.Create(InventoryType.Block, hashes.ToArray())));
+            Context.Parent.Tell(Message.Create("inv", InvPayload.Create(InventoryType.Block, hashes.ToArray())));
         }
 
-        private void OnGetBlockDataMessageReceived(GetBlockDataPayload payload)
-        {
-            for (uint i = payload.IndexStart, max = payload.IndexStart + payload.Count; i < max; i++)
-            {
-                Block block = Blockchain.Singleton.Store.GetBlock(i);
-                if (block == null)
-                    break;
-
-                if (bloom_filter == null)
-                {
-                    Context.Parent.Tell(Message.Create(MessageCommand.Block, block));
-                }
-                else
-                {
-                    BitArray flags = new BitArray(block.Transactions.Select(p => bloom_filter.Test(p)).ToArray());
-                    Context.Parent.Tell(Message.Create(MessageCommand.MerkleBlock, MerkleBlockPayload.Create(block, flags)));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Will be triggered when a MessageCommand.GetData message is received.
-        /// The payload includes an array of hash values.
-        /// For different payload.Type (Tx, Block, Consensus), get the corresponding (Txs, Blocks, Consensus) and tell them to RemoteNode actor.
-        /// </summary>
-        /// <param name="payload">The payload containing the requested information.</param>
         private void OnGetDataMessageReceived(InvPayload payload)
         {
             UInt256[] hashes = payload.Hashes.Where(p => sentHashes.Add(p)).ToArray();
             foreach (UInt256 hash in hashes)
             {
+                Blockchain.Singleton.RelayCache.TryGet(hash, out IInventory inventory);
                 switch (payload.Type)
                 {
                     case InventoryType.TX:
-                        Transaction tx = Blockchain.Singleton.GetTransaction(hash);
-                        if (tx != null)
-                            Context.Parent.Tell(Message.Create(MessageCommand.Transaction, tx));
+                        if (inventory == null)
+                            inventory = Blockchain.Singleton.GetTransaction(hash);
+                        if (inventory is Transaction)
+                            Context.Parent.Tell(Message.Create("tx", inventory));
                         break;
                     case InventoryType.Block:
-                        Block block = Blockchain.Singleton.GetBlock(hash);
-                        if (block != null)
+                        if (inventory == null)
+                            inventory = Blockchain.Singleton.GetBlock(hash);
+                        if (inventory is Block block)
                         {
                             if (bloom_filter == null)
                             {
-                                Context.Parent.Tell(Message.Create(MessageCommand.Block, block));
+                                Context.Parent.Tell(Message.Create("block", inventory));
                             }
                             else
                             {
                                 BitArray flags = new BitArray(block.Transactions.Select(p => bloom_filter.Test(p)).ToArray());
-                                Context.Parent.Tell(Message.Create(MessageCommand.MerkleBlock, MerkleBlockPayload.Create(block, flags)));
+                                Context.Parent.Tell(Message.Create("merkleblock", MerkleBlockPayload.Create(block, flags)));
                             }
                         }
                         break;
                     case InventoryType.Consensus:
-                        if (Blockchain.Singleton.ConsensusRelayCache.TryGet(hash, out IInventory inventoryConsensus))
-                            Context.Parent.Tell(Message.Create(MessageCommand.Consensus, inventoryConsensus));
+                        if (inventory != null)
+                            Context.Parent.Tell(Message.Create("consensus", inventory));
                         break;
                 }
             }
         }
 
-        /// <summary>
-        /// Will be triggered when a MessageCommand.GetHeaders message is received.
-        /// Tell the specified number of blocks' headers starting with the requested HashStart to RemoteNode actor.
-        /// A limit set by HeadersPayload.MaxHeadersCount is also applied to the number of requested Headers, namely payload.Count.
-        /// </summary>
-        /// <param name="payload">A GetBlocksPayload including start block Hash and number of blocks' headers requested.</param>
         private void OnGetHeadersMessageReceived(GetBlocksPayload payload)
         {
-            UInt256 hash = payload.HashStart;
-            int count = payload.Count < 0 || payload.Count > HeadersPayload.MaxHeadersCount ? HeadersPayload.MaxHeadersCount : payload.Count;
-            DataCache<UInt256, TrimmedBlock> cache = Blockchain.Singleton.Store.GetBlocks();
-            TrimmedBlock state = cache.TryGet(hash);
+            UInt256 hash = payload.HashStart[0];
+            if (hash == payload.HashStop) return;
+            DataCache<UInt256, BlockState> cache = Blockchain.Singleton.Store.GetBlocks();
+            BlockState state = cache.TryGet(hash);
             if (state == null) return;
             List<Header> headers = new List<Header>();
-            for (uint i = 1; i <= count; i++)
+            for (uint i = 1; i <= HeadersPayload.MaxHeadersCount; i++)
             {
-                uint index = state.Index + i;
+                uint index = state.TrimmedBlock.Index + i;
                 hash = Blockchain.Singleton.GetBlockHash(index);
                 if (hash == null) break;
-                Header header = cache.TryGet(hash)?.Header;
+                if (hash == payload.HashStop) break;
+                Header header = cache.TryGet(hash)?.TrimmedBlock.Header;
                 if (header == null) break;
                 headers.Add(header);
             }
             if (headers.Count == 0) return;
-            Context.Parent.Tell(Message.Create(MessageCommand.Headers, HeadersPayload.Create(headers)));
+            Context.Parent.Tell(Message.Create("headers", HeadersPayload.Create(headers)));
         }
 
         private void OnHeadersMessageReceived(HeadersPayload payload)
@@ -289,37 +278,41 @@ namespace Bhp.Network.P2P
             system.TaskManager.Tell(new TaskManager.TaskCompleted { Hash = inventory.Hash }, Context.Parent);
             if (inventory is MinerTransaction) return;
             system.LocalNode.Tell(new LocalNode.Relay { Inventory = inventory });
+            pendingKnownHashes.Remove(inventory.Hash);
+            knownHashes.Add(inventory.Hash);
         }
 
         private void OnInvMessageReceived(InvPayload payload)
         {
-            UInt256[] hashes = payload.Hashes.Where(p => knownHashes.Add(p) && !sentHashes.Contains(p)).ToArray();
+            UInt256[] hashes = payload.Hashes.Where(p => !pendingKnownHashes.Contains(p) && !knownHashes.Contains(p) && !sentHashes.Contains(p)).ToArray();
             if (hashes.Length == 0) return;
             switch (payload.Type)
             {
                 case InventoryType.Block:
-                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
                         hashes = hashes.Where(p => !snapshot.ContainsBlock(p)).ToArray();
                     break;
                 case InventoryType.TX:
-                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
                         hashes = hashes.Where(p => !snapshot.ContainsTransaction(p)).ToArray();
                     break;
             }
             if (hashes.Length == 0) return;
+            foreach (UInt256 hash in hashes)
+                pendingKnownHashes.Add((hash, DateTime.UtcNow));
             system.TaskManager.Tell(new TaskManager.NewTasks { Payload = InvPayload.Create(payload.Type, hashes) }, Context.Parent);
         }
 
         private void OnMemPoolMessageReceived()
         {
             foreach (InvPayload payload in InvPayload.CreateGroup(InventoryType.TX, Blockchain.Singleton.MemPool.GetVerifiedTransactions().Select(p => p.Hash).ToArray()))
-                Context.Parent.Tell(Message.Create(MessageCommand.Inv, payload));
+                Context.Parent.Tell(Message.Create("inv", payload));
         }
 
         private void OnPingMessageReceived(PingPayload payload)
         {
             Context.Parent.Tell(payload);
-            Context.Parent.Tell(Message.Create(MessageCommand.Pong, PingPayload.Create(Blockchain.Singleton.Height, payload.Nonce)));
+            Context.Parent.Tell(Message.Create("pong", PingPayload.Create(Blockchain.Singleton.Height, payload.Nonce)));
         }
 
         private void OnPongMessageReceived(PingPayload payload)
@@ -330,13 +323,35 @@ namespace Bhp.Network.P2P
         private void OnVerackMessageReceived()
         {
             verack = true;
-            Context.Parent.Tell(MessageCommand.Verack);
+            Context.Parent.Tell("verack");
         }
 
         private void OnVersionMessageReceived(VersionPayload payload)
         {
             version = payload;
             Context.Parent.Tell(payload);
+        }
+
+        private void OnTimer()
+        {
+            RefreshPendingKnownHashes();
+        }
+
+        protected override void PostStop()
+        {
+            timer.CancelIfNotNull();
+            base.PostStop();
+        }
+
+        private void RefreshPendingKnownHashes()
+        {
+            while (pendingKnownHashes.Count > 0)
+            {
+                var (_, time) = pendingKnownHashes[0];
+                if (DateTime.UtcNow - time <= PendingTimeout)
+                    break;
+                pendingKnownHashes.RemoveAt(0);
+            }
         }
 
         public static Props Props(BhpSystem system)
@@ -347,38 +362,40 @@ namespace Bhp.Network.P2P
 
     internal class ProtocolHandlerMailbox : PriorityMailbox
     {
-        public ProtocolHandlerMailbox(Settings settings, Config config)
-           : base(settings, config)
+        public ProtocolHandlerMailbox(Akka.Actor.Settings settings, Config config)
+            : base(settings, config)
         {
         }
 
-        protected override bool IsHighPriority(object message)
+        internal protected override bool IsHighPriority(object message)
         {
-            if (!(message is Message msg)) return true;
+            if (!(message is Message msg)) return false;
             switch (msg.Command)
             {
-                case MessageCommand.Consensus:
-                case MessageCommand.FilterAdd:
-                case MessageCommand.FilterClear:
-                case MessageCommand.FilterLoad:
-                case MessageCommand.Verack:
-                case MessageCommand.Version:
-                case MessageCommand.Alert:
+                case "consensus":
+                case "filteradd":
+                case "filterclear":
+                case "filterload":
+                case "verack":
+                case "version":
+                case "alert":
                     return true;
                 default:
                     return false;
             }
         }
 
-        protected override bool ShallDrop(object message, IEnumerable queue)
+        internal protected override bool ShallDrop(object message, IEnumerable queue)
         {
-            if (!(message is Message msg)) return false;
+            if (message is ProtocolHandler.Timer) return false;
+            if (!(message is Message msg)) return true;
             switch (msg.Command)
             {
-                case MessageCommand.GetAddr:
-                case MessageCommand.GetBlocks:
-                case MessageCommand.GetHeaders:
-                case MessageCommand.Mempool:
+                case "getaddr":
+                case "getblocks":
+                case "getdata":
+                case "getheaders":
+                case "mempool":
                     return queue.OfType<Message>().Any(p => p.Command == msg.Command);
                 default:
                     return false;
