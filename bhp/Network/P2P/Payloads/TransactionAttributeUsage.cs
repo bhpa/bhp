@@ -7,7 +7,8 @@
         ECDH02 = 0x02,
         ECDH03 = 0x03,
 
-        Cosigner = 0x20,
+        Script = 0x20,
+
         Vote = 0x30,
 
         DescriptionUrl = 0x81,

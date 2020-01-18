@@ -7,7 +7,7 @@ namespace Bhp.IO.Caching
         where TKey : IEquatable<TKey>, ISerializable
         where TValue : class, ICloneable<TValue>, ISerializable, new()
     {
-        private readonly DataCache<TKey, TValue> innerCache;
+        private DataCache<TKey, TValue> innerCache;
 
         public CloneCache(DataCache<TKey, TValue> innerCache)
         {
@@ -19,7 +19,7 @@ namespace Bhp.IO.Caching
             innerCache.Add(key, value);
         }
 
-        protected override void DeleteInternal(TKey key)
+        public override void DeleteInternal(TKey key)
         {
             innerCache.Delete(key);
         }

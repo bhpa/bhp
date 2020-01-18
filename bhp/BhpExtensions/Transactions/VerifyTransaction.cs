@@ -3,9 +3,11 @@ using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.SmartContract;
+using Bhp.VM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Bhp.BhpExtensions.Transactions
 {
@@ -17,7 +19,7 @@ namespace Bhp.BhpExtensions.Transactions
         /// <param name="persistence"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static string IsDoubleSpend(StoreView snapshot, Transaction tx)
+        public static string IsDoubleSpend(Snapshot snapshot, Transaction tx)
         {
             if (tx.Inputs.Length == 0) return "Input is empty.";
             foreach (var group in tx.Inputs.GroupBy(p => p.PrevHash))
@@ -36,10 +38,10 @@ namespace Bhp.BhpExtensions.Transactions
         /// <param name="snapshot"></param>
         /// <param name="mempool"></param>
         /// <returns></returns>
-        public static string Verify(StoreView snapshot, IEnumerable<Transaction> mempool,
+        public static string Verify(Snapshot snapshot, IEnumerable<Transaction> mempool,
              Transaction tx)
         {
-            if (tx.Size > Transaction.MaxTransactionSize) return "The size of the free transaction must be less than 102400 bytes";
+            if (tx.Size > Transaction.MaxTransactionSize) return "The data is too long.";
             for (int i = 1; i < tx.Inputs.Length; i++)
                 for (int j = 0; j < i; j++)
                     if (tx.Inputs[i].PrevHash == tx.Inputs[j].PrevHash
@@ -90,13 +92,15 @@ namespace Bhp.BhpExtensions.Transactions
                     if (VerifyMiningTransaction.Verify(tx.Outputs, tx.Attributes) == false)
                         return "MinerTransaction is invalid.";
                     break;
-                /*
                 //case TransactionType.MinerTransaction:
                 case TransactionType.ClaimTransaction:
                     if (results_issue.Any(p => p.AssetId != Blockchain.UtilityToken.Hash))
                         return "ClaimTransaction is invalid.";
                     break;
-                */
+                case TransactionType.IssueTransaction:
+                    if (results_issue.Any(p => p.AssetId == Blockchain.UtilityToken.Hash))
+                        return "IssueTransaction is invalid.";
+                    break;
                 default:
                     if (results_issue.Length > 0)
                         return "Transaction input is not equal to output.";
@@ -104,21 +108,26 @@ namespace Bhp.BhpExtensions.Transactions
             }
             if (tx.Attributes.Count(p => p.Usage == TransactionAttributeUsage.ECDH02 || p.Usage == TransactionAttributeUsage.ECDH03) > 1)
                 return "ECDH02 and ECDH03 too much.";
-            if (tx.VerifyWitnesses(snapshot, 1_00000000) == false) return "Verify Witnesses is failure.";
+            if (tx.VerifyWitnesses(snapshot) == false) return "Verify Witnesses is failure.";
             return "success";
         }
 
         //By BHP
         public static string Verify(Transaction tx, TransactionResult[] results_destroy, Fixed8 SystemFee)
         {
-            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
-                Fixed8 otherInput = Fixed8.Zero;
-                otherInput = tx.References.Values.Where(p => p.AssetId != Blockchain.UtilityToken.Hash).Sum(p => p.Value);
-                //输入存在不是gas的资产
-                if (otherInput == Fixed8.Zero)
+                Fixed8 BHPsum = Fixed8.Zero;
+                BHPsum = tx.References.Values.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(k => k.Value);//所有BHP输入的和
+
+                if (BHPsum == Fixed8.Zero)//交易中不存在BHP转账
                 {
+                    if (ExtensionSettings.Default.WalletConfig.IsBhpFee)
+                    {
+                        if (tx.Outputs.Any(p => p.AssetId != Blockchain.GoverningToken.Hash && p.AssetId != Blockchain.UtilityToken.Hash))//except bhp and gas
+                            return "TxFee is not enough!";
+                    }
+
                     if (results_destroy.Length == 0) return "success";
                     if (results_destroy.Length == 1 && results_destroy[0].AssetId != Blockchain.UtilityToken.Hash) return "Transaction is error";
                     if (results_destroy.Length > 1) return "Transaction is error";
@@ -128,7 +137,7 @@ namespace Bhp.BhpExtensions.Transactions
 
                     return "success";
                 }
-                else
+                else //存在BHP转账
                 {
                     if (results_destroy.Length == 0)
                     {
@@ -149,7 +158,6 @@ namespace Bhp.BhpExtensions.Transactions
                 }
             }
             else
-            */
             {
                 if (results_destroy.Length > 1) return "Transaction input is not equal to output!";
                 if (results_destroy.Length == 1 && results_destroy[0].AssetId != Blockchain.UtilityToken.Hash)

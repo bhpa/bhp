@@ -1,6 +1,5 @@
 ﻿using Bhp.IO.Json;
 using Bhp.SmartContract;
-using System;
 using System.Linq;
 
 namespace Bhp.Wallets.BRC6
@@ -15,8 +14,8 @@ namespace Bhp.Wallets.BRC6
             if (json == null) return null;
             return new BRC6Contract
             {
-                Script = Convert.FromBase64String(json["script"].AsString()),
-                ParameterList = ((JArray)json["parameters"]).Select(p => p["type"].TryGetEnum<ContractParameterType>()).ToArray(),
+                Script = json["script"].AsString().HexToBytes(),
+                ParameterList = ((JArray)json["parameters"]).Select(p => p["type"].AsEnum<ContractParameterType>()).ToArray(),
                 ParameterNames = ((JArray)json["parameters"]).Select(p => p["name"].AsString()).ToArray(),
                 Deployed = json["deployed"].AsBoolean()
             };
@@ -25,7 +24,7 @@ namespace Bhp.Wallets.BRC6
         public JObject ToJson()
         {
             JObject contract = new JObject();
-            contract["script"] = Convert.ToBase64String(Script);
+            contract["script"] = Script.ToHexString();
             contract["parameters"] = new JArray(ParameterList.Zip(ParameterNames, (type, name) =>
             {
                 JObject parameter = new JObject();

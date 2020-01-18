@@ -59,14 +59,14 @@ namespace Bhp.SmartContract
         {
             ContractParameter parameter = new ContractParameter
             {
-                Type = json["type"].TryGetEnum<ContractParameterType>()
+                Type = json["type"].AsEnum<ContractParameterType>()
             };
             if (json["value"] != null)
                 switch (parameter.Type)
                 {
                     case ContractParameterType.Signature:
                     case ContractParameterType.ByteArray:
-                        parameter.Value = Convert.FromBase64String(json["value"].AsString());
+                        parameter.Value = json["value"].AsString().HexToBytes();
                         break;
                     case ContractParameterType.Boolean:
                         parameter.Value = json["value"].AsBoolean();
@@ -147,7 +147,7 @@ namespace Bhp.SmartContract
                 {
                     case ContractParameterType.Signature:
                     case ContractParameterType.ByteArray:
-                        json["value"] = Convert.ToBase64String((byte[])parameter.Value);
+                        json["value"] = ((byte[])parameter.Value).ToHexString();
                         break;
                     case ContractParameterType.Boolean:
                         json["value"] = (bool)parameter.Value;

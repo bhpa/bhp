@@ -1,5 +1,4 @@
-﻿using Bhp.IO.Json;
-using Bhp.Ledger;
+﻿using Bhp.Ledger;
 using System;
 using System.IO;
 
@@ -46,19 +45,12 @@ namespace Bhp.Network.P2P.Payloads
                 PrevHash = PrevHash,
                 MerkleRoot = MerkleRoot,
                 Timestamp = Timestamp,
-                Index = Index,                
+                Index = Index,
+                ConsensusData = ConsensusData,
                 NextConsensus = NextConsensus,
                 Witness = Witness,
                 Hashes = new UInt256[0]
             };
-        }
-
-        public new static Header FromJson(JObject json)
-        {
-            Header header = new Header();
-            BlockBase blockBase = header;
-            blockBase.FromJson(json);
-            return header;
         }
     }
 }

@@ -33,12 +33,12 @@ namespace Bhp.SmartContract
             {
                 return new ContextItem
                 {
-                    Script = Convert.FromBase64String(json["script"]?.AsString()),
+                    Script = json["script"]?.AsString().HexToBytes(),
                     Parameters = ((JArray)json["parameters"]).Select(p => ContractParameter.FromJson(p)).ToArray(),
                     Signatures = json["signatures"]?.Properties.Select(p => new
                     {
-                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256r1),
-                        Signature = Convert.FromBase64String(p.Value.AsString())
+                        PublicKey = ECPoint.Parse(p.Key, ECCurve.Secp256),
+                        Signature = p.Value.AsString().HexToBytes()
                     }).ToDictionary(p => p.PublicKey, p => p.Signature)
                 };
             }
@@ -47,13 +47,13 @@ namespace Bhp.SmartContract
             {
                 JObject json = new JObject();
                 if (Script != null)
-                    json["script"] = Convert.ToBase64String(Script);
+                    json["script"] = Script.ToHexString();
                 json["parameters"] = new JArray(Parameters.Select(p => p.ToJson()));
                 if (Signatures != null)
                 {
                     json["signatures"] = new JObject();
                     foreach (var signature in Signatures)
-                        json["signatures"][signature.Key.ToString()] = Convert.ToBase64String(signature.Value);
+                        json["signatures"][signature.Key.ToString()] = signature.Value.ToHexString();
                 }
                 return json;
             }
@@ -72,32 +72,16 @@ namespace Bhp.SmartContract
             }
         }
 
-        /// <summary>
-        /// Cache for public ScriptHashes field
-        /// </summary>
         private UInt160[] _ScriptHashes = null;
-        /// <summary>
-        /// ScriptHashes are the verifiable ScriptHashes from Verifiable element
-        /// Equivalent to: Verifiable.GetScriptHashesForVerifying(Blockchain.Singleton.GetSnapshot())
-        /// </summary>
         public IReadOnlyList<UInt160> ScriptHashes
         {
             get
             {
                 if (_ScriptHashes == null)
-                {
-                    // snapshot is not necessary for Transaction
-                    if (Verifiable is Transaction)
-                    {
-                        _ScriptHashes = Verifiable.GetScriptHashesForVerifying(null);
-                        return _ScriptHashes;
-                    }
-
-                    using (StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+                    using (Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
                     {
                         _ScriptHashes = Verifiable.GetScriptHashesForVerifying(snapshot);
                     }
-                }
                 return _ScriptHashes;
             }
         }
@@ -116,20 +100,9 @@ namespace Bhp.SmartContract
             return true;
         }
 
-        public bool Add(Contract contract, params object[] parameters)
-        {
-            ContextItem item = CreateItem(contract);
-            if (item == null) return false;
-            for (int index = 0; index < parameters.Length; index++)
-            {
-                item.Parameters[index].Value = parameters[index];
-            }
-            return true;
-        }
-
         public bool AddSignature(Contract contract, ECPoint pubkey, byte[] signature)
         {
-            if (contract.Script.IsMultiSigContract(out _, out _))
+            if (contract.Script.IsMultiSigContract())
             {
                 ContextItem item = CreateItem(contract);
                 if (item == null) return false;
@@ -210,11 +183,9 @@ namespace Bhp.SmartContract
 
         public static ContractParametersContext FromJson(JObject json)
         {
-            var type = typeof(ContractParametersContext).GetTypeInfo().Assembly.GetType(json["type"].AsString());
-            if (!typeof(IVerifiable).IsAssignableFrom(type)) throw new FormatException();
-
-            var verifiable = (IVerifiable)Activator.CreateInstance(type);
-            using (MemoryStream ms = new MemoryStream(Convert.FromBase64String(json["hex"].AsString()), false))
+            IVerifiable verifiable = typeof(ContractParametersContext).GetTypeInfo().Assembly.CreateInstance(json["type"].AsString()) as IVerifiable;
+            if (verifiable == null) throw new FormatException();
+            using (MemoryStream ms = new MemoryStream(json["hex"].AsString().HexToBytes(), false))
             using (BinaryReader reader = new BinaryReader(ms, Encoding.UTF8))
             {
                 verifiable.DeserializeUnsigned(reader);
@@ -237,13 +208,6 @@ namespace Bhp.SmartContract
             if (!ContextItems.TryGetValue(scriptHash, out ContextItem item))
                 return null;
             return item.Parameters;
-        }
-
-        public byte[] GetScript(UInt160 scriptHash)
-        {
-            if (!ContextItems.TryGetValue(scriptHash, out ContextItem item))
-                return null;
-            return item.Script;
         }
 
         public Witness[] GetWitnesses()
@@ -283,7 +247,7 @@ namespace Bhp.SmartContract
             {
                 Verifiable.SerializeUnsigned(writer);
                 writer.Flush();
-                json["hex"] = Convert.ToBase64String(ms.ToArray());
+                json["hex"] = ms.ToArray().ToHexString();
             }
             json["items"] = new JObject();
             foreach (var item in ContextItems)

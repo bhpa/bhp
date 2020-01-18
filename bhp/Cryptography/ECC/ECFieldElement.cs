@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 
@@ -44,7 +45,9 @@ namespace Bhp.Cryptography.ECC
         private static BigInteger[] FastLucasSequence(BigInteger p, BigInteger P, BigInteger Q, BigInteger k)
         {
             int n = k.GetBitLength();
-            int s = k.GetLowestSetBit();            
+            int s = k.GetLowestSetBit();
+
+            Debug.Assert(k.TestBit(s));
 
             BigInteger Uh = 1;
             BigInteger Vl = 2;
@@ -128,6 +131,7 @@ namespace Bhp.Cryptography.ECC
                         V += curve.Q;
                     }
                     V >>= 1;
+                    Debug.Assert((V * V).Mod(curve.Q) == Value);
                     return new ECFieldElement(V, curve);
                 }
             }

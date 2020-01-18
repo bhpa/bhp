@@ -3,12 +3,12 @@ using System.IO;
 
 namespace Bhp.Ledger
 {
-    public class StorageItem : ICloneable<StorageItem>, ISerializable
+    public class StorageItem : StateBase, ICloneable<StorageItem>
     {
         public byte[] Value;
         public bool IsConstant;
 
-        public int Size => Value.GetVarSize() + sizeof(bool);
+        public override int Size => base.Size + Value.GetVarSize() + sizeof(bool);
 
         StorageItem ICloneable<StorageItem>.Clone()
         {
@@ -19,8 +19,9 @@ namespace Bhp.Ledger
             };
         }
 
-        public void Deserialize(BinaryReader reader)
+        public override void Deserialize(BinaryReader reader)
         {
+            base.Deserialize(reader);
             Value = reader.ReadVarBytes();
             IsConstant = reader.ReadBoolean();
         }
@@ -31,8 +32,9 @@ namespace Bhp.Ledger
             IsConstant = replica.IsConstant;
         }
 
-        public void Serialize(BinaryWriter writer)
+        public override void Serialize(BinaryWriter writer)
         {
+            base.Serialize(writer);
             writer.WriteVarBytes(Value);
             writer.Write(IsConstant);
         }

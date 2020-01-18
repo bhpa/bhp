@@ -8,14 +8,14 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class MinerTransaction : Transaction
     {
-        public new uint Nonce;
+        public uint Nonce;
 
-        public new Fixed8 NetworkFee => Fixed8.Zero;
+        public override Fixed8 NetworkFee => Fixed8.Zero;
 
-        public new int Size => base.Size + sizeof(uint);
+        public override int Size => base.Size + sizeof(uint);
 
         public MinerTransaction()
-            : base()
+            : base(TransactionType.MinerTransaction)
         {
         }
 

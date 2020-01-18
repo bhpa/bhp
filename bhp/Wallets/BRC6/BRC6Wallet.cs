@@ -42,7 +42,11 @@ namespace Bhp.Wallets.BRC6
                 {
                     wallet = JObject.Parse(reader);
                 }
-                LoadFromJson(wallet, out Scrypt, out accounts, out extra);
+                this.name = wallet["name"]?.AsString();
+                this.version = Version.Parse(wallet["version"].AsString());
+                this.Scrypt = ScryptParameters.FromJson(wallet["scrypt"]);
+                this.accounts = ((JArray)wallet["accounts"]).Select(p => BRC6Account.FromJson(p, this)).ToDictionary(p => p.ScriptHash);
+                this.extra = wallet["extra"];
                 indexer.RegisterAccounts(accounts.Keys);
             }
             else
@@ -54,21 +58,6 @@ namespace Bhp.Wallets.BRC6
                 this.extra = JObject.Null;
             }
             indexer.WalletTransaction += WalletIndexer_WalletTransaction;
-        }
-
-        public BRC6Wallet(JObject wallet)
-        {
-            this.path = "";
-            LoadFromJson(wallet, out Scrypt, out accounts, out extra);
-        }
-
-        private void LoadFromJson(JObject wallet, out ScryptParameters scrypt, out Dictionary<UInt160, BRC6Account> accounts, out JObject extra)
-        {
-            this.name = wallet["name"]?.AsString();
-            this.version = Version.Parse(wallet["version"].AsString());
-            scrypt = ScryptParameters.FromJson(wallet["scrypt"]);
-            accounts = ((JArray)wallet["accounts"]).Select(p => BRC6Account.FromJson(p, this)).ToDictionary(p => p.ScriptHash);
-            extra = wallet["extra"];
         }
 
         private void AddAccount(BRC6Account account, bool is_import)
@@ -103,7 +92,22 @@ namespace Bhp.Wallets.BRC6
                 accounts[account.ScriptHash] = account;
             }
         }
-        
+
+        public override void ApplyTransaction(Transaction tx)
+        {
+            lock (unconfirmed)
+            {
+                unconfirmed[tx.Hash] = tx;
+            }
+            WalletTransaction?.Invoke(this, new WalletTransactionEventArgs
+            {
+                Transaction = tx,
+                RelatedAccounts = tx.Witnesses.Select(p => p.ScriptHash).Union(tx.Outputs.Select(p => p.ScriptHash)).Where(p => Contains(p)).ToArray(),
+                Height = null,
+                Time = DateTime.UtcNow.ToTimestamp()
+            });
+        }
+
         public override bool Contains(UInt160 scriptHash)
         {
             lock (accounts)
@@ -215,11 +219,12 @@ namespace Bhp.Wallets.BRC6
                 return GetCoinsInternal();
             IEnumerable<Coin> GetCoinsInternal()
             {
-                HashSet<CoinReference> inputs;
+                HashSet<CoinReference> inputs, claims;
                 Coin[] coins_unconfirmed;
                 lock (unconfirmed)
                 {
                     inputs = new HashSet<CoinReference>(unconfirmed.Values.SelectMany(p => p.Inputs));
+                    claims = new HashSet<CoinReference>(unconfirmed.Values.OfType<ClaimTransaction>().SelectMany(p => p.Claims));
                     coins_unconfirmed = unconfirmed.Values.Select(tx => tx.Outputs.Select((o, i) => new Coin
                     {
                         Reference = new CoinReference
@@ -242,6 +247,10 @@ namespace Bhp.Wallets.BRC6
                                 Output = coin.Output,
                                 State = coin.State | CoinState.Spent
                             };
+                        continue;
+                    }
+                    else if (claims.Contains(coin.Reference))
+                    {
                         continue;
                     }
                     yield return coin;
@@ -306,9 +315,9 @@ namespace Bhp.Wallets.BRC6
             return account;
         }
 
-        public override WalletAccount Import(string brc2, string passphrase, int N = 16384, int r = 8, int p = 8)
+        public override WalletAccount Import(string brc2, string passphrase)
         {
-            KeyPair key = new KeyPair(GetPrivateKeyFromBRC2(brc2, passphrase, N, r, p));
+            KeyPair key = new KeyPair(GetPrivateKeyFromBRC2(brc2, passphrase));
             BRC6Contract contract = new BRC6Contract
             {
                 Script = Contract.CreateSignatureRedeemScript(key.PublicKey),

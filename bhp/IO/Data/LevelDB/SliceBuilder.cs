@@ -38,22 +38,19 @@ namespace Bhp.IO.Data.LevelDB
 
         public SliceBuilder Add(IEnumerable<byte> value)
         {
-            if (value != null)
-                data.AddRange(value);
+            data.AddRange(value);
             return this;
         }
 
         public SliceBuilder Add(string value)
         {
-            if (value != null)
-                data.AddRange(Encoding.UTF8.GetBytes(value));
+            data.AddRange(Encoding.UTF8.GetBytes(value));
             return this;
         }
 
         public SliceBuilder Add(ISerializable value)
         {
-            if (value != null)
-                data.AddRange(value.ToArray());
+            data.AddRange(value.ToArray());
             return this;
         }
 

@@ -2,14 +2,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace Bhp.IO.Json
 {
     public class JArray : JObject, IList<JObject>
     {
-        private readonly List<JObject> items = new List<JObject>();
+        private List<JObject> items = new List<JObject>();
 
         public JArray(params JObject[] items) : this((IEnumerable<JObject>)items)
         {
@@ -53,11 +52,6 @@ namespace Bhp.IO.Json
             items.Add(item);
         }
 
-        public override string AsString()
-        {
-            return string.Join(VALUE_SEPARATOR.ToString(), items.Select(p => p?.AsString()));
-        }
-
         public void Clear()
         {
             items.Clear();
@@ -94,28 +88,20 @@ namespace Bhp.IO.Json
         }
 
         internal new static JArray Parse(TextReader reader, int max_nest)
-        {           
+        {
+            if (max_nest < 0) throw new FormatException();
             SkipSpace(reader);
-            if (reader.Read() != BEGIN_ARRAY) throw new FormatException();
+            if (reader.Read() != '[') throw new FormatException();
+            SkipSpace(reader);
             JArray array = new JArray();
-            SkipSpace(reader);
-            if (reader.Peek() != END_ARRAY)
+            while (reader.Peek() != ']')
             {
-                while (true)
-                {
-                    JObject obj = JObject.Parse(reader, max_nest - 1);
-                    array.items.Add(obj);
-                    SkipSpace(reader);
-                    char nextchar = (char)reader.Read();
-                    if (nextchar == VALUE_SEPARATOR) continue;
-                    if (nextchar == END_ARRAY) break;
-                    throw new FormatException();
-                }
+                if (reader.Peek() == ',') reader.Read();
+                JObject obj = JObject.Parse(reader, max_nest - 1);
+                array.items.Add(obj);
+                SkipSpace(reader);
             }
-            else
-            {
-                reader.Read();
-            }
+            reader.Read();
             return array;
         }
 
@@ -132,22 +118,22 @@ namespace Bhp.IO.Json
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append(BEGIN_ARRAY);
+            sb.Append('[');
             foreach (JObject item in items)
             {
                 if (item == null)
-                    sb.Append(LITERAL_NULL);
+                    sb.Append("null");
                 else
                     sb.Append(item);
-                sb.Append(VALUE_SEPARATOR);
+                sb.Append(',');
             }
             if (items.Count == 0)
             {
-                sb.Append(END_ARRAY);
+                sb.Append(']');
             }
             else
             {
-                sb[sb.Length - 1] = END_ARRAY;
+                sb[sb.Length - 1] = ']';
             }
             return sb.ToString();
         }

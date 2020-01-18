@@ -1,21 +1,27 @@
 ﻿using Bhp.IO;
 using Bhp.IO.Json;
 using Bhp.SmartContract;
-using Bhp.SmartContract.Manifest;
-using Bhp.VM;
-using Bhp.VM.Types;
-using System;
 using System.IO;
+using System.Linq;
 
 namespace Bhp.Ledger
 {
-    public class ContractState : ICloneable<ContractState>, ISerializable, IInteroperable
+    public class ContractState : StateBase, ICloneable<ContractState>
     {
         public byte[] Script;
-        public ContractManifest Manifest;
+        public ContractParameterType[] ParameterList;
+        public ContractParameterType ReturnType;
+        public ContractPropertyState ContractProperties;
+        public string Name;
+        public string CodeVersion;
+        public string Author;
+        public string Email;
+        public string Description;
 
-        public bool HasStorage => Manifest.Features.HasFlag(ContractFeatures.HasStorage);
-        public bool Payable => Manifest.Features.HasFlag(ContractFeatures.Payable);
+
+        public bool HasStorage => ContractProperties.HasFlag(ContractPropertyState.HasStorage);
+        public bool HasDynamicInvoke => ContractProperties.HasFlag(ContractPropertyState.HasDynamicInvoke);
+        public bool Payable => ContractProperties.HasFlag(ContractPropertyState.Payable);
 
         private UInt160 _scriptHash;
         public UInt160 ScriptHash
@@ -30,63 +36,81 @@ namespace Bhp.Ledger
             }
         }
 
-        int ISerializable.Size => Script.GetVarSize() + Manifest.ToJson().ToString().GetVarSize();
+        public override int Size => base.Size + Script.GetVarSize() + ParameterList.GetVarSize() + sizeof(ContractParameterType) + sizeof(bool) + Name.GetVarSize() + CodeVersion.GetVarSize() + Author.GetVarSize() + Email.GetVarSize() + Description.GetVarSize();
 
         ContractState ICloneable<ContractState>.Clone()
         {
             return new ContractState
             {
                 Script = Script,
-                Manifest = Manifest.Clone()
+                ParameterList = ParameterList,
+                ReturnType = ReturnType,
+                ContractProperties = ContractProperties,
+                Name = Name,
+                CodeVersion = CodeVersion,
+                Author = Author,
+                Email = Email,
+                Description = Description
             };
         }
 
-        void ISerializable.Deserialize(BinaryReader reader)
+        public override void Deserialize(BinaryReader reader)
         {
+            base.Deserialize(reader);
             Script = reader.ReadVarBytes();
-            Manifest = reader.ReadSerializable<ContractManifest>();
+            ParameterList = reader.ReadVarBytes().Select(p => (ContractParameterType)p).ToArray();
+            ReturnType = (ContractParameterType)reader.ReadByte();
+            ContractProperties = (ContractPropertyState)reader.ReadByte();
+            Name = reader.ReadVarString();
+            CodeVersion = reader.ReadVarString();
+            Author = reader.ReadVarString();
+            Email = reader.ReadVarString();
+            Description = reader.ReadVarString();
         }
 
         void ICloneable<ContractState>.FromReplica(ContractState replica)
         {
             Script = replica.Script;
-            Manifest = replica.Manifest.Clone();
+            ParameterList = replica.ParameterList;
+            ReturnType = replica.ReturnType;
+            ContractProperties = replica.ContractProperties;
+            Name = replica.Name;
+            CodeVersion = replica.CodeVersion;
+            Author = replica.Author;
+            Email = replica.Email;
+            Description = replica.Description;
         }
 
-        void ISerializable.Serialize(BinaryWriter writer)
+        public override void Serialize(BinaryWriter writer)
         {
+            base.Serialize(writer);
             writer.WriteVarBytes(Script);
-            writer.Write(Manifest);
+            writer.WriteVarBytes(ParameterList.Cast<byte>().ToArray());
+            writer.Write((byte)ReturnType);
+            writer.Write((byte)ContractProperties);
+            writer.WriteVarString(Name);
+            writer.WriteVarString(CodeVersion);
+            writer.WriteVarString(Author);
+            writer.WriteVarString(Email);
+            writer.WriteVarString(Description);
         }
 
-        public JObject ToJson()
+        public override JObject ToJson()
         {
-            JObject json = new JObject();
+            JObject json = base.ToJson();
             json["hash"] = ScriptHash.ToString();
-            json["script"] = Convert.ToBase64String(Script);
-            json["manifest"] = Manifest.ToJson();
+            json["script"] = Script.ToHexString();
+            json["parameters"] = new JArray(ParameterList.Select(p => (JObject)p));
+            json["returntype"] = ReturnType;
+            json["name"] = Name;
+            json["code_version"] = CodeVersion;
+            json["author"] = Author;
+            json["email"] = Email;
+            json["description"] = Description;
+            json["properties"] = new JObject();
+            json["properties"]["storage"] = HasStorage;
+            json["properties"]["dynamic_invoke"] = HasDynamicInvoke;
             return json;
-        }
-
-        public static ContractState FromJson(JObject json)
-        {
-            ContractState contractState = new ContractState();
-            contractState.Script = Convert.FromBase64String(json["script"].AsString());
-            contractState.Manifest = ContractManifest.FromJson(json["manifest"]);
-            return contractState;
-        }
-
-        public StackItem ToStackItem()
-        {
-            return new VM.Types.Array
-           (
-               new StackItem[]
-               {
-                    new ByteArray(Script),
-                    HasStorage,
-                    Payable
-               }
-           );
         }
     }
 }

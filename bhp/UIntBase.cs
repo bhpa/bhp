@@ -2,10 +2,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 
 namespace Bhp
 {
+    
     /// <summary>
     /// Base class for little-endian unsigned integers. Two classes inherit from this: UInt160 and UInt256.
     /// Only basic comparison/serialization are proposed for these classes. For arithmetic purposes, use BigInteger class.
@@ -15,7 +15,7 @@ namespace Bhp
         /// <summary>
         /// Storing unsigned int in a little-endian byte array.
         /// </summary>
-        private readonly byte[] data_bytes;
+        private byte[] data_bytes;
 
         /// <summary>
         /// Number of bytes of the unsigned int.
@@ -44,10 +44,7 @@ namespace Bhp
         /// </summary>
         void ISerializable.Deserialize(BinaryReader reader)
         {
-            if (reader.Read(data_bytes, 0, data_bytes.Length) != data_bytes.Length)
-            {
-                throw new FormatException();
-            }
+            reader.Read(data_bytes, 0, data_bytes.Length);
         }
 
         /// <summary>
@@ -56,7 +53,7 @@ namespace Bhp
         /// </summary>
         public bool Equals(UIntBase other)
         {
-            if (other is null)
+            if (ReferenceEquals(other, null))
                 return false;
             if (ReferenceEquals(this, other))
                 return true;
@@ -71,7 +68,7 @@ namespace Bhp
         /// </summary>
         public override bool Equals(object obj)
         {
-            if (obj is null)
+            if (ReferenceEquals(obj, null))
                 return false;
             if (!(obj is UIntBase))
                 return false;
@@ -111,7 +108,6 @@ namespace Bhp
         /// <summary>
         /// Method ToArray() returns the byte array data_bytes, which stores the little-endian unsigned int
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte[] ToArray()
         {
             return data_bytes;

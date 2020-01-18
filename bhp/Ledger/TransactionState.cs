@@ -1,50 +1,52 @@
 ﻿using Bhp.IO;
+using Bhp.IO.Json;
 using Bhp.Network.P2P.Payloads;
-using Bhp.VM;
 using System.IO;
 
 namespace Bhp.Ledger
 {
-    public class TransactionState : ICloneable<TransactionState>, ISerializable
+    public class TransactionState : StateBase, ICloneable<TransactionState>
     {
         public uint BlockIndex;
-        public VMState VMState;
         public Transaction Transaction;
 
-        int ISerializable.Size =>
-            sizeof(uint) +      // BlockIndex
-            sizeof(VMState) +   // VMState
-            Transaction.Size;   // Transaction
+        public override int Size => base.Size + sizeof(uint) + Transaction.Size;
 
         TransactionState ICloneable<TransactionState>.Clone()
         {
             return new TransactionState
             {
                 BlockIndex = BlockIndex,
-                VMState = VMState,
                 Transaction = Transaction
             };
         }
 
-        void ISerializable.Deserialize(BinaryReader reader)
+        public override void Deserialize(BinaryReader reader)
         {
+            base.Deserialize(reader);
             BlockIndex = reader.ReadUInt32();
-            VMState = (VMState)reader.ReadByte();
-            Transaction = reader.ReadSerializable<Transaction>();
+            Transaction = Transaction.DeserializeFrom(reader);
         }
 
         void ICloneable<TransactionState>.FromReplica(TransactionState replica)
         {
             BlockIndex = replica.BlockIndex;
-            VMState = replica.VMState;
             Transaction = replica.Transaction;
         }
 
-        void ISerializable.Serialize(BinaryWriter writer)
+        public override void Serialize(BinaryWriter writer)
         {
+            base.Serialize(writer);
             writer.Write(BlockIndex);
-            writer.Write((byte)VMState);
             writer.Write(Transaction);
+        }
+
+        public override JObject ToJson()
+        {
+            JObject json = base.ToJson();
+            json["height"] = BlockIndex;
+            json["tx"] = Transaction.ToJson();
+            return json;
         }
     }
 }

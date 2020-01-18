@@ -1,10 +1,11 @@
-﻿using Bhp.Consensus;
+﻿#pragma warning disable CS0612
+using Bhp.Consensus;
 using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.Persistence;
 using Bhp.SmartContract;
-using Bhp.SmartContract.Native;
+using Bhp.VM;
 using System;
 using System.IO;
 
@@ -16,6 +17,8 @@ namespace Bhp.Network.P2P.Payloads
         public UInt256 PrevHash;
         public uint BlockIndex;
         public ushort ValidatorIndex;
+        [Obsolete] //This field will be removed from future version and should not be used.
+        private uint Timestamp;
         public byte[] Data;
         public Witness Witness;
 
@@ -53,26 +56,22 @@ namespace Bhp.Network.P2P.Payloads
 
         InventoryType IInventory.InventoryType => InventoryType.Consensus;
 
-        public int Size =>
-            sizeof(uint) +      //Version
-            PrevHash.Size +     //PrevHash
-            sizeof(uint) +      //BlockIndex
-            sizeof(ushort) +    //ValidatorIndex
-            Data.GetVarSize() + //Data
-            1 + Witness.Size;   //Witness
-
         Witness[] IVerifiable.Witnesses
         {
             get
             {
                 return new[] { Witness };
             }
-            set
-            {
-                if (value.Length != 1) throw new ArgumentException();
-                Witness = value[0];
-            }
         }
+
+        public int Size =>
+            sizeof(uint) +      //Version
+            PrevHash.Size +     //PrevHash
+            sizeof(uint) +      //BlockIndex
+            sizeof(ushort) +    //ValidatorIndex
+            sizeof(uint) +      //Timestamp
+            Data.GetVarSize() + //Data
+            1 + Witness.Size;   //Witness
 
         public T GetDeserializedMessage<T>() where T : ConsensusMessage
         {
@@ -92,12 +91,18 @@ namespace Bhp.Network.P2P.Payloads
             PrevHash = reader.ReadSerializable<UInt256>();
             BlockIndex = reader.ReadUInt32();
             ValidatorIndex = reader.ReadUInt16();
+            Timestamp = reader.ReadUInt32();
             Data = reader.ReadVarBytes();
         }
 
-        UInt160[] IVerifiable.GetScriptHashesForVerifying(StoreView snapshot)
+        byte[] IScriptContainer.GetMessage()
         {
-            ECPoint[] validators = NativeContract.Bhp.GetNextBlockValidators(snapshot);
+            return this.GetHashData();
+        }
+
+        UInt160[] IVerifiable.GetScriptHashesForVerifying(Snapshot snapshot)
+        {
+            ECPoint[] validators = snapshot.GetValidators();
             if (validators.Length <= ValidatorIndex)
                 throw new InvalidOperationException();
             return new[] { Contract.CreateSignatureRedeemScript(validators[ValidatorIndex]).ToScriptHash() };
@@ -115,14 +120,16 @@ namespace Bhp.Network.P2P.Payloads
             writer.Write(PrevHash);
             writer.Write(BlockIndex);
             writer.Write(ValidatorIndex);
+            writer.Write(Timestamp);
             writer.WriteVarBytes(Data);
         }
 
-        public bool Verify(StoreView snapshot)
+        public bool Verify(Snapshot snapshot)
         {
             if (BlockIndex <= snapshot.Height)
                 return false;
-            return this.VerifyWitnesses(snapshot, 0_02000000);
+            return this.VerifyWitnesses(snapshot);
         }
     }
 }
+#pragma warning restore CS0612

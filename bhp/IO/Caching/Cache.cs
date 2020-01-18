@@ -10,15 +10,15 @@ namespace Bhp.IO.Caching
     {
         protected class CacheItem
         {
-            public readonly TKey Key;
-            public readonly TValue Value;
-            public readonly DateTime Time;
+            public TKey Key;
+            public TValue Value;
+            public DateTime Time;
 
             public CacheItem(TKey key, TValue value)
             {
                 this.Key = key;
                 this.Value = value;
-                this.Time = TimeProvider.Current.UtcNow;
+                this.Time = DateTime.UtcNow;
             }
         }
 
@@ -60,7 +60,13 @@ namespace Bhp.IO.Caching
             }
         }
 
-        public bool IsReadOnly => false;
+        public bool IsReadOnly
+        {
+            get
+            {
+                return false;
+            }
+        }
 
         public Cache(int max_capacity)
         {
@@ -241,7 +247,7 @@ namespace Bhp.IO.Caching
             {
                 RwSyncRootLock.ExitReadLock();
             }
-            item = default;
+            item = default(TValue);
             return false;
         }
     }

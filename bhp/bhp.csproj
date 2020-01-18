@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Copyright>2018-2019 The Bhp Project</Copyright>
     <AssemblyTitle>Bhp</AssemblyTitle>
-    <Version>1.2.0.6</Version>
+    <Version>1.2.0.11</Version>
     <Authors>The Bhp Project</Authors>
     <TargetFrameworks>netstandard2.0;net47</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -16,8 +16,6 @@
     <RootNamespace>Bhp</RootNamespace>
     <Company>The Bhp Project</Company>
     <Description>Bhp</Description>
-    <AssemblyVersion>1.2.0.6</AssemblyVersion>
-    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -34,13 +32,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Akka" Version="1.3.14" />
-    <PackageReference Include="K4os.Compression.LZ4.Streams" Version="1.1.11" />
+    <PackageReference Include="Akka" Version="1.3.11" />
     <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Https" Version="2.2.0" />
-    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="2.2.6" />
+    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="2.2.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="2.2.0" /> 
     <PackageReference Include="System.Text.Encodings.Web" Version="4.5.0" />
   </ItemGroup>

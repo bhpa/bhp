@@ -1,7 +1,9 @@
 ﻿using Bhp.Ledger;
 using Bhp.Network.P2P.Payloads;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Bhp.BhpExtensions.Fees
 {
@@ -43,13 +45,11 @@ namespace Bhp.BhpExtensions.Fees
 
         public static Fixed8 EstimateTxFee(Transaction tx)
         {
-            return Fixed8.Zero;
-            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
                 Fixed8 txFee = MinTxFee;
                 int tx_size = tx.OutputSize;
-                txFee = Fixed8.FromDecimal(tx_size / SizeRadix + (tx_size % SizeRadix == 0 ? 0 : 1)) * MinTxFee; ;
+                txFee = Fixed8.FromDecimal(tx_size / SizeRadix + (tx_size % SizeRadix == 0 ? 0 : 1)) * MinTxFee;
                 txFee = txFee <= MaxTxFee ? txFee : MaxTxFee;
                 return txFee;
             }
@@ -57,13 +57,14 @@ namespace Bhp.BhpExtensions.Fees
             {
                 return Fixed8.Zero;
             }
-            */
         }
 
-        public static Fixed8 EstimateTxFee(Transaction tx, UInt256 asset_id)
+        public static Fixed8 EstimateTxFee(Transaction tx, UInt256 asset_id, bool hasBhpFeeAddress = false)
         {
             if (asset_id == Blockchain.GoverningToken.Hash)
             {
+                if (hasBhpFeeAddress) return Fixed8.Zero;
+
                 return EstimateTxFee(tx);
             }
             else
@@ -107,10 +108,8 @@ namespace Bhp.BhpExtensions.Fees
 
         public static Fixed8 CalcuTxFee(List<Transaction> transactions)
         {
-            return Fixed8.Zero;
-            /*
             Transaction[] ts = transactions.Where(p => p.Type == TransactionType.ContractTransaction).ToArray();
-            
+
             Fixed8 inputsum = Fixed8.Zero;
             Fixed8 outputsum = Fixed8.Zero;
 
@@ -120,7 +119,6 @@ namespace Bhp.BhpExtensions.Fees
                 outputsum += tx.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
             }
             return inputsum - outputsum;
-            */
         }
 
         public static bool Verify(Transaction tx, TransactionResult[] results_destroy, Fixed8 SystemFee)
@@ -138,11 +136,28 @@ namespace Bhp.BhpExtensions.Fees
             Fixed8 _systemFee = results_destroy.Where(p => p.AssetId == Blockchain.UtilityToken.Hash).Sum(q => q.Amount);
             if (SystemFee > Fixed8.Zero && _systemFee < SystemFee) return false;
 
-            return true;
-            /*
             if (tx.Type == TransactionType.ContractTransaction)
             {
-                Fixed8 inputsum= tx.References.Values.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
+                if (ExtensionSettings.Default.WalletConfig.IsBhpFee)
+                {
+                    if (tx.Outputs.Any(p => p.AssetId != Blockchain.GoverningToken.Hash && p.AssetId != Blockchain.UtilityToken.Hash))//except bhp and gas
+                    {
+                        if (tx.References.Values.Any(p => p.AssetId == Blockchain.GoverningToken.Hash))
+                        {
+                            Fixed8 inputbhpsum = tx.References.Values.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
+                            Fixed8 outputbhpsum = tx.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
+                            if (inputbhpsum == Fixed8.Zero) return false;
+                            Fixed8 feediffer = inputbhpsum - outputbhpsum;
+                            return feediffer >= MinTxFee && feediffer <= MaxTxFee;
+                        }
+                        else//without bhp
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                Fixed8 inputsum = tx.References.Values.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
                 Fixed8 outputsum = tx.Outputs.Where(p => p.AssetId == Blockchain.GoverningToken.Hash).Sum(q => q.Value);
                 if (inputsum == Fixed8.Zero && outputsum == Fixed8.Zero) return true;
                 Fixed8 differ = inputsum - outputsum;
@@ -151,8 +166,7 @@ namespace Bhp.BhpExtensions.Fees
             else
             {
                 return true;
-            }   
-            */
+            }
         }
 
         /*
@@ -171,7 +185,7 @@ namespace Bhp.BhpExtensions.Fees
 
                     Fixed8 amount = results_destroy.Where(p => p.AssetId == Blockchain.UtilityToken.Hash).Sum(p => p.Amount);
                     if (SystemFee > Fixed8.Zero && amount < SystemFee) return false;
-                    
+
                     return true;
                 }
                 else
@@ -196,7 +210,7 @@ namespace Bhp.BhpExtensions.Fees
                 return true;
             }
         } 
-      
+
         public static bool CheckTxFee(Transaction tx)
         {   
             if (tx.References == null) return false;

@@ -17,7 +17,7 @@ namespace Bhp.BhpExtensions.Transactions
     public class VerifyTransactionContract
     {
         /*
-       public static bool Verify(StoreView snapshot, Transaction tx)
+       public static bool Verify(Snapshot snapshot, Transaction tx)
        {
            return true;
        }
@@ -29,7 +29,7 @@ namespace Bhp.BhpExtensions.Transactions
         */
 
         /*
-        public static bool Verify(StoreView snapshot, Transaction tx)
+        public static bool Verify(Snapshot snapshot, Transaction tx)
         {
             foreach (CoinReference item in tx.Inputs)
             {
@@ -65,7 +65,7 @@ namespace Bhp.BhpExtensions.Transactions
             {
                 Transaction preTx = Blockchain.Singleton.GetTransaction(item.Reference.PrevHash);
                 TransactionAttribute[] attribute = preTx.Attributes;
-                using (Persistence.StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+                using (Persistence.Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
                 {
                     foreach (TransactionAttribute att in attribute)
                     {
@@ -136,7 +136,7 @@ namespace Bhp.BhpExtensions.Transactions
         }
         */
 
-        public static bool Verify(StoreView snapshot, Transaction tx)
+        public static bool Verify(Snapshot snapshot, Transaction tx)
         {
             foreach (CoinReference item in tx.Inputs)
             {
@@ -151,11 +151,10 @@ namespace Bhp.BhpExtensions.Transactions
 
                         if (!changeNum.Contains(item.PrevIndex))
                         {
-                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, 0))
+                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
                             {
                                 engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
-                                engine.Execute();
-                                if (engine.State.HasFlag(VMState.FAULT)) return false;
+                                if (!engine.Execute()) return false;
                                 if (engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean()) return false;
                             }
                         }
@@ -172,7 +171,7 @@ namespace Bhp.BhpExtensions.Transactions
             {
                 Transaction preTx = Blockchain.Singleton.GetTransaction(item.Reference.PrevHash);
                 TransactionAttribute[] attribute = preTx.Attributes;
-                using (Persistence.StoreView snapshot = Blockchain.Singleton.GetSnapshot())
+                using (Persistence.Snapshot snapshot = Blockchain.Singleton.GetSnapshot())
                 {
                     foreach (TransactionAttribute att in attribute)
                     {
@@ -183,11 +182,10 @@ namespace Bhp.BhpExtensions.Transactions
 
                             if (!changeNum.Contains(item.Reference.PrevIndex))
                             {
-                                using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, 0))
+                                using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Verification, null, snapshot, Fixed8.Zero))
                                 {
                                     engine.LoadScript(OpReader.ReadBytes(OpReader.ReadByte()));
-                                    engine.Execute();                                    
-                                    if (engine.State.HasFlag(VMState.FAULT) || engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean())
+                                    if (!engine.Execute() || engine.ResultStack.Count != 1 || !engine.ResultStack.Pop().GetBoolean())
                                     {
                                         unspents.Remove(item);
                                     }

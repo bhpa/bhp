@@ -9,17 +9,15 @@ namespace Bhp.Network.P2P.Payloads
 {
     public class InvocationTransaction : Transaction
     {
-        public new byte[] Script;
+        public byte[] Script;
         public Fixed8 Gas;
 
-        public new int Size => base.Size  // Transaction base size
-          + Script.GetVarSize()               // Script variable size
-          + (Version >= 1 ? Gas.Size : 0);    // Gas Fixed8 size (for version >= 1)
+        public override int Size => base.Size + Script.GetVarSize();
 
-        public new Fixed8 SystemFee => Gas;
+        public override Fixed8 SystemFee => Gas;
 
         public InvocationTransaction()
-            : base()
+            : base(TransactionType.InvocationTransaction)
         {
         }
 
@@ -61,7 +59,7 @@ namespace Bhp.Network.P2P.Payloads
             return json;
         }
 
-        public override bool Verify(StoreView snapshot, IEnumerable<Transaction> mempool)
+        public override bool Verify(Snapshot snapshot, IEnumerable<Transaction> mempool)
         {
             if (Gas.GetData() % 100000000 != 0) return false;
             return base.Verify(snapshot, mempool);

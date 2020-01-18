@@ -18,6 +18,7 @@ namespace Bhp.Network.P2P
 {
     public abstract class Peer : UntypedActor
     {
+        public class Start { public int Port; public int WsPort; public int MinDesiredConnections; public int MaxConnections; public int MaxConnectionsPerAddress; }
         public class Peers { public IEnumerable<IPEndPoint> EndPoints; }
         public class Connect { public IPEndPoint EndPoint; public bool IsTrusted = false; }
         private class Timer { }
@@ -34,24 +35,12 @@ namespace Bhp.Network.P2P
 
         private static readonly HashSet<IPAddress> localAddresses = new HashSet<IPAddress>();
         private readonly Dictionary<IPAddress, int> ConnectedAddresses = new Dictionary<IPAddress, int>();
-        /// <summary>
-        /// A dictionary that stores the connected nodes.
-        /// </summary>
         protected readonly ConcurrentDictionary<IActorRef, IPEndPoint> ConnectedPeers = new ConcurrentDictionary<IActorRef, IPEndPoint>();
-        /// <summary>
-        /// An ImmutableHashSet that stores the Peers received: 1) from other nodes or 2) from default file.
-        /// If the number of desired connections is not enough, first try to connect with the peers from this set.
-        /// </summary>
         protected ImmutableHashSet<IPEndPoint> UnconnectedPeers = ImmutableHashSet<IPEndPoint>.Empty;
-        /// <summary>
-        /// When a TCP connection request is sent to a peer, the peer will be added to the ImmutableHashSet.
-        /// If a Tcp.Connected or a Tcp.CommandFailed (with TCP.Command of type Tcp.Connect) is received, the related peer will be removed.
-        /// </summary>
         protected ImmutableHashSet<IPEndPoint> ConnectingPeers = ImmutableHashSet<IPEndPoint>.Empty;
         protected HashSet<IPAddress> TrustedIpAddresses { get; } = new HashSet<IPAddress>();
 
-        public int ListenerTcpPort { get; private set; }
-        public int ListenerWsPort { get; private set; }
+        public int ListenerPort { get; private set; }
         public int MaxConnectionsPerAddress { get; private set; } = 3;
         public int MinDesiredConnections { get; private set; } = DefaultMinDesiredConnections;
         public int MaxConnections { get; private set; } = DefaultMaxConnections;
@@ -72,17 +61,11 @@ namespace Bhp.Network.P2P
             localAddresses.UnionWith(NetworkInterface.GetAllNetworkInterfaces().SelectMany(p => p.GetIPProperties().UnicastAddresses).Select(p => p.Address.Unmap()));
         }
 
-        /// <summary>
-        /// Tries to add a set of peers to the immutable ImmutableHashSet of UnconnectedPeers.
-        /// </summary>
-        /// <param name="peers">Peers that the method will try to add (union) to (with) UnconnectedPeers.</param>
         protected void AddPeers(IEnumerable<IPEndPoint> peers)
         {
             if (UnconnectedPeers.Count < UnconnectedMax)
             {
-                // Do not select peers to be added that are already on the ConnectedPeers
-                // If the address is the same, the ListenerTcpPort should be different
-                peers = peers.Where(p => (p.Port != ListenerTcpPort || !localAddresses.Contains(p.Address)) && !ConnectedPeers.Values.Contains(p));
+                peers = peers.Where(p => p.Port != ListenerPort || !localAddresses.Contains(p.Address));
                 ImmutableInterlocked.Update(ref UnconnectedPeers, p => p.Union(peers));
             }
         }
@@ -90,11 +73,9 @@ namespace Bhp.Network.P2P
         protected void ConnectToPeer(IPEndPoint endPoint, bool isTrusted = false)
         {
             endPoint = endPoint.Unmap();
-            // If the address is the same, the ListenerTcpPort should be different, otherwise, return
-            if (endPoint.Port == ListenerTcpPort && localAddresses.Contains(endPoint.Address)) return;
+            if (endPoint.Port == ListenerPort && localAddresses.Contains(endPoint.Address)) return;
 
             if (isTrusted) TrustedIpAddresses.Add(endPoint.Address);
-            // If connections with the peer greater than or equal to MaxConnectionsPerAddress, return.
             if (ConnectedAddresses.TryGetValue(endPoint.Address, out int count) && count >= MaxConnectionsPerAddress)
                 return;
             if (ConnectedPeers.Values.Contains(endPoint)) return;
@@ -114,18 +95,14 @@ namespace Bhp.Network.P2P
             return (value & 0xff000000) == 0x0a000000 || (value & 0xff000000) == 0x7f000000 || (value & 0xfff00000) == 0xac100000 || (value & 0xffff0000) == 0xc0a80000 || (value & 0xffff0000) == 0xa9fe0000;
         }
 
-        /// <summary>
-        /// Abstract method for asking for more peers. Currently triggered when UnconnectedPeers is empty.
-        /// </summary>
-        /// <param name="count">Number of peers that are being requested.</param>
         protected abstract void NeedMorePeers(int count);
 
         protected override void OnReceive(object message)
         {
             switch (message)
             {
-                case ChannelsConfig config:
-                    OnStart(config);
+                case Start start:
+                    OnStart(start.Port, start.WsPort, start.MinDesiredConnections, start.MaxConnections, start.MaxConnectionsPerAddress);
                     break;
                 case Timer _:
                     OnTimer();
@@ -154,56 +131,39 @@ namespace Bhp.Network.P2P
             }
         }
 
-        private void OnStart(ChannelsConfig config)
+        private void OnStart(int port, int wsPort, int minDesiredConnections, int maxConnections, int maxConnectionsPerAddress)
         {
-            ListenerTcpPort = config.Tcp?.Port ?? 0;
-            ListenerWsPort = config.WebSocket?.Port ?? 0;
+            ListenerPort = port;
+            MinDesiredConnections = minDesiredConnections;
+            MaxConnections = maxConnections;
+            MaxConnectionsPerAddress = maxConnectionsPerAddress;
 
-            MinDesiredConnections = config.MinDesiredConnections;
-            MaxConnections = config.MaxConnections;
-            MaxConnectionsPerAddress = config.MaxConnectionsPerAddress;
-
-            // schedule time to trigger `OnTimer` event every TimerMillisecondsInterval ms
             timer = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(0, 5000, Context.Self, new Timer(), ActorRefs.NoSender);
-            if ((ListenerTcpPort > 0 || ListenerWsPort > 0)
+            if ((port > 0 || wsPort > 0)
                 && localAddresses.All(p => !p.IsIPv4MappedToIPv6 || IsIntranetAddress(p))
                 && UPnP.Discover())
             {
                 try
                 {
                     localAddresses.Add(UPnP.GetExternalIP());
-
-                    if (ListenerTcpPort > 0) UPnP.ForwardPort(ListenerTcpPort, ProtocolType.Tcp, "BHP Tcp");
-                    if (ListenerWsPort > 0) UPnP.ForwardPort(ListenerWsPort, ProtocolType.Tcp, "BHP WebSocket");
+                    if (port > 0)
+                        UPnP.ForwardPort(port, ProtocolType.Tcp, "BHP");
+                    if (wsPort > 0)
+                        UPnP.ForwardPort(wsPort, ProtocolType.Tcp, "BHP WebSocket");
                 }
                 catch { }
             }
-            if (ListenerTcpPort > 0)
+            if (port > 0)
             {
-                tcp_manager.Tell(new Tcp.Bind(Self, config.Tcp, options: new[] { new Inet.SO.ReuseAddress(true) }));
+                tcp_manager.Tell(new Tcp.Bind(Self, new IPEndPoint(IPAddress.Any, port), options: new[] { new Inet.SO.ReuseAddress(true) }));
             }
-            if (ListenerWsPort > 0)
+            if (wsPort > 0)
             {
-                var host = "*";
-
-                if (!config.WebSocket.Address.GetAddressBytes().SequenceEqual(IPAddress.Any.GetAddressBytes()))
-                {
-                    // Is not for all interfaces
-                    host = config.WebSocket.Address.ToString();
-                }
-
-                ws_host = new WebHostBuilder().UseKestrel().UseUrls($"http://{host}:{ListenerWsPort}").Configure(app => app.UseWebSockets().Run(ProcessWebSocketAsync)).Build();
+                ws_host = new WebHostBuilder().UseKestrel().UseUrls($"http://*:{wsPort}").Configure(app => app.UseWebSockets().Run(ProcessWebSocketAsync)).Build();
                 ws_host.Start();
             }
         }
 
-        /// <summary>
-        /// Will be triggered when a Tcp.Connected message is received.
-        /// If the conditions are met, the remote endpoint will be added to ConnectedPeers.
-        /// Increase the connection number with the remote endpoint by one.
-        /// </summary>
-        /// <param name="remote">The remote endpoint of TCP connection.</param>
-        /// <param name="local">The local endpoint of TCP connection.</param>
         private void OnTcpConnected(IPEndPoint remote, IPEndPoint local)
         {
             ImmutableInterlocked.Update(ref ConnectingPeers, p => p.Remove(remote));
@@ -228,11 +188,6 @@ namespace Bhp.Network.P2P
             }
         }
 
-        /// <summary>
-        /// Will be triggered when a Tcp.CommandFailed message is received.
-        /// If it's a Tcp.Connect command, remove the related endpoint from ConnectingPeers.
-        /// </summary>
-        /// <param name="cmd">Tcp.Command message/event.</param>
         private void OnTcpCommandFailed(Tcp.Command cmd)
         {
             switch (cmd)
@@ -258,9 +213,7 @@ namespace Bhp.Network.P2P
 
         private void OnTimer()
         {
-            // Check if the number of desired connections is already enough
             if (ConnectedPeers.Count >= MinDesiredConnections) return;
-            // If there aren't available UnconnectedPeers, it triggers an abstract implementation of NeedMorePeers 
             if (UnconnectedPeers.Count == 0)
                 NeedMorePeers(MinDesiredConnections - ConnectedPeers.Count);
             IPEndPoint[] endpoints = UnconnectedPeers.Take(MinDesiredConnections - ConnectedPeers.Count).ToArray();

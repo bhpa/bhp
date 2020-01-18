@@ -13,25 +13,6 @@ namespace Bhp.Ledger
 
         int ISerializable.Size => ScriptHash.Size + (Key.Length / 16 + 1) * 17;
 
-        internal static byte[] CreateSearchPrefix(UInt160 hash, byte[] prefix)
-        {
-            using (MemoryStream ms = new MemoryStream())
-            {
-                int index = 0;
-                int remain = prefix.Length;
-                while (remain >= 16)
-                {
-                    ms.Write(prefix, index, 16);
-                    ms.WriteByte(16);
-                    index += 16;
-                    remain -= 16;
-                }
-                if (remain > 0)
-                    ms.Write(prefix, index, remain);
-                return hash.ToArray().Concat(ms.ToArray()).ToArray();
-            }
-        }
-
         void ISerializable.Deserialize(BinaryReader reader)
         {
             ScriptHash = reader.ReadSerializable<UInt160>();
@@ -49,8 +30,9 @@ namespace Bhp.Ledger
 
         public override bool Equals(object obj)
         {
-            if (!(obj is StorageKey other)) return false;
-            return Equals(other);
+            if (obj is null) return false;
+            if (!(obj is StorageKey)) return false;
+            return Equals((StorageKey)obj);
         }
 
         public override int GetHashCode()

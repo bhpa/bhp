@@ -1,6 +1,5 @@
 ﻿using Akka.Actor;
 using Akka.Configuration;
-using Bhp.Cryptography;
 using Bhp.Cryptography.ECC;
 using Bhp.IO;
 using Bhp.IO.Actors;
@@ -10,7 +9,6 @@ using Bhp.Network.P2P.Payloads;
 using Bhp.Persistence;
 using Bhp.Plugins;
 using Bhp.SmartContract;
-using Bhp.SmartContract.Native;
 using Bhp.VM;
 using System;
 using System.Collections.Generic;
@@ -19,10 +17,9 @@ using System.Threading;
 
 namespace Bhp.Ledger
 {
-    public sealed partial class Blockchain : UntypedActor
+    public sealed class Blockchain : UntypedActor
     {
-        public class Register { }
-        public partial class ApplicationExecuted { }
+        public class ApplicationExecuted { public Transaction Transaction; public ApplicationExecutionResult[] ExecutionResults; }
         public class PersistCompleted { public Block Block; }
         public class Import { public IEnumerable<Block> Blocks; }
         public class ImportCompleted { }
@@ -32,7 +29,7 @@ namespace Bhp.Ledger
         public static readonly uint SecondsPerBlock = ProtocolSettings.Default.SecondsPerBlock;
         public const uint DecrementInterval = 2000000;
         public const int MaxValidators = 1024;
-        public static readonly uint[] GenerationAmount = { 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+        public static readonly uint[] GenerationAmount = { 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
         public static readonly TimeSpan TimePerBlock = TimeSpan.FromSeconds(SecondsPerBlock);
         public static readonly ECPoint[] StandbyValidators = ProtocolSettings.Default.StandbyValidators.OfType<string>().Select(p => ECPoint.DecodePoint(p.HexToBytes(), ECCurve.Secp256)).ToArray();
 
@@ -53,13 +50,7 @@ namespace Bhp.Ledger
             Attributes = new TransactionAttribute[0],
             Inputs = new CoinReference[0],
             Outputs = new TransactionOutput[0],
-            Witnesses = new Witness[1] {
-                new Witness
-                {
-                    InvocationScript = new byte[0],
-                    VerificationScript = new[] { (byte)OpCode.PUSHT }
-                }
-            }
+            Witnesses = new Witness[0]
         };
 
         public static readonly RegisterTransaction UtilityToken = new RegisterTransaction
@@ -82,16 +73,12 @@ namespace Bhp.Ledger
             PrevHash = UInt256.Zero,
             Timestamp = (new DateTime(2018, 8, 8, 8, 8, 8, DateTimeKind.Utc)).ToTimestamp(),
             Index = 0,
+            ConsensusData = 2083236893, //向比特币致敬
             NextConsensus = GetConsensusAddress(StandbyValidators),
             Witness = new Witness
             {
                 InvocationScript = new byte[0],
                 VerificationScript = new[] { (byte)OpCode.PUSHT }
-            },
-            ConsensusData = new ConsensusData
-            {
-                PrimaryIndex = 0,
-                Nonce = 2083236893
             },
             Transactions = new Transaction[]
             {
@@ -105,11 +92,32 @@ namespace Bhp.Ledger
                 },
                 GoverningToken,
                 UtilityToken,
-                DeployNativeContracts()
+                new IssueTransaction
+                {
+                    Attributes = new TransactionAttribute[0],
+                    Inputs = new CoinReference[0],
+                    Outputs = new[]
+                    {
+                        new TransactionOutput
+                        {
+                            AssetId = GoverningToken.Hash,
+                            Value = GoverningToken.Amount,
+                            ScriptHash = Contract.CreateMultiSigRedeemScript(StandbyValidators.Length / 2 + 1, StandbyValidators).ToScriptHash()
+                        }
+                    },
+                    Witnesses = new[]
+                    {
+                        new Witness
+                        {
+                            InvocationScript = new byte[0],
+                            VerificationScript = new[] { (byte)OpCode.PUSHT }
+                        }
+                    }
+                }
             }
         };
 
-        private readonly static byte[] onPersistNativeContractScript;
+        private const int MemoryPoolMaxTransactions = 50_000;
         private const int MaxTxToReverifyPerIdle = 10;
         private static readonly object lockObj = new object();
         private readonly BhpSystem system;
@@ -117,8 +125,8 @@ namespace Bhp.Ledger
         private uint stored_header_count = 0;
         private readonly Dictionary<UInt256, Block> block_cache = new Dictionary<UInt256, Block>();
         private readonly Dictionary<uint, LinkedList<Block>> block_cache_unverified = new Dictionary<uint, LinkedList<Block>>();
-        internal readonly RelayCache ConsensusRelayCache = new RelayCache(100);
-        private StoreView currentSnapshot;
+        internal readonly RelayCache RelayCache = new RelayCache(100);
+        private Snapshot currentSnapshot;
 
         public Store Store { get; }
         public MemoryPool MemPool { get; }
@@ -140,20 +148,12 @@ namespace Bhp.Ledger
         static Blockchain()
         {
             GenesisBlock.RebuildMerkleRoot();
-            NativeContract[] contracts = { NativeContract.GAS, NativeContract.Bhp };
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                foreach (NativeContract contract in contracts)
-                    sb.EmitAppCall(contract.Hash, "onPersist");
-
-                onPersistNativeContractScript = sb.ToArray();
-            }
         }
 
         public Blockchain(BhpSystem system, Store store)
         {
             this.system = system;
-            this.MemPool = new MemoryPool(system, ProtocolSettings.Default.MemoryPoolMaxTransactions);
+            this.MemPool = new MemoryPool(system, MemoryPoolMaxTransactions);
             this.Store = store;
             lock (lockObj)
             {
@@ -163,30 +163,25 @@ namespace Bhp.Ledger
                 stored_header_count += (uint)header_index.Count;
                 if (stored_header_count == 0)
                 {
-                    header_index.AddRange(store.GetBlocks().Find().OrderBy(p => p.Value.Index).Select(p => p.Key));
+                    header_index.AddRange(store.GetBlocks().Find().OrderBy(p => p.Value.TrimmedBlock.Index).Select(p => p.Key));
                 }
                 else
                 {
                     HashIndexState hashIndex = store.GetHeaderHashIndex().Get();
                     if (hashIndex.Index >= stored_header_count)
                     {
-                        DataCache<UInt256, TrimmedBlock> cache = store.GetBlocks();
+                        DataCache<UInt256, BlockState> cache = store.GetBlocks();
                         for (UInt256 hash = hashIndex.Hash; hash != header_index[(int)stored_header_count - 1];)
                         {
                             header_index.Insert((int)stored_header_count, hash);
-                            hash = cache[hash].PrevHash;
+                            hash = cache[hash].TrimmedBlock.PrevHash;
                         }
                     }
                 }
                 if (header_index.Count == 0)
-                {
                     Persist(GenesisBlock);
-                }
                 else
-                {
                     UpdateCurrentSnapshot();
-                    MemPool.LoadPolicy(currentSnapshot);
-                }
                 singleton = this;
             }
         }
@@ -201,33 +196,6 @@ namespace Bhp.Ledger
         {
             if (MemPool.ContainsKey(hash)) return true;
             return Store.ContainsTransaction(hash);
-        }
-
-        private static InvocationTransaction DeployNativeContracts()
-        {
-            byte[] script;
-            using (ScriptBuilder sb = new ScriptBuilder())
-            {
-                sb.EmitSysCall(InteropService.Bhp_Native_Deploy);
-                script = sb.ToArray();
-            }
-            return new InvocationTransaction
-            {
-                Version = 1,
-                Script = script,
-                Attributes = new TransactionAttribute[0],
-                Cosigners = new Cosigner[0],
-                Inputs = new CoinReference[0],
-                Outputs = new TransactionOutput[0],
-                Witnesses = new[]
-                {
-                    new Witness
-                    {
-                        InvocationScript = new byte[0],
-                        VerificationScript = new[] { (byte)OpCode.PUSHT }
-                    }
-                }
-            };
         }
 
         public Block GetBlock(UInt256 hash)
@@ -248,7 +216,7 @@ namespace Bhp.Ledger
             return Contract.CreateMultiSigRedeemScript(validators.Length - (validators.Length - 1) / 3, validators).ToScriptHash();
         }
 
-        public StoreView GetSnapshot()
+        public Snapshot GetSnapshot()
         {
             return Store.GetSnapshot();
         }
@@ -301,7 +269,7 @@ namespace Bhp.Ledger
                 // First remove the tx if it is unverified in the pool.
                 MemPool.TryRemoveUnVerified(tx.Hash, out _);
                 // Verify the the transaction
-                if (!tx.Verify(currentSnapshot, MemPool.SendersFeeMonitor.GetSenderFee(tx.Sender)))
+                if (!tx.Verify(currentSnapshot, MemPool.GetVerifiedTransactions()))
                     continue;
                 // Add to the memory pool
                 MemPool.TryAdd(tx.Hash, tx);
@@ -374,9 +342,13 @@ namespace Bhp.Ledger
                 if (block.Index == header_index.Count)
                 {
                     header_index.Add(block.Hash);
-                    using (StoreView snapshot = GetSnapshot())
+                    using (Snapshot snapshot = GetSnapshot())
                     {
-                        snapshot.Blocks.Add(block.Hash, block.Header.Trim());
+                        snapshot.Blocks.Add(block.Hash, new BlockState
+                        {
+                            SystemFeeAmount = 0,
+                            TrimmedBlock = block.Header.Trim()
+                        });
                         snapshot.HeaderHashIndex.GetAndChange().Hash = block.Hash;
                         snapshot.HeaderHashIndex.GetAndChange().Index = block.Index;
                         SaveHeaderHashList(snapshot);
@@ -392,14 +364,14 @@ namespace Bhp.Ledger
         {
             if (!payload.Verify(currentSnapshot)) return RelayResultReason.Invalid;
             system.Consensus?.Tell(payload);
-            ConsensusRelayCache.Add(payload);
+            RelayCache.Add(payload);
             system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = payload });
             return RelayResultReason.Succeed;
         }
 
         private void OnNewHeaders(Header[] headers)
         {
-            using (StoreView snapshot = GetSnapshot())
+            using (Snapshot snapshot = GetSnapshot())
             {
                 foreach (Header header in headers)
                 {
@@ -407,7 +379,11 @@ namespace Bhp.Ledger
                     if (header.Index < header_index.Count) continue;
                     if (!header.Verify(snapshot)) break;
                     header_index.Add(header.Hash);
-                    snapshot.Blocks.Add(header.Hash, header.Trim());
+                    snapshot.Blocks.Add(header.Hash, new BlockState
+                    {
+                        SystemFeeAmount = 0,
+                        TrimmedBlock = header.Trim()
+                    });
                     snapshot.HeaderHashIndex.GetAndChange().Hash = header.Hash;
                     snapshot.HeaderHashIndex.GetAndChange().Index = header.Index;
                 }
@@ -418,7 +394,7 @@ namespace Bhp.Ledger
             system.TaskManager.Tell(new TaskManager.HeaderTaskCompleted(), Sender);
         }
 
-        private RelayResultReason OnNewTransaction(Transaction transaction, bool relay)
+        private RelayResultReason OnNewTransaction(Transaction transaction)
         {
             if (transaction.Type == TransactionType.MinerTransaction)
                 return RelayResultReason.Invalid;
@@ -426,7 +402,7 @@ namespace Bhp.Ledger
                 return RelayResultReason.AlreadyExists;
             if (!MemPool.CanTransactionFitInPool(transaction))
                 return RelayResultReason.OutOfMemory;
-            if (!transaction.Verify(currentSnapshot, MemPool.SendersFeeMonitor.GetSenderFee(transaction.Sender)))
+            if (!transaction.Verify(currentSnapshot, MemPool.GetVerifiedTransactions()))
                 return RelayResultReason.Invalid;
             if (!Plugin.CheckPolicy(transaction))
                 return RelayResultReason.PolicyFail;
@@ -434,8 +410,7 @@ namespace Bhp.Ledger
             if (!MemPool.TryAdd(transaction.Hash, transaction))
                 return RelayResultReason.OutOfMemory;
 
-            if (relay)
-                system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = transaction });
+            system.LocalNode.Tell(new LocalNode.RelayDirectly { Inventory = transaction });
             return RelayResultReason.Succeed;
         }
 
@@ -462,14 +437,8 @@ namespace Bhp.Ledger
                 case Block block:
                     Sender.Tell(OnNewBlock(block));
                     break;
-                case Transaction[] transactions:
-                    {
-                        // This message comes from a mempool's revalidation, already relayed
-                        foreach (var tx in transactions) OnNewTransaction(tx, false);
-                        break;
-                    }
                 case Transaction transaction:
-                    Sender.Tell(OnNewTransaction(transaction, true));
+                    Sender.Tell(OnNewTransaction(transaction));
                     break;
                 case ConsensusPayload payload:
                     Sender.Tell(OnNewConsensus(payload));
@@ -483,22 +452,15 @@ namespace Bhp.Ledger
 
         private void Persist(Block block)
         {
-            using (StoreView snapshot = GetSnapshot())
+            using (Snapshot snapshot = GetSnapshot())
             {
                 List<ApplicationExecuted> all_application_executed = new List<ApplicationExecuted>();
                 snapshot.PersistingBlock = block;
-                if (block.Index > 0)
+                snapshot.Blocks.Add(block.Hash, new BlockState
                 {
-                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.System, null, snapshot, 0, true))
-                    {
-                        engine.LoadScript(onPersistNativeContractScript);
-                        if (engine.Execute() != VMState.HALT) throw new InvalidOperationException();
-                        ApplicationExecuted application_executed = new ApplicationExecuted(engine);
-                        Context.System.EventStream.Publish(application_executed);
-                        all_application_executed.Add(application_executed);
-                    }
-                }
-                snapshot.Blocks.Add(block.Hash, block.Trim());
+                    SystemFeeAmount = snapshot.GetSysFeeAmount(block.PrevHash) + (long)block.Transactions.Sum(p => p.SystemFee),
+                    TrimmedBlock = block.Trim()
+                });
                 foreach (Transaction tx in block.Transactions)
                 {
                     snapshot.Transactions.Add(tx.Hash, new TransactionState
@@ -506,23 +468,161 @@ namespace Bhp.Ledger
                         BlockIndex = block.Index,
                         Transaction = tx
                     });
-                    using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx, snapshot.Clone(), tx.SystemFee))
+                    snapshot.UnspentCoins.Add(tx.Hash, new UnspentCoinState
                     {
-                        engine.LoadScript(tx.GetHashData());
-                        if (!engine.Execute().HasFlag(VMState.FAULT))
+                        Items = Enumerable.Repeat(CoinState.Confirmed, tx.Outputs.Length).ToArray()
+                    });
+                    foreach (TransactionOutput output in tx.Outputs)
+                    {
+                        AccountState account = snapshot.Accounts.GetAndChange(output.ScriptHash, () => new AccountState(output.ScriptHash));
+                        if (account.Balances.ContainsKey(output.AssetId))
+                            account.Balances[output.AssetId] += output.Value;
+                        else
+                            account.Balances[output.AssetId] = output.Value;
+                        if (output.AssetId.Equals(GoverningToken.Hash) && account.Votes.Length > 0)
                         {
-                            engine.Snapshot.Commit();
+                            foreach (ECPoint pubkey in account.Votes)
+                                snapshot.Validators.GetAndChange(pubkey, () => new ValidatorState(pubkey)).Votes += output.Value;
+                            snapshot.ValidatorsCount.GetAndChange().Votes[account.Votes.Length - 1] += output.Value;
                         }
-                        ApplicationExecuted application_executed = new ApplicationExecuted(engine);
+                    }
+                    foreach (var group in tx.Inputs.GroupBy(p => p.PrevHash))
+                    {
+                        TransactionState tx_prev = snapshot.Transactions[group.Key];
+                        foreach (CoinReference input in group)
+                        {
+                            snapshot.UnspentCoins.GetAndChange(input.PrevHash).Items[input.PrevIndex] |= CoinState.Spent;
+                            TransactionOutput out_prev = tx_prev.Transaction.Outputs[input.PrevIndex];
+                            AccountState account = snapshot.Accounts.GetAndChange(out_prev.ScriptHash);
+                            if (out_prev.AssetId.Equals(GoverningToken.Hash))
+                            {
+                                snapshot.SpentCoins.GetAndChange(input.PrevHash, () => new SpentCoinState
+                                {
+                                    TransactionHash = input.PrevHash,
+                                    TransactionHeight = tx_prev.BlockIndex,
+                                    Items = new Dictionary<ushort, uint>()
+                                }).Items.Add(input.PrevIndex, block.Index);
+                                if (account.Votes.Length > 0)
+                                {
+                                    foreach (ECPoint pubkey in account.Votes)
+                                    {
+                                        ValidatorState validator = snapshot.Validators.GetAndChange(pubkey);
+                                        validator.Votes -= out_prev.Value;
+                                        if (!validator.Registered && validator.Votes.Equals(Fixed8.Zero))
+                                            snapshot.Validators.Delete(pubkey);
+                                    }
+                                    snapshot.ValidatorsCount.GetAndChange().Votes[account.Votes.Length - 1] -= out_prev.Value;
+                                }
+                            }
+                            account.Balances[out_prev.AssetId] -= out_prev.Value;
+                        }
+                    }
+                    List<ApplicationExecutionResult> execution_results = new List<ApplicationExecutionResult>();
+                    switch (tx)
+                    {
+#pragma warning disable CS0612
+                        case RegisterTransaction tx_register:
+                            snapshot.Assets.Add(tx.Hash, new AssetState
+                            {
+                                AssetId = tx_register.Hash,
+                                AssetType = tx_register.AssetType,
+                                Name = tx_register.Name,
+                                Amount = tx_register.Amount,
+                                Available = Fixed8.Zero,
+                                Precision = tx_register.Precision,
+                                Fee = Fixed8.Zero,
+                                FeeAddress = new UInt160(),
+                                Owner = tx_register.Owner,
+                                Admin = tx_register.Admin,
+                                Issuer = tx_register.Admin,
+                                Expiration = block.Index + 2 * 2000000,
+                                IsFrozen = false
+                            });
+                            break;
+#pragma warning restore CS0612
+                        case IssueTransaction _:
+                            foreach (TransactionResult result in tx.GetTransactionResults().Where(p => p.Amount < Fixed8.Zero))
+                                snapshot.Assets.GetAndChange(result.AssetId).Available -= result.Amount;
+                            break;
+                        case ClaimTransaction _:
+                            foreach (CoinReference input in ((ClaimTransaction)tx).Claims)
+                            {
+                                if (snapshot.SpentCoins.TryGet(input.PrevHash)?.Items.Remove(input.PrevIndex) == true)
+                                    snapshot.SpentCoins.GetAndChange(input.PrevHash);
+                            }
+                            break;
+#pragma warning disable CS0612
+                        case EnrollmentTransaction tx_enrollment:
+                            snapshot.Validators.GetAndChange(tx_enrollment.PublicKey, () => new ValidatorState(tx_enrollment.PublicKey)).Registered = true;
+                            break;
+#pragma warning restore CS0612
+                        case StateTransaction tx_state:
+                            foreach (StateDescriptor descriptor in tx_state.Descriptors)
+                                switch (descriptor.Type)
+                                {
+                                    case StateType.Account:
+                                        ProcessAccountStateDescriptor(descriptor, snapshot);
+                                        break;
+                                    case StateType.Validator:
+                                        ProcessValidatorStateDescriptor(descriptor, snapshot);
+                                        break;
+                                }
+                            break;
+#pragma warning disable CS0612
+                        case PublishTransaction tx_publish:
+                            snapshot.Contracts.GetOrAdd(tx_publish.ScriptHash, () => new ContractState
+                            {
+                                Script = tx_publish.Script,
+                                ParameterList = tx_publish.ParameterList,
+                                ReturnType = tx_publish.ReturnType,
+                                ContractProperties = (ContractPropertyState)Convert.ToByte(tx_publish.NeedStorage),
+                                Name = tx_publish.Name,
+                                CodeVersion = tx_publish.CodeVersion,
+                                Author = tx_publish.Author,
+                                Email = tx_publish.Email,
+                                Description = tx_publish.Description
+                            });
+                            break;
+#pragma warning restore CS0612
+                        case InvocationTransaction tx_invocation:
+                            using (ApplicationEngine engine = new ApplicationEngine(TriggerType.Application, tx_invocation, snapshot.Clone(), tx_invocation.Gas))
+                            {
+                                engine.LoadScript(tx_invocation.Script);
+                                engine.Execute();
+                                if (!engine.State.HasFlag(VMState.FAULT))
+                                {
+                                    engine.Service.Commit();
+                                }
+                                execution_results.Add(new ApplicationExecutionResult
+                                {
+                                    Trigger = TriggerType.Application,
+                                    ScriptHash = tx_invocation.Script.ToScriptHash(),
+                                    VMState = engine.State,
+                                    GasConsumed = engine.GasConsumed,
+                                    Stack = engine.ResultStack.ToArray(),
+                                    Notifications = engine.Service.Notifications.ToArray()
+                                });
+                            }
+                            break;
+                    }
+                    if (execution_results.Count > 0)
+                    {
+                        ApplicationExecuted application_executed = new ApplicationExecuted
+                        {
+                            Transaction = tx,
+                            ExecutionResults = execution_results.ToArray()
+                        };
                         Context.System.EventStream.Publish(application_executed);
                         all_application_executed.Add(application_executed);
                     }
                 }
-                snapshot.BlockHashIndex.GetAndChange().Set(block);
+                snapshot.BlockHashIndex.GetAndChange().Hash = block.Hash;
+                snapshot.BlockHashIndex.GetAndChange().Index = block.Index;
                 if (block.Index == header_index.Count)
                 {
                     header_index.Add(block.Hash);
-                    snapshot.HeaderHashIndex.GetAndChange().Set(block);
+                    snapshot.HeaderHashIndex.GetAndChange().Hash = block.Hash;
+                    snapshot.HeaderHashIndex.GetAndChange().Index = block.Index;
                 }
                 foreach (IPersistencePlugin plugin in Plugin.PersistencePlugins)
                     plugin.OnPersist(snapshot, all_application_executed);
@@ -557,12 +657,55 @@ namespace Bhp.Ledger
             currentSnapshot?.Dispose();
         }
 
+        internal static void ProcessAccountStateDescriptor(StateDescriptor descriptor, Snapshot snapshot)
+        {
+            UInt160 hash = new UInt160(descriptor.Key);
+            AccountState account = snapshot.Accounts.GetAndChange(hash, () => new AccountState(hash));
+            switch (descriptor.Field)
+            {
+                case "Votes":
+                    Fixed8 balance = account.GetBalance(GoverningToken.Hash);
+                    foreach (ECPoint pubkey in account.Votes)
+                    {
+                        ValidatorState validator = snapshot.Validators.GetAndChange(pubkey);
+                        validator.Votes -= balance;
+                        if (!validator.Registered && validator.Votes.Equals(Fixed8.Zero))
+                            snapshot.Validators.Delete(pubkey);
+                    }
+                    ECPoint[] votes = descriptor.Value.AsSerializableArray<ECPoint>().Distinct().ToArray();
+                    if (votes.Length != account.Votes.Length)
+                    {
+                        ValidatorsCountState count_state = snapshot.ValidatorsCount.GetAndChange();
+                        if (account.Votes.Length > 0)
+                            count_state.Votes[account.Votes.Length - 1] -= balance;
+                        if (votes.Length > 0)
+                            count_state.Votes[votes.Length - 1] += balance;
+                    }
+                    account.Votes = votes;
+                    foreach (ECPoint pubkey in account.Votes)
+                        snapshot.Validators.GetAndChange(pubkey, () => new ValidatorState(pubkey)).Votes += balance;
+                    break;
+            }
+        }
+
+        internal static void ProcessValidatorStateDescriptor(StateDescriptor descriptor, Snapshot snapshot)
+        {
+            ECPoint pubkey = ECPoint.DecodePoint(descriptor.Key, ECCurve.Secp256);
+            ValidatorState validator = snapshot.Validators.GetAndChange(pubkey, () => new ValidatorState(pubkey));
+            switch (descriptor.Field)
+            {
+                case "Registered":
+                    validator.Registered = BitConverter.ToBoolean(descriptor.Value, 0);
+                    break;
+            }
+        }
+
         public static Props Props(BhpSystem system, Store store)
         {
             return Akka.Actor.Props.Create(() => new Blockchain(system, store)).WithMailbox("blockchain-mailbox");
         }
 
-        private void SaveHeaderHashList(StoreView snapshot = null)
+        private void SaveHeaderHashList(Snapshot snapshot = null)
         {
             if ((header_index.Count - stored_header_count < 2000))
                 return;
@@ -599,7 +742,7 @@ namespace Bhp.Ledger
         {
         }
 
-        protected override bool IsHighPriority(object message)
+        internal protected override bool IsHighPriority(object message)
         {
             switch (message)
             {

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace Bhp.Persistence.LevelDB
 {
-    public class DbCache<TKey, TValue> : DataCache<TKey, TValue>
+    internal class DbCache<TKey, TValue> : DataCache<TKey, TValue>
         where TKey : IEquatable<TKey>, ISerializable, new()
         where TValue : class, ICloneable<TValue>, ISerializable, new()
     {
@@ -28,7 +28,7 @@ namespace Bhp.Persistence.LevelDB
             batch?.Put(prefix, key, value);
         }
 
-        protected override void DeleteInternal(TKey key)
+        public override void DeleteInternal(TKey key)
         {
             batch?.Delete(prefix, key);
         }

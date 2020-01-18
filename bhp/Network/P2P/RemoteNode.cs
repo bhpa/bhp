@@ -5,8 +5,8 @@ using Bhp.Cryptography;
 using Bhp.IO;
 using Bhp.IO.Actors;
 using Bhp.Ledger;
-using Bhp.Network.P2P.Capabilities;
 using Bhp.Network.P2P.Payloads;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -26,11 +26,10 @@ namespace Bhp.Network.P2P
         private BloomFilter bloom_filter;
         private bool verack = false;
 
-        public IPEndPoint Listener => new IPEndPoint(Remote.Address, ListenerTcpPort);
-        public int ListenerTcpPort { get; private set; } = 0;
+        public IPEndPoint Listener => new IPEndPoint(Remote.Address, ListenerPort);
+        public override int ListenerPort => Version?.Port ?? 0;
         public VersionPayload Version { get; private set; }
-        public uint LastBlockIndex { get; private set; } = 0;
-        public bool IsFullNode { get; private set; } = false;
+        public uint LastBlockIndex { get; private set; }
 
         public RemoteNode(BhpSystem system, object connection, IPEndPoint remote, IPEndPoint local)
             : base(connection, remote, local)
@@ -38,69 +37,48 @@ namespace Bhp.Network.P2P
             this.system = system;
             this.protocol = Context.ActorOf(ProtocolHandler.Props(system));
             LocalNode.Singleton.RemoteNodes.TryAdd(Self, this);
-            var capabilities = new List<NodeCapability>
-            {
-                new FullNodeCapability(Blockchain.Singleton.Height)
-            };
-
-            if (LocalNode.Singleton.ListenerTcpPort > 0) capabilities.Add(new ServerCapability(NodeCapabilityType.TcpServer, (ushort)LocalNode.Singleton.ListenerTcpPort));
-            if (LocalNode.Singleton.ListenerWsPort > 0) capabilities.Add(new ServerCapability(NodeCapabilityType.WsServer, (ushort)LocalNode.Singleton.ListenerWsPort));
-
-            SendMessage(Message.Create(MessageCommand.Version, VersionPayload.Create(LocalNode.Nonce, LocalNode.UserAgent, capabilities.ToArray())));
+            SendMessage(Message.Create("version", VersionPayload.Create(LocalNode.Singleton.ListenerPort, LocalNode.Nonce, LocalNode.UserAgent, Blockchain.Singleton.Height)));
         }
 
-        /// <summary>
-        /// It defines the message queue to be used for dequeuing.
-        /// If the high-priority message queue is not empty, choose the high-priority message queue.
-        /// Otherwise, choose the low-priority message queue.
-        /// Finally, it sends the first message of the queue.
-        /// </summary>
         private void CheckMessageQueue()
         {
             if (!verack || !ack) return;
             Queue<Message> queue = message_queue_high;
-            if (queue.Count == 0)
-            {
-                queue = message_queue_low;
-                if (queue.Count == 0) return;
-            }
+            if (queue.Count == 0) queue = message_queue_low;
+            if (queue.Count == 0) return;
             SendMessage(queue.Dequeue());
         }
 
-        private void EnqueueMessage(MessageCommand command, ISerializable payload = null)
+        private void EnqueueMessage(string command, ISerializable payload = null)
         {
             EnqueueMessage(Message.Create(command, payload));
         }
 
-        /// <summary>
-        /// Add message to high priority queue or low priority queue depending on the message type.
-        /// </summary>
-        /// <param name="message">The message to be added.</param>
         private void EnqueueMessage(Message message)
         {
             bool is_single = false;
             switch (message.Command)
             {
-                case MessageCommand.Addr:
-                case MessageCommand.GetAddr:
-                case MessageCommand.GetBlocks:
-                case MessageCommand.GetHeaders:
-                case MessageCommand.Mempool:
-                case MessageCommand.Ping:
-                case MessageCommand.Pong:
+                case "addr":
+                case "getaddr":
+                case "getblocks":
+                case "getheaders":
+                case "mempool":
+                case "ping":
+                case "pong":
                     is_single = true;
                     break;
             }
             Queue<Message> message_queue;
             switch (message.Command)
             {
-                case MessageCommand.Alert:
-                case MessageCommand.Consensus:
-                case MessageCommand.FilterAdd:
-                case MessageCommand.FilterClear:
-                case MessageCommand.FilterLoad:
-                case MessageCommand.GetAddr:
-                case MessageCommand.Mempool:
+                case "alert":
+                case "consensus":
+                case "filteradd":
+                case "filterclear":
+                case "filterload":
+                case "getaddr":
+                case "mempool":
                     message_queue = message_queue_high;
                     break;
                 default:
@@ -142,7 +120,7 @@ namespace Bhp.Network.P2P
                 case VersionPayload payload:
                     OnVersionPayload(payload);
                     break;
-                case MessageCommand.Verack:
+                case "verack":
                     OnVerack();
                     break;
                 case ProtocolHandler.SetFilter setFilter:
@@ -157,29 +135,32 @@ namespace Bhp.Network.P2P
         private void OnPingPayload(PingPayload payload)
         {
             if (payload.LastBlockIndex > LastBlockIndex)
+            {
                 LastBlockIndex = payload.LastBlockIndex;
+                system.TaskManager.Tell(new TaskManager.Update { LastBlockIndex = LastBlockIndex });
+            }
         }
 
         private void OnRelay(IInventory inventory)
         {
-            if (!IsFullNode) return;
+            if (Version?.Relay != true) return;
             if (inventory.InventoryType == InventoryType.TX)
             {
                 if (bloom_filter != null && !bloom_filter.Test((Transaction)inventory))
                     return;
             }
-            EnqueueMessage(MessageCommand.Inv, InvPayload.Create(inventory.InventoryType, inventory.Hash));
+            EnqueueMessage("inv", InvPayload.Create(inventory.InventoryType, inventory.Hash));
         }
 
         private void OnSend(IInventory inventory)
         {
-            if (!IsFullNode) return;
+            if (Version?.Relay != true) return;
             if (inventory.InventoryType == InventoryType.TX)
             {
                 if (bloom_filter != null && !bloom_filter.Test((Transaction)inventory))
                     return;
             }
-            EnqueueMessage(inventory.InventoryType.ToMessageCommand(), inventory);
+            EnqueueMessage(inventory.InventoryType.ToString().ToLower(), inventory);
         }
 
         private void OnSetFilter(BloomFilter filter)
@@ -196,22 +177,9 @@ namespace Bhp.Network.P2P
 
         private void OnVersionPayload(VersionPayload version)
         {
-            Version = version;
-            foreach (NodeCapability capability in version.Capabilities)
-            {
-                switch (capability)
-                {
-                    case FullNodeCapability fullNodeCapability:
-                        IsFullNode = true;
-                        LastBlockIndex = fullNodeCapability.StartHeight;
-                        break;
-                    case ServerCapability serverCapability:
-                        if (serverCapability.Type == NodeCapabilityType.TcpServer)
-                            ListenerTcpPort = serverCapability.Port;
-                        break;
-                }
-            }
-            if (version.Nonce == LocalNode.Nonce || version.Magic != ProtocolSettings.Default.Magic)
+            this.Version = version;
+            this.LastBlockIndex = Version.StartHeight;
+            if (version.Nonce == LocalNode.Nonce)
             {
                 Disconnect(true);
                 return;
@@ -221,7 +189,7 @@ namespace Bhp.Network.P2P
                 Disconnect(true);
                 return;
             }
-            SendMessage(Message.Create(MessageCommand.Verack));
+            SendMessage(Message.Create("verack"));
         }
 
         protected override void PostStop()
@@ -252,19 +220,30 @@ namespace Bhp.Network.P2P
 
         private Message TryParseMessage()
         {
-            var length = Message.TryDeserialize(msg_buffer, out var msg);
-            if (length <= 0) return null;
-
+            if (msg_buffer.Count < sizeof(uint)) return null;
+            uint magic = msg_buffer.Slice(0, sizeof(uint)).ToArray().ToUInt32(0);
+            if (magic != Message.Magic)
+                throw new FormatException();
+            if (msg_buffer.Count < Message.HeaderSize) return null;
+            int length = msg_buffer.Slice(16, sizeof(int)).ToArray().ToInt32(0);
+            if (length > Message.PayloadMaxSize)
+                throw new FormatException();
+            length += Message.HeaderSize;
+            if (msg_buffer.Count < length) return null;
+            Message message = msg_buffer.Slice(0, length).ToArray().AsSerializable<Message>();
             msg_buffer = msg_buffer.Slice(length).Compact();
-            return msg;
+            return message;
         }
     }
 
     internal class RemoteNodeMailbox : PriorityMailbox
     {
-        public RemoteNodeMailbox(Settings settings, Config config) : base(settings, config) { }
+        public RemoteNodeMailbox(Akka.Actor.Settings settings, Config config)
+            : base(settings, config)
+        {
+        }
 
-        protected override bool IsHighPriority(object message)
+        internal protected override bool IsHighPriority(object message)
         {
             switch (message)
             {

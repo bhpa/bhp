@@ -11,8 +11,8 @@ namespace Bhp.Mining
     /// Mining transaction output (block output)
     /// </summary>
     public class MiningTransaction
-    {
-        public MinerTransaction MakeMinerTransaction(Wallet wallet, uint blockIndex, ulong nonce, Fixed8 amount_txfee, Fixed8 amount_netfee)
+    {   
+        public MinerTransaction MakeMinerTransaction(Wallet wallet, uint blockIndex, ulong nonce, Fixed8 amount_txfee, Fixed8 amount_netfee )
         {
             List<TransactionOutput> outputs = new List<TransactionOutput>();
             List<TransactionAttribute> attributes = new List<TransactionAttribute>();
@@ -22,7 +22,7 @@ namespace Bhp.Mining
                 AddMiningTransaction(wallet, blockIndex, outputs, attributes);
                 AddTxFee(outputs, amount_txfee, blockIndex);
                 AddNetFee(wallet, outputs, amount_netfee);
-            }
+            } 
 
             MinerTransaction tx = new MinerTransaction
             {
@@ -40,7 +40,7 @@ namespace Bhp.Mining
             MiningOutput miningOutput = new MiningOutput
             {
                 AssetId = Blockchain.GoverningToken.Hash,
-                Value = MiningSubsidy.GetMiningSubsidy(blockIndex),
+                Value = MiningSubsidy.GetMiningSubsidy(blockIndex),                
                 ScriptHash = MiningParams.PoSAddress.Length > 0 ? MiningParams.PoSAddress[blockIndex % (uint)MiningParams.PoSAddress.Length].ToScriptHash() : wallet.GetChangeAddress()
             };
 
@@ -49,9 +49,9 @@ namespace Bhp.Mining
                 AssetId = miningOutput.AssetId,
                 Value = miningOutput.Value,
                 ScriptHash = miningOutput.ScriptHash
-            };
+            }; 
 
-            byte[] signatureOfMining = null;
+            byte[] signatureOfMining = null; 
 
             //Signature 
             WalletAccount account = wallet.GetAccount(wallet.GetChangeAddress());
@@ -59,7 +59,7 @@ namespace Bhp.Mining
             {
                 byte[] hashDataOfMining = miningOutput.GetHashData();
                 KeyPair key = account.GetKey();
-                signatureOfMining = Crypto.Default.Sign(hashDataOfMining, key.PrivateKey, key.PublicKey.EncodePoint(false).Skip(1).ToArray());
+                signatureOfMining = Crypto.Default.Sign(hashDataOfMining, key.PrivateKey, key.PublicKey.EncodePoint(false).Skip(1).ToArray()); 
             }
 
             if (signatureOfMining != null)
@@ -75,7 +75,7 @@ namespace Bhp.Mining
         }
 
         private void AddTxFee(List<TransactionOutput> outputs, Fixed8 amount_txfee, uint blockIndex)
-        {
+        { 
             if (amount_txfee != Fixed8.Zero)
             {
                 outputs.Add(TransactionFeeOutput(amount_txfee, blockIndex));
@@ -88,7 +88,7 @@ namespace Bhp.Mining
             {
                 outputs.Add(NetFeeOutput(wallet, amount_netfee));
             }
-        }
+        }  
 
         /// <summary>
         /// Network Fee
@@ -105,7 +105,7 @@ namespace Bhp.Mining
                 ScriptHash = wallet.GetChangeAddress()
             };
         }
-
+         
         private TransactionOutput TransactionFeeOutput(Fixed8 amount_txfee, uint blockIndex)
         {
             return new TransactionOutput
