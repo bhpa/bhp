@@ -154,6 +154,12 @@ namespace Bhp.Network.RPC
             rpcExtension.SetWallet(wallet);
         }
 
+        public void CloseWallet()
+        {
+            this.Wallet = null;
+            rpcExtension.SetWallet(null);
+        }
+
         private JObject Process(string method, JArray _params)
         {
             switch (method)
