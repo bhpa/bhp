@@ -14,37 +14,6 @@ namespace Bhp.SmartContract
 {
     public class ApplicationEngine : ExecutionEngine
     {
-        #region Limits
-        /// <summary>
-        /// Max value for SHL and SHR
-        /// </summary>
-        public const int Max_SHL_SHR = ushort.MaxValue;
-        /// <summary>
-        /// Min value for SHL and SHR
-        /// </summary>
-        public const int Min_SHL_SHR = -Max_SHL_SHR;
-        /// <summary>
-        /// Set the max size allowed size for BigInteger
-        /// </summary>
-        public const int MaxSizeForBigInteger = 32;
-        /// <summary>
-        /// Set the max Stack Size
-        /// </summary>
-        public const uint MaxStackSize = 2 * 1024;
-        /// <summary>
-        /// Set Max Item Size
-        /// </summary>
-        public const uint MaxItemSize = 1024 * 1024;
-        /// <summary>
-        /// Set Max Invocation Stack Size
-        /// </summary>
-        public const uint MaxInvocationStackSize = 1024;
-        /// <summary>
-        /// Set Max Array Size
-        /// </summary>
-        public const uint MaxArraySize = 1024;
-        #endregion
-
         private const long ratio = 100000;
         private const long gas_free = 10 * 100000000;
         private readonly long gas_amount;
@@ -140,17 +109,6 @@ namespace Bhp.SmartContract
                 default:
                     return true;
             }
-        }
-
-        /// <summary>
-        /// Check if the BigInteger is allowed for numeric operations
-        /// </summary>
-        /// <param name="value">Value</param>
-        /// <returns>Return True if are allowed, otherwise False</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool CheckBigInteger(BigInteger value)
-        {
-            return value.ToByteArray().Length <= MaxSizeForBigInteger;
         }
 
         /// <summary>
