@@ -7,6 +7,7 @@ namespace Bhp.BhpExtensions
     {
         public WalletConfigSettings WalletConfig { get; set; }
         public DataRPCServerSettings DataRPCServer { get; set; }
+        public CertificateSettings Certificate { get; set; }
 
         public static ExtensionSettings Default { get; }
 
@@ -19,6 +20,7 @@ namespace Bhp.BhpExtensions
         {
             WalletConfig = new WalletConfigSettings();
             DataRPCServer = new DataRPCServerSettings();
+            Certificate = new CertificateSettings();
         }
 
         public class WalletConfigSettings
@@ -26,7 +28,7 @@ namespace Bhp.BhpExtensions
             public WalletIndexer Indexer { get; set; }
             public string Path { get; set; }
             public string Index { get; set; }
-            public bool AutoLock { get; set; } 
+            public bool AutoLock { get; set; }
             public bool IsBhpFee { get; set; }
 
             public void Set(WalletIndexer Indexer, string Path, string Index, bool AutoLock, bool IsBhpFee)
@@ -48,6 +50,16 @@ namespace Bhp.BhpExtensions
             {
                 this.Host = Host;
                 this.Port = Port;
+            }
+        }
+
+        public class CertificateSettings
+        {
+            public string Name { get; set; }
+
+            public void Set(string Name)
+            {
+                this.Name = Name;
             }
         }
     }
