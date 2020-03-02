@@ -276,14 +276,14 @@ namespace Bhp.SmartContract
                     return false;
                 }
                 writer.Flush();
-                if (ms.Length > engine.MaxItemSize)
+                if (ms.Length > ApplicationEngine.MaxItemSize)
                     return false;
                 engine.CurrentContext.EvaluationStack.Push(ms.ToArray());
             }
             return true;
         }
 
-        private StackItem DeserializeStackItem(BinaryReader reader, ExecutionEngine engine)
+        private StackItem DeserializeStackItem(BinaryReader reader)
         {
             Stack<StackItem> deserialized = new Stack<StackItem>();
             int undeserialized = 1;
@@ -304,7 +304,7 @@ namespace Bhp.SmartContract
                     case StackItemType.Array:
                     case StackItemType.Struct:
                         {
-                            int count = (int)reader.ReadVarInt(engine.MaxArraySize);
+                            int count = (int)reader.ReadVarInt(ApplicationEngine.MaxArraySize);
                             deserialized.Push(new ContainerPlaceholder
                             {
                                 Type = type,
@@ -315,7 +315,7 @@ namespace Bhp.SmartContract
                         break;
                     case StackItemType.Map:
                         {
-                            int count = (int)reader.ReadVarInt(engine.MaxArraySize);
+                            int count = (int)reader.ReadVarInt(ApplicationEngine.MaxArraySize);
                             deserialized.Push(new ContainerPlaceholder
                             {
                                 Type = type,
@@ -374,7 +374,7 @@ namespace Bhp.SmartContract
                 StackItem item;
                 try
                 {
-                    item = DeserializeStackItem(reader, engine);
+                    item = DeserializeStackItem(reader);
                 }
                 catch (FormatException)
                 {
@@ -532,7 +532,7 @@ namespace Bhp.SmartContract
             {
                 Block block = _interface.GetInterface<Block>();
                 if (block == null) return false;
-                if (block.Transactions.Length > engine.MaxArraySize)
+                if (block.Transactions.Length > ApplicationEngine.MaxArraySize)
                     return false;
                 engine.CurrentContext.EvaluationStack.Push(block.Transactions.Select(p => StackItem.FromInterface(p)).ToArray());
                 return true;
