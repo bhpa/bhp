@@ -14,6 +14,37 @@ namespace Bhp.SmartContract
 {
     public class ApplicationEngine : ExecutionEngine
     {
+        #region Limits
+        /// <summary>
+        /// Max value for SHL and SHR
+        /// </summary>
+        public const int Max_SHL_SHR = ushort.MaxValue;
+        /// <summary>
+        /// Min value for SHL and SHR
+        /// </summary>
+        public const int Min_SHL_SHR = -Max_SHL_SHR;
+        /// <summary>
+        /// Set the max size allowed size for BigInteger
+        /// </summary>
+        public const int MaxSizeForBigInteger = 32;
+        /// <summary>
+        /// Set the max Stack Size
+        /// </summary>
+        public const uint MaxStackSize = 2 * 1024;
+        /// <summary>
+        /// Set Max Item Size
+        /// </summary>
+        public const uint MaxItemSize = 1024 * 1024;
+        /// <summary>
+        /// Set Max Invocation Stack Size
+        /// </summary>
+        public const uint MaxInvocationStackSize = 1024;
+        /// <summary>
+        /// Set Max Array Size
+        /// </summary>
+        public const uint MaxArraySize = 1024;
+        #endregion
+
         private const long ratio = 100000;
         private const long gas_free = 10 * 100000000;
         private readonly long gas_amount;
@@ -95,7 +126,7 @@ namespace Bhp.SmartContract
                     {
                         if (CurrentContext.InstructionPointer + 4 >= CurrentContext.Script.Length)
                             return false;
-                        uint length = CurrentContext.ScriptHash.ToUInt32(CurrentContext.InstructionPointer + 1);
+                        uint length = CurrentContext.Script.ToUInt32(CurrentContext.InstructionPointer + 1);
                         if (length > MaxItemSize) return false;
                         return true;
                     }
@@ -109,6 +140,17 @@ namespace Bhp.SmartContract
                 default:
                     return true;
             }
+        }
+
+        /// <summary>
+        /// Check if the BigInteger is allowed for numeric operations
+        /// </summary>
+        /// <param name="value">Value</param>
+        /// <returns>Return True if are allowed, otherwise False</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool CheckBigInteger(BigInteger value)
+        {
+            return value.ToByteArray().Length <= MaxSizeForBigInteger;
         }
 
         /// <summary>
@@ -457,12 +499,12 @@ namespace Bhp.SmartContract
         {
             if (CurrentContext.InstructionPointer >= CurrentContext.Script.Length - 3)
                 return 1;
-            byte length = CurrentContext.ScriptHash[CurrentContext.InstructionPointer + 1];
+            byte length = CurrentContext.Script[CurrentContext.InstructionPointer + 1];
             if (CurrentContext.InstructionPointer > CurrentContext.Script.Length - length - 2)
                 return 1;
             uint api_hash = length == 4
-                ? System.BitConverter.ToUInt32(CurrentContext.ScriptHash, CurrentContext.InstructionPointer + 2)
-                : Encoding.ASCII.GetString(CurrentContext.ScriptHash, CurrentContext.InstructionPointer + 2, length).ToInteropMethodHash();
+                ? System.BitConverter.ToUInt32(CurrentContext.Script, CurrentContext.InstructionPointer + 2)
+                : Encoding.ASCII.GetString(CurrentContext.Script, CurrentContext.InstructionPointer + 2, length).ToInteropMethodHash();
             long price = Service.GetPrice(api_hash);
             if (price > 0) return price;
             if (api_hash == "Bhp.Asset.Create".ToInteropMethodHash())
