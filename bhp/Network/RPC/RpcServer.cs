@@ -82,9 +82,9 @@ namespace Bhp.Network.RPC
             }
         }
 
-        private JObject GetInvokeResult(byte[] script)
+        private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
         {
-            ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: maxGasInvoke);
+            ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke);
             JObject json = new JObject();
             json["script"] = script.ToHexString();
             json["state"] = engine.State;
@@ -411,29 +411,47 @@ namespace Bhp.Network.RPC
                     {
                         UInt160 script_hash = UInt160.Parse(_params[0].AsString());
                         ContractParameter[] parameters = ((JArray)_params[1]).Select(p => ContractParameter.FromJson(p)).ToArray();
+                        CheckWitnessHashes checkWitnessHashes = null;
+                        if (_params.Count > 2)
+                        {
+                            UInt160[] scriptHashesForVerifying = _params.Skip(2).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                        }
                         byte[] script;
                         using (ScriptBuilder sb = new ScriptBuilder())
                         {
                             script = sb.EmitAppCall(script_hash, parameters).ToArray();
                         }
-                        return GetInvokeResult(script);
+                        return GetInvokeResult(script, checkWitnessHashes);
                     }
                 case "invokefunction":
                     {
                         UInt160 script_hash = UInt160.Parse(_params[0].AsString());
                         string operation = _params[1].AsString();
                         ContractParameter[] args = _params.Count >= 3 ? ((JArray)_params[2]).Select(p => ContractParameter.FromJson(p)).ToArray() : new ContractParameter[0];
+                        CheckWitnessHashes checkWitnessHashes = null;
+                        if (_params.Count > 3)
+                        {
+                            UInt160[] scriptHashesForVerifying = _params.Skip(3).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                        }
                         byte[] script;
                         using (ScriptBuilder sb = new ScriptBuilder())
                         {
                             script = sb.EmitAppCall(script_hash, operation, args).ToArray();
                         }
-                        return GetInvokeResult(script);
+                        return GetInvokeResult(script, checkWitnessHashes);
                     }
                 case "invokescript":
                     {
                         byte[] script = _params[0].AsString().HexToBytes();
-                        return GetInvokeResult(script);
+                        CheckWitnessHashes checkWitnessHashes = null;
+                        if (_params.Count > 1)
+                        {
+                            UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                        }
+                        return GetInvokeResult(script, checkWitnessHashes);
                     }
                 case "listaddress":
                     if (Wallet == null || rpcExtension.walletTimeLock.IsLocked())
@@ -795,6 +813,48 @@ namespace Bhp.Network.RPC
             .Build();
 
             host.Start();
+        }
+
+        public class CheckWitnessHashes : IVerifiable
+        {
+            private readonly UInt160[] _scriptHashesForVerifying;
+            public Witness[] Witnesses { get; set; }
+            public int Size { get; }
+
+            public CheckWitnessHashes(UInt160[] scriptHashesForVerifying)
+            {
+                _scriptHashesForVerifying = scriptHashesForVerifying;
+            }
+
+            public void Serialize(BinaryWriter writer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Deserialize(BinaryReader reader)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void DeserializeUnsigned(BinaryReader reader)
+            {
+                throw new NotImplementedException();
+            }
+
+            public UInt160[] GetScriptHashesForVerifying(Snapshot snapshot)
+            {
+                return _scriptHashesForVerifying;
+            }
+
+            public void SerializeUnsigned(BinaryWriter writer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public byte[] GetMessage()
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }
