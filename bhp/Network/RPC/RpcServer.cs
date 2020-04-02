@@ -27,7 +27,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Bhp.BhpExtensions.RPC;
-using Bhp.BhpExtensions;
 
 namespace Bhp.Network.RPC
 {
@@ -82,8 +81,14 @@ namespace Bhp.Network.RPC
             }
         }
 
-        private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
+        private JObject GetInvokeResult(byte[] script, UInt160 checkWitnessHash = null)
         {
+            CheckWitnessHashes checkWitnessHashes = null;
+            if (checkWitnessHash != null)
+            {
+                checkWitnessHashes = new CheckWitnessHashes(new UInt160[] { checkWitnessHash });
+            }
+
             ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke);
             JObject json = new JObject();
             json["script"] = script.ToHexString();
@@ -108,7 +113,16 @@ namespace Bhp.Network.RPC
                 tx.Gas -= Fixed8.FromDecimal(10);
                 if (tx.Gas < Fixed8.Zero) tx.Gas = Fixed8.Zero;
                 tx.Gas = tx.Gas.Ceiling();
-                tx = Wallet.MakeTransaction(tx);
+
+                Fixed8 fee = tx.Gas.Equals(Fixed8.Zero) ? Fixed8.FromDecimal(0.001m) : Fixed8.Zero;
+
+                UInt160 from = null;
+                if (checkWitnessHashes != null)
+                {
+                    from = checkWitnessHash;
+                }
+
+                tx = Wallet.MakeTransaction(tx, from: from, fee: fee);
                 if (tx != null)
                 {
                     ContractParametersContext context = new ContractParametersContext(tx);
@@ -123,6 +137,7 @@ namespace Bhp.Network.RPC
                     throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
 
                 json["tx"] = tx?.ToArray().ToHexString();
+                json["txid"] = tx?.Hash.ToString();
             }
             return json;
         }
@@ -411,47 +426,44 @@ namespace Bhp.Network.RPC
                     {
                         UInt160 script_hash = UInt160.Parse(_params[0].AsString());
                         ContractParameter[] parameters = ((JArray)_params[1]).Select(p => ContractParameter.FromJson(p)).ToArray();
-                        CheckWitnessHashes checkWitnessHashes = null;
+                        UInt160 checkWitnessHash = null;
                         if (_params.Count > 2)
                         {
-                            UInt160[] scriptHashesForVerifying = _params.Skip(2).Select(u => UInt160.Parse(u.AsString())).ToArray();
-                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                            checkWitnessHash = UInt160.Parse(_params[2].AsString());
                         }
                         byte[] script;
                         using (ScriptBuilder sb = new ScriptBuilder())
                         {
                             script = sb.EmitAppCall(script_hash, parameters).ToArray();
                         }
-                        return GetInvokeResult(script, checkWitnessHashes);
+                        return GetInvokeResult(script, checkWitnessHash);
                     }
                 case "invokefunction":
                     {
                         UInt160 script_hash = UInt160.Parse(_params[0].AsString());
                         string operation = _params[1].AsString();
                         ContractParameter[] args = _params.Count >= 3 ? ((JArray)_params[2]).Select(p => ContractParameter.FromJson(p)).ToArray() : new ContractParameter[0];
-                        CheckWitnessHashes checkWitnessHashes = null;
+                        UInt160 checkWitnessHash = null;
                         if (_params.Count > 3)
                         {
-                            UInt160[] scriptHashesForVerifying = _params.Skip(3).Select(u => UInt160.Parse(u.AsString())).ToArray();
-                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                            checkWitnessHash = UInt160.Parse(_params[3].AsString());
                         }
                         byte[] script;
                         using (ScriptBuilder sb = new ScriptBuilder())
                         {
                             script = sb.EmitAppCall(script_hash, operation, args).ToArray();
                         }
-                        return GetInvokeResult(script, checkWitnessHashes);
+                        return GetInvokeResult(script, checkWitnessHash);
                     }
                 case "invokescript":
                     {
                         byte[] script = _params[0].AsString().HexToBytes();
-                        CheckWitnessHashes checkWitnessHashes = null;
+                        UInt160 checkWitnessHash = null;
                         if (_params.Count > 1)
                         {
-                            UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
-                            checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
+                            checkWitnessHash = UInt160.Parse(_params[1].AsString());
                         }
-                        return GetInvokeResult(script, checkWitnessHashes);
+                        return GetInvokeResult(script, checkWitnessHash);
                     }
                 case "listaddress":
                     if (Wallet == null || rpcExtension.walletTimeLock.IsLocked())
