@@ -76,14 +76,8 @@ namespace Bhp.Network.RPC
             }
         }
 
-        private JObject GetInvokeResult(byte[] script, UInt160 checkWitnessHash = null)
+        private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
         {
-            CheckWitnessHashes checkWitnessHashes = null;
-            if (checkWitnessHash != null)
-            {
-                checkWitnessHashes = new CheckWitnessHashes(new UInt160[] { checkWitnessHash });
-            }
-
             ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke);
             JObject json = new JObject();
             json["script"] = script.ToHexString();
@@ -96,43 +90,6 @@ namespace Bhp.Network.RPC
             catch (InvalidOperationException)
             {
                 json["stack"] = "error: recursive reference";
-            }
-            if (Wallet != null)
-            {
-                InvocationTransaction tx = new InvocationTransaction
-                {
-                    Version = 1,
-                    Script = json["script"].AsString().HexToBytes(),
-                    Gas = Fixed8.Parse(json["gas_consumed"].AsString())
-                };
-                tx.Gas -= Fixed8.FromDecimal(10);
-                if (tx.Gas < Fixed8.Zero) tx.Gas = Fixed8.Zero;
-                tx.Gas = tx.Gas.Ceiling();
-
-                Fixed8 fee = tx.Gas.Equals(Fixed8.Zero) ? Fixed8.FromDecimal(0.001m) : Fixed8.Zero;
-
-                UInt160 from = null;
-                if (checkWitnessHashes != null)
-                {
-                    from = checkWitnessHash;
-                }
-
-                tx = Wallet.MakeTransaction(tx, from: from, fee: fee);
-                if (tx != null)
-                {
-                    ContractParametersContext context = new ContractParametersContext(tx);
-                    Wallet.Sign(context);
-                    if (context.Completed)
-                        tx.Witnesses = context.GetWitnesses();
-                    else
-                        tx = null;
-                }
-
-                if (tx?.Size > Transaction.MaxTransactionSize)
-                    throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
-
-                json["tx"] = tx?.ToArray().ToHexString();
-                json["txid"] = tx?.Hash.ToString();
             }
             return json;
         }
@@ -732,17 +689,18 @@ namespace Bhp.Network.RPC
         {
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
             ContractParameter[] parameters = ((JArray)_params[1]).Select(p => ContractParameter.FromJson(p)).ToArray();
-            UInt160 checkWitnessHash = null;
+            CheckWitnessHashes checkWitnessHashes = null;
             if (_params.Count > 2)
             {
-                checkWitnessHash = UInt160.Parse(_params[2].AsString());
+                UInt160[] scriptHashesForVerifying = _params.Skip(2).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
             }
             byte[] script;
             using (ScriptBuilder sb = new ScriptBuilder())
             {
                 script = sb.EmitAppCall(script_hash, parameters).ToArray();
             }
-            return GetInvokeResult(script, checkWitnessHash);
+            return GetInvokeResult(script, checkWitnessHashes);
         }
 
         /// <summary>
@@ -758,17 +716,18 @@ namespace Bhp.Network.RPC
             UInt160 script_hash = UInt160.Parse(_params[0].AsString());
             string operation = _params[1].AsString();
             ContractParameter[] args = _params.Count >= 3 ? ((JArray)_params[2]).Select(p => ContractParameter.FromJson(p)).ToArray() : new ContractParameter[0];
-            UInt160 checkWitnessHash = null;
+            CheckWitnessHashes checkWitnessHashes = null;
             if (_params.Count > 3)
             {
-                checkWitnessHash = UInt160.Parse(_params[3].AsString());
+                UInt160[] scriptHashesForVerifying = _params.Skip(3).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
             }
             byte[] script;
             using (ScriptBuilder sb = new ScriptBuilder())
             {
                 script = sb.EmitAppCall(script_hash, operation, args).ToArray();
             }
-            return GetInvokeResult(script, checkWitnessHash);
+            return GetInvokeResult(script, checkWitnessHashes);
         }
 
         /// <summary>
@@ -780,12 +739,13 @@ namespace Bhp.Network.RPC
         private JObject InvokeScript(JArray _params)
         {
             byte[] script = _params[0].AsString().HexToBytes();
-            UInt160 checkWitnessHash = null;
+            CheckWitnessHashes checkWitnessHashes = null;
             if (_params.Count > 1)
             {
-                checkWitnessHash = UInt160.Parse(_params[1].AsString());
+                UInt160[] scriptHashesForVerifying = _params.Skip(1).Select(u => UInt160.Parse(u.AsString())).ToArray();
+                checkWitnessHashes = new CheckWitnessHashes(scriptHashesForVerifying);
             }
-            return GetInvokeResult(script, checkWitnessHash);
+            return GetInvokeResult(script, checkWitnessHashes);
         }
 
         /// <summary>
