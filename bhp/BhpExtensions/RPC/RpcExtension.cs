@@ -641,9 +641,7 @@ namespace Bhp.BhpExtensions.RPC
 
                 InvocationTransaction tx = null;
 
-                gas_consumed -= Fixed8.FromDecimal(10);
-                if (gas_consumed < Fixed8.Zero) gas_consumed = Fixed8.Zero;
-                gas_consumed = gas_consumed.Ceiling();
+                gas_consumed = InvocationTransaction.GetGas(gas_consumed);
 
                 tx = new InvocationTransaction
                 {
@@ -652,16 +650,29 @@ namespace Bhp.BhpExtensions.RPC
                     Gas = gas_consumed
                 };
 
+                List<TransactionAttribute> attributes = new List<TransactionAttribute>();
+
                 byte[] timeStamp = System.Text.ASCIIEncoding.ASCII.GetBytes(DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"));
                 byte[] nonce = new byte[8];
                 rand.NextBytes(nonce);
-                tx.Attributes = new TransactionAttribute[] {
-                    new TransactionAttribute() {
+                attributes.Add(
+                    new TransactionAttribute()
+                    {
                         Usage = TransactionAttributeUsage.Remark,
                         Data = timeStamp.Concat(nonce).ToArray()
-                    }
-                };
+                    });
 
+                if (check_witness_address != null)
+                {
+                    attributes.Add(
+                    new TransactionAttribute()
+                    {
+                        Usage = TransactionAttributeUsage.Script,
+                        Data = check_witness_address.ToArray()
+                    });
+                }
+
+                tx.Attributes = attributes.ToArray();
                 tx = wallet.MakeTransaction(tx, from: check_witness_address);
                 if (tx == null)
                     throw new RpcException(-300, "Insufficient funds");
