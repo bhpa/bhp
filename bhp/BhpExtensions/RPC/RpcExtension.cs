@@ -40,6 +40,10 @@ namespace Bhp.BhpExtensions.RPC
         /// 密码长度限制128
         /// </summary>
         public const int MaxPWLength = 128;
+        /// <summary>
+        /// invoke 随机数
+        /// </summary>
+        private static readonly Random rand = new Random();
 
         public RpcExtension()
         {
@@ -107,6 +111,7 @@ namespace Bhp.BhpExtensions.RPC
                 case "getutxos": return GetUtxos(_params, json);
                 case "listsinceblock": return ListSinceBlock(_params, json);
                 case "sendissuetransaction": return SendIssueTransaction(_params);
+                case "sendinvokescript": return SendInvokeScript(_params);
                 case "sendtoaddressorder": return SendToAddressOrder(_params);
                 case "sendtocold": return SendToCold(_params);
                 case "showgas": return ShowGas(json);
@@ -593,6 +598,69 @@ namespace Bhp.BhpExtensions.RPC
                     Version = 1,
                     Outputs = outputs
                 }, fee: Fixed8.One);
+                if (tx == null)
+                    throw new RpcException(-300, "Insufficient funds");
+                ContractParametersContext context = new ContractParametersContext(tx);
+                wallet.Sign(context);
+                if (context.Completed)
+                {
+                    tx.Witnesses = context.GetWitnesses();
+
+                    if (tx.Size > Transaction.MaxTransactionSize)
+                        throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
+
+                    wallet.ApplyTransaction(tx);
+                    system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
+                    return tx.ToJson();
+                }
+                else
+                {
+                    return context.ToJson();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 发送invoke交易
+        /// </summary>
+        /// <param name="script">合约执行脚本</param>
+        /// <param name="gas_consumed">手续费</param>
+        /// <param name="check_witness_address">见证者地址并作为输入地址，可选参数</param>
+        /// <returns></returns>
+        private JObject SendInvokeScript(JArray _params)
+        {
+            if (wallet == null || walletTimeLock.IsLocked())
+                throw new RpcException(-400, "Access denied");
+            else
+            {
+                byte[] script = _params[0].AsString().HexToBytes();
+                Fixed8 gas_consumed = Fixed8.Parse(_params[1].AsString());
+                if (gas_consumed < Fixed8.Zero)
+                    throw new RpcException(-32602, "Invalid params");
+                UInt160 check_witness_address = _params.Count >= 3 ? _params[2].AsString().ToScriptHash() : null;
+
+                InvocationTransaction tx = null;
+
+                gas_consumed -= Fixed8.FromDecimal(10);
+                if (gas_consumed < Fixed8.Zero) gas_consumed = Fixed8.Zero;
+                gas_consumed = gas_consumed.Ceiling();
+
+                using (ScriptBuilder sb = new ScriptBuilder())
+                {
+                    sb.EmitPush(script);
+                    sb.Emit(OpCode.THROWIFNOT);
+                    sb.Emit(OpCode.RET);
+                    byte[] nonce = new byte[8];
+                    rand.NextBytes(nonce);
+                    sb.EmitPush(nonce);
+                    tx = new InvocationTransaction
+                    {
+                        Version = 1,
+                        Script = sb.ToArray(),
+                        Gas = gas_consumed
+                    };
+                }
+                tx = wallet.MakeTransaction(tx, from: check_witness_address);
                 if (tx == null)
                     throw new RpcException(-300, "Insufficient funds");
                 ContractParametersContext context = new ContractParametersContext(tx);
