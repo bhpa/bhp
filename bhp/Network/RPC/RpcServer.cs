@@ -165,6 +165,7 @@ namespace Bhp.Network.RPC
                 case "invokefunction": return InvokeFunction(_params);
                 case "invokescript": return InvokeScript(_params);
                 case "listaddress": return ListAddress();
+                case "listplugins": return ListPlugins();                    
                 case "sendfrom": return SendFrom(_params);
                 case "sendmany": return SendMany(_params);
                 case "sendrawtransaction": return SendRawTransaction(_params);
@@ -766,6 +767,25 @@ namespace Bhp.Network.RPC
                     account["watchonly"] = p.WatchOnly;
                     return account;
                 }).ToArray();
+        }
+
+        /// <summary>
+        /// 显示节点已加载的插件列表
+        /// </summary>
+        /// <returns></returns>
+        private JObject ListPlugins()
+        {
+            return new JArray(Plugin.Plugins
+                .OrderBy(u => u.Name)
+                .Select(u => new JObject
+                {
+                    ["name"] = u.Name,
+                    ["version"] = u.Version.ToString(),
+                    ["interfaces"] = new JArray(u.GetType().GetInterfaces()
+                        .Select(p => p.Name)
+                        .Where(p => p.EndsWith("Plugin"))
+                        .Select(p => (JObject)p))
+                }));
         }
 
         /// <summary>
