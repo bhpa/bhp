@@ -86,6 +86,21 @@ namespace Bhp.Network.RPC
             try
             {
                 json["stack"] = new JArray(engine.ResultStack.Select(p => p.ToParameter().ToJson()));
+                JObject notifications = engine.Service.Notifications.Select(q =>
+                {
+                    JObject notification = new JObject();
+                    notification["contract"] = q.ScriptHash.ToString();
+                    try
+                    {
+                        notification["state"] = q.State.ToParameter().ToJson();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        notification["state"] = "error: recursive reference";
+                    }
+                    return notification;
+                }).ToArray();
+                json["notifications"] = notifications;
             }
             catch (InvalidOperationException)
             {
@@ -165,7 +180,7 @@ namespace Bhp.Network.RPC
                 case "invokefunction": return InvokeFunction(_params);
                 case "invokescript": return InvokeScript(_params);
                 case "listaddress": return ListAddress();
-                case "listplugins": return ListPlugins();                    
+                case "listplugins": return ListPlugins();
                 case "sendfrom": return SendFrom(_params);
                 case "sendmany": return SendMany(_params);
                 case "sendrawtransaction": return SendRawTransaction(_params);
