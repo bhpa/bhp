@@ -14,14 +14,10 @@ using Bhp.VM;
 using Bhp.Wallets;
 using Bhp.Wallets.BRC6;
 using Bhp.Wallets.SQLite;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading.Tasks;
 
 namespace Bhp.BhpExtensions.RPC
 {
@@ -101,17 +97,13 @@ namespace Bhp.BhpExtensions.RPC
             {
                 case "claimgas": return ClaimGas(json);
                 case "exportaddresswif": return ExportAddressWif(_params, json);
-               // case "get_tx_list": return GetTxList(_params, json);
                 case "getcontractopcode": return GetContractOpCode(_params, json);
-                //case "getdeposits": return GetDeposits(_params, json);
                 case "getrawtransactionorder": return GetRawTransactionOrder(_params, ref json);
-                //case "gettransaction": return GetTransaction(_params, json);
                 case "gettransactiondata": return GetTransactionData(_params);
-               // case "getutxoofaddress": return GetUtxoOfAddress(_params, json);
                 case "getutxos": return GetUtxos(_params, json);
                 case "listsinceblock": return ListSinceBlock(_params, json);
-                case "sendissuetransaction": return SendIssueTransaction(_params);
                 case "sendinvokescript": return SendInvokeScript(_params);
+                case "sendissuetransaction": return SendIssueTransaction(_params);
                 case "sendtoaddressorder": return SendToAddressOrder(_params);
                 case "sendtocold": return SendToCold(_params);
                 case "showgas": return ShowGas(json);
@@ -174,50 +166,6 @@ namespace Bhp.BhpExtensions.RPC
             }
         }
 
-        ///// <summary>
-        ///// 获取指定地址的交易列表
-        ///// </summary>
-        ///// <param name="_params[0]">地址</param>
-        ///// <param name="_params[1]">起始索引位置，默认1</param>
-        ///// <param name="_params[2]">偏移量，默认20</param>
-        ///// <returns>交易列表</returns>
-        //private JObject GetTxList(JArray _params, JObject json)
-        //{
-        //    string from = _params[0].AsString();
-        //    string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
-        //    string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-        //    string jsonRes = RequestRpc("findTxAddressRecord", $"address={from}&position={position}&offset={offset}");
-        //    Newtonsoft.Json.Linq.JObject jsons = Newtonsoft.Json.Linq.JObject.Parse(jsonRes);
-        //    json["transaction"] = new JArray(jsons["txAddressRecord"].Select(p =>
-        //    {
-        //        JObject peerJson = new JObject();
-        //        peerJson["txid"] = p["txid"].ToString();
-        //        peerJson["blockHeight"] = p["blockHeight"].ToString();
-        //        peerJson["time"] = p["time"].ToString();
-        //        peerJson["type"] = p["type"].ToString();
-        //        Newtonsoft.Json.Linq.JToken[] jt = p["inAddressList"].ToArray();
-        //        JArray j_inaddress = new JArray();
-        //        foreach (Newtonsoft.Json.Linq.JToken i in jt)
-        //        {
-        //            string s = i.ToString();
-        //            j_inaddress.Add(s);
-        //        }
-        //        peerJson["inputaddress"] = j_inaddress;
-        //        peerJson["outputaddress"] = new JArray(p["outAddressList"].OrderBy(g => g["n"]).Select(k =>
-        //        {
-        //            JObject a = new JObject();
-        //            a["n"] = k["n"].ToString();
-        //            a["asset"] = k["asset"].ToString();
-        //            a["value"] = (double)k["value"];
-        //            a["address"] = k["outAddress"].ToString();
-        //            a["svalue"] = k["svalue"].ToString();
-        //            return a;
-        //        }));
-        //        return peerJson;
-        //    }));
-        //    return json;
-        //}
-
         /// <summary>
         /// 获取合约脚本的指令解析
         /// </summary>
@@ -235,48 +183,6 @@ namespace Bhp.BhpExtensions.RPC
             }));
             return json;
         }
-
-        ///// <summary>
-        ///// 获取指定地址的交易列表
-        ///// </summary>
-        ///// <param name="_params[0]">地址</param>
-        ///// <param name="_params[1]">起始索引位置，默认1</param>
-        ///// <param name="_params[2]">偏移量，默认20</param>
-        ///// <returns>交易列表</returns>
-        //private JObject GetDeposits(JArray _params, JObject json)
-        //{
-        //    string from = _params[0].AsString();
-        //    string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
-        //    string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-        //    string jsonRes = RequestRpc("getDeposit", $"address={from}&position={position}&offset={offset}");
-
-        //    Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
-
-        //    json["transaction"] = new JArray(jsons.Select(p =>
-        //    {
-        //        JObject peerJson = new JObject();
-        //        peerJson["blockHeight"] = p["blockHeight"].ToString();
-        //        peerJson["txid"] = p["txid"].ToString();
-        //        peerJson["type"] = p["type"].ToString();
-        //        Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
-        //        JArray j_inaddress = new JArray();
-        //        foreach (Newtonsoft.Json.Linq.JToken i in jt)
-        //        {
-        //            string s = i.ToString();
-        //            j_inaddress.Add(s);
-        //        }
-        //        peerJson["inputaddress"] = j_inaddress;
-        //        peerJson["asset"] = p["asset"].ToString();
-        //        peerJson["n"] = (int)p["n"];
-        //        peerJson["value"] = (double)p["value"];
-        //        peerJson["outputaddress"] = p["address"].ToString();
-        //        peerJson["time"] = p["time"].ToString();
-        //        peerJson["utctime"] = (int)p["utcTime"];
-        //        peerJson["confirmations"] = p["confirmations"].ToString();
-        //        return peerJson;
-        //    }));
-        //    return json;
-        //}
 
         /// <summary>
         /// 查询订单交易信息
@@ -318,48 +224,6 @@ namespace Bhp.BhpExtensions.RPC
             }
             return tx.ToArray().ToHexString();
         }
-
-        ///// <summary>
-        ///// 获取指定地址的交易列表
-        ///// </summary>
-        ///// <param name="_params[0]">地址</param>
-        ///// <param name="_params[1]">起始索引位置，默认1</param>
-        ///// <param name="_params[2]">偏移量，默认20</param>
-        ///// <returns>交易列表</returns>
-        //private JObject GetTransaction(JArray _params, JObject json)
-        //{
-        //    string from = _params[0].AsString();
-        //    string position = _params[1].AsString() != "" ? _params[1].AsString() : "1";
-        //    string offset = _params[2].AsString() != "" ? _params[2].AsString() : "20";
-        //    string jsonRes = RequestRpc("findTxVout", $"address={from}&position={position}&offset={offset}");
-
-        //    Newtonsoft.Json.Linq.JArray jsons = Newtonsoft.Json.Linq.JArray.Parse(jsonRes);
-
-        //    json["transaction"] = new JArray(jsons.Select(p =>
-        //    {
-        //        JObject peerJson = new JObject();
-        //        peerJson["blockHeight"] = p["blockHeight"].ToString();
-        //        peerJson["txid"] = p["txid"].ToString();
-        //        peerJson["type"] = p["type"].ToString();
-        //        Newtonsoft.Json.Linq.JToken[] jt = p["inAddress"].ToArray();
-        //        JArray j_inaddress = new JArray();
-        //        foreach (Newtonsoft.Json.Linq.JToken i in jt)
-        //        {
-        //            string s = i.ToString();
-        //            j_inaddress.Add(s);
-        //        }
-        //        peerJson["inputaddress"] = j_inaddress;
-        //        peerJson["asset"] = p["asset"].ToString();
-        //        peerJson["n"] = (int)p["n"];
-        //        peerJson["value"] = (double)p["value"];
-        //        peerJson["outputaddress"] = p["address"].ToString();
-        //        peerJson["time"] = p["time"].ToString();
-        //        peerJson["utctime"] = (int)p["utcTime"];
-        //        peerJson["confirmations"] = p["confirmations"].ToString();
-        //        return peerJson;
-        //    }));
-        //    return json;
-        //}
 
         /// <summary>
         /// 获取交易的的十六进制字符串(不上链)
@@ -418,31 +282,6 @@ namespace Bhp.BhpExtensions.RPC
             }
         }
 
-        ///// <summary>
-        ///// 获取指定地址的未花费UTXO
-        ///// </summary>
-        ///// <param name="_params[0]">地址</param>
-        ///// <returns>指定地址的未花费UTXO</returns>
-        //private JObject GetUtxoOfAddress(JArray _params, JObject json)
-        //{
-        //    string from = _params[0].AsString();
-        //    string jsonRes = RequestRpc("getUtxo", $"address={from}");
-
-        //    Newtonsoft.Json.Linq.JArray jsons = (Newtonsoft.Json.Linq.JArray)JsonConvert.DeserializeObject(jsonRes);
-        //    json["utxo"] = new JArray(jsons.Select(p =>
-        //    {
-        //        JObject peerJson = new JObject();
-        //        peerJson["asset"] = p["asset"].ToString();
-        //        peerJson["txid"] = p["txid"].ToString();
-        //        peerJson["n"] = (int)p["n"];
-        //        peerJson["value"] = (double)p["value"];
-        //        peerJson["address"] = p["address"].ToString();
-        //        peerJson["blockHeight"] = (int)p["blockHeight"];
-        //        return peerJson;
-        //    }));
-        //    return json;
-        //}
-
         /// <summary>
         /// 查询指定地址指定资产的未花费UTXO
         /// </summary>
@@ -455,7 +294,6 @@ namespace Bhp.BhpExtensions.RPC
                 throw new RpcException(-400, "Access denied");
             else
             {
-                //address,assetid
                 UInt160 scriptHash = _params[0].AsString().ToScriptHash();
                 IEnumerable<Coin> coins = wallet.FindUnspentCoins();
                 UInt256 assetId;
@@ -568,59 +406,6 @@ namespace Bhp.BhpExtensions.RPC
         }
 
         /// <summary>
-        /// 分发资产
-        /// </summary>
-        /// <param name="_params[0]">资产 ID</param>
-        /// <param name="_params[1]">数组{"address": \<收款地址>,"value": \<转账金额>}</param>
-        /// <returns>交易</returns>
-        private JObject SendIssueTransaction(JArray _params)
-        {
-            if (wallet == null || walletTimeLock.IsLocked())
-                throw new RpcException(-400, "Access denied");
-            else
-            {
-                UInt256 asset_id = UInt256.Parse(_params[0].AsString());
-                JArray to = (JArray)_params[1];
-                if (to.Count == 0)
-                    throw new RpcException(-32602, "Invalid params");
-                TransactionOutput[] outputs = new TransactionOutput[to.Count];
-                for (int i = 0; i < to.Count; i++)
-                {
-                    outputs[i] = new TransactionOutput
-                    {
-                        AssetId = asset_id,
-                        Value = Fixed8.Parse(to[i]["value"].AsString()),
-                        ScriptHash = to[i]["address"].AsString().ToScriptHash()
-                    };
-                }
-                IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
-                {
-                    Version = 1,
-                    Outputs = outputs
-                }, fee: Fixed8.One);
-                if (tx == null)
-                    throw new RpcException(-300, "Insufficient funds");
-                ContractParametersContext context = new ContractParametersContext(tx);
-                wallet.Sign(context);
-                if (context.Completed)
-                {
-                    tx.Witnesses = context.GetWitnesses();
-
-                    if (tx.Size > Transaction.MaxTransactionSize)
-                        throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
-
-                    wallet.ApplyTransaction(tx);
-                    system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
-                    return tx.ToJson();
-                }
-                else
-                {
-                    return context.ToJson();
-                }
-            }
-        }
-
-        /// <summary>
         /// 发送invoke交易
         /// </summary>
         /// <param name="script">合约执行脚本</param>
@@ -674,6 +459,59 @@ namespace Bhp.BhpExtensions.RPC
 
                 tx.Attributes = attributes.ToArray();
                 tx = wallet.MakeTransaction(tx, from: check_witness_address);
+                if (tx == null)
+                    throw new RpcException(-300, "Insufficient funds");
+                ContractParametersContext context = new ContractParametersContext(tx);
+                wallet.Sign(context);
+                if (context.Completed)
+                {
+                    tx.Witnesses = context.GetWitnesses();
+
+                    if (tx.Size > Transaction.MaxTransactionSize)
+                        throw new RpcException(-301, "The size of the free transaction must be less than 102400 bytes");
+
+                    wallet.ApplyTransaction(tx);
+                    system.LocalNode.Tell(new LocalNode.Relay { Inventory = tx });
+                    return tx.ToJson();
+                }
+                else
+                {
+                    return context.ToJson();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 分发资产
+        /// </summary>
+        /// <param name="_params[0]">资产 ID</param>
+        /// <param name="_params[1]">数组{"address": \<收款地址>,"value": \<转账金额>}</param>
+        /// <returns>交易</returns>
+        private JObject SendIssueTransaction(JArray _params)
+        {
+            if (wallet == null || walletTimeLock.IsLocked())
+                throw new RpcException(-400, "Access denied");
+            else
+            {
+                UInt256 asset_id = UInt256.Parse(_params[0].AsString());
+                JArray to = (JArray)_params[1];
+                if (to.Count == 0)
+                    throw new RpcException(-32602, "Invalid params");
+                TransactionOutput[] outputs = new TransactionOutput[to.Count];
+                for (int i = 0; i < to.Count; i++)
+                {
+                    outputs[i] = new TransactionOutput
+                    {
+                        AssetId = asset_id,
+                        Value = Fixed8.Parse(to[i]["value"].AsString()),
+                        ScriptHash = to[i]["address"].AsString().ToScriptHash()
+                    };
+                }
+                IssueTransaction tx = wallet.MakeTransaction(new IssueTransaction
+                {
+                    Version = 1,
+                    Outputs = outputs
+                }, fee: Fixed8.One);
                 if (tx == null)
                     throw new RpcException(-300, "Insufficient funds");
                 ContractParametersContext context = new ContractParametersContext(tx);
@@ -933,25 +771,6 @@ namespace Bhp.BhpExtensions.RPC
                 }
             return System.Text.Encoding.Default.GetString(data);
         }
-
-        //private string RequestRpc(string method, string kvs)
-        //{
-        //    string jsonRes = "";
-        //    using (HttpClient client = new HttpClient())
-        //    {
-        //        string uri = $"{ExtensionSettings.Default.DataRPCServer.Host}/{method}?{kvs}";
-        //        client.BaseAddress = new Uri(uri);
-        //        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        //        var response = client.GetAsync(uri).Result;
-        //        Task<Stream> task = response.Content.ReadAsStreamAsync();
-        //        Stream backStream = task.Result;
-        //        StreamReader reader = new StreamReader(backStream);
-        //        jsonRes = reader.ReadToEnd();
-        //        reader.Close();
-        //        backStream.Close();
-        //    }
-        //    return jsonRes;
-        //}
 
         private Transaction MakeToColdTransaction(Coin[] coins, UInt160 outAddress, UInt256 assetId, UInt160 fee_address = null)
         {
