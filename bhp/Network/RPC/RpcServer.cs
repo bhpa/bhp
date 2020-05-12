@@ -38,12 +38,15 @@ namespace Bhp.Network.RPC
         private Fixed8 maxGasInvoke;
         private readonly BhpSystem system;
         private RpcExtension rpcExtension;
+        public int MaxConcurrentConnections { get; }
 
-        public RpcServer(BhpSystem system, Wallet wallet = null, Fixed8 maxGasInvoke = default(Fixed8))
+        public RpcServer(BhpSystem system, Wallet wallet = null, Fixed8 maxGasInvoke = default(Fixed8), int maxConcurrentConnections = Peer.DefaultMaxConnections)
         {
             this.system = system;
             this.Wallet = wallet;
             this.maxGasInvoke = maxGasInvoke;
+
+            this.MaxConcurrentConnections = maxConcurrentConnections;
 
             rpcExtension = new RpcExtension(system, wallet, this);
         }
@@ -294,6 +297,9 @@ namespace Bhp.Network.RPC
         {
             host = new WebHostBuilder().UseKestrel(options => options.Listen(bindAddress, port, listenOptions =>
             {
+                // Default value is unlimited
+                options.Limits.MaxConcurrentConnections = MaxConcurrentConnections;
+
                 if (string.IsNullOrEmpty(sslCert)) return;
                 listenOptions.UseHttps(sslCert, password, httpsConnectionAdapterOptions =>
                 {
