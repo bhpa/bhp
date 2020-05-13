@@ -26,6 +26,7 @@ namespace Bhp.Network.P2P
 
         public const int DefaultMinDesiredConnections = 10;
         public const int DefaultMaxConnections = DefaultMinDesiredConnections * 4;
+        public const int DefaultMaxConnectionsPerAddress = 3;
 
         private static readonly IActorRef tcp_manager = Context.System.Tcp();
         private IActorRef tcp_listener;
