@@ -7,7 +7,7 @@ namespace Bhp.Mining
     public class MiningSubsidy
     {
         private const long COIN = 100000000;//100000000;
-        private const long CatchUpWithBTC = 3039999;
+        private const long CatchUpWithBTC = 2858888;
         private const long SubsidyHalvingInterval = 8400000; //BTC:BHP=1:40
         private const long offsetHeightOfBHP = SubsidyHalvingInterval - CatchUpWithBTC;
         private const long FactorOfSubsidy = 100;
