@@ -117,7 +117,7 @@ namespace Bhp
         }
 
         public void StartNode(int port = 0, int wsPort = 0, int minDesiredConnections = Peer.DefaultMinDesiredConnections,
-            int maxConnections = Peer.DefaultMaxConnections, int maxConnectionsPerAddress = 3)
+            int maxConnections = Peer.DefaultMaxConnections, int maxConnectionsPerAddress = Peer.DefaultMaxConnectionsPerAddress)
         {
             start_message = new Peer.Start
             {
