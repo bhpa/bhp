@@ -42,7 +42,7 @@ namespace Bhp.Network.P2P
         protected HashSet<IPAddress> TrustedIpAddresses { get; } = new HashSet<IPAddress>();
 
         public int ListenerPort { get; private set; }
-        public int MaxConnectionsPerAddress { get; private set; } = 3;
+        public int MaxConnectionsPerAddress { get; private set; } = DefaultMaxConnectionsPerAddress;
         public int MinDesiredConnections { get; private set; } = DefaultMinDesiredConnections;
         public int MaxConnections { get; private set; } = DefaultMaxConnections;
         protected int UnconnectedMax { get; } = 1000;
