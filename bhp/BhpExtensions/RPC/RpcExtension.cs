@@ -102,6 +102,7 @@ namespace Bhp.BhpExtensions.RPC
                 case "gettransactiondata": return GetTransactionData(_params);
                 case "getutxos": return GetUtxos(_params, json);
                 case "listsinceblock": return ListSinceBlock(_params, json);
+                case "scripttoaddress": return ScriptToAddress(_params, json);
                 case "sendinvokescript": return SendInvokeScript(_params);
                 case "sendissuetransaction": return SendIssueTransaction(_params);
                 case "sendtoaddressorder": return SendToAddressOrder(_params);
@@ -403,6 +404,14 @@ namespace Bhp.BhpExtensions.RPC
                     return json;
                 }
             }
+        }
+
+        private JObject ScriptToAddress(JArray _params, JObject json)
+        {
+            UInt160 script_hash = UInt160.Parse(_params[0].AsString());
+            json["script_hash"] = script_hash.ToString();
+            json["address"] = script_hash.ToAddress();
+            return json;
         }
 
         /// <summary>
