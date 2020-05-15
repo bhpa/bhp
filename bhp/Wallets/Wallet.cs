@@ -117,12 +117,14 @@ namespace Bhp.Wallets
                     sb.EmitAppCall(asset_id_160, "decimals");
                     script = sb.ToArray();
                 }
-                ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: Fixed8.FromDecimal(0.2m) * accounts.Length);
-                if (engine.State.HasFlag(VMState.FAULT))
-                    return new BigDecimal(0, 0);
-                byte decimals = (byte)engine.ResultStack.Pop().GetBigInteger();
-                BigInteger amount = engine.ResultStack.Pop().GetBigInteger();
-                return new BigDecimal(amount, decimals);
+                using (ApplicationEngine engine = ApplicationEngine.Run(script, extraGAS: Fixed8.FromDecimal(0.2m) * accounts.Length))
+                {
+                    if (engine.State.HasFlag(VMState.FAULT))
+                        return new BigDecimal(0, 0);
+                    byte decimals = (byte)engine.ResultStack.Pop().GetBigInteger();
+                    BigInteger amount = engine.ResultStack.Pop().GetBigInteger();
+                    return new BigDecimal(amount, decimals);
+                }
             }
             else
             {
@@ -320,9 +322,11 @@ namespace Bhp.Wallets
                                 sb2.EmitAppCall(output.AssetId, "balanceOf", account);
                                 script = sb2.ToArray();
                             }
-                            ApplicationEngine engine = ApplicationEngine.Run(script);
-                            if (engine.State.HasFlag(VMState.FAULT)) return null;
-                            balances.Add((account, engine.ResultStack.Pop().GetBigInteger()));
+                            using (ApplicationEngine engine = ApplicationEngine.Run(script))
+                            {
+                                if (engine.State.HasFlag(VMState.FAULT)) return null;
+                                balances.Add((account, engine.ResultStack.Pop().GetBigInteger()));
+                            }
                         }
                         BigInteger sum = balances.Aggregate(BigInteger.Zero, (x, y) => x + y.Value);
                         if (sum < output.Value) return null;
@@ -373,18 +377,20 @@ namespace Bhp.Wallets
             tx.Witnesses = new Witness[0];
             if (tx is InvocationTransaction itx)
             {
-                ApplicationEngine engine = ApplicationEngine.Run(itx.Script, itx);
-                if (engine.State.HasFlag(VMState.FAULT)) return null;
-                tx = new InvocationTransaction
+                using (ApplicationEngine engine = ApplicationEngine.Run(itx.Script, itx))
                 {
-                    Version = itx.Version,
-                    Script = itx.Script,
-                    Gas = InvocationTransaction.GetGas(engine.GasConsumed),
-                    Attributes = itx.Attributes,
-                    Inputs = itx.Inputs,
-                    Outputs = itx.Outputs
-                };
-            }            
+                    if (engine.State.HasFlag(VMState.FAULT)) return null;
+                    tx = new InvocationTransaction
+                    {
+                        Version = itx.Version,
+                        Script = itx.Script,
+                        Gas = InvocationTransaction.GetGas(engine.GasConsumed),
+                        Attributes = itx.Attributes,
+                        Inputs = itx.Inputs,
+                        Outputs = itx.Outputs
+                    };
+                }
+            }
             tx = transactionContract.MakeTransaction(this, tx, from, fee_address, change_address, fee);//By BHP
             return tx;
         }
