@@ -81,35 +81,37 @@ namespace Bhp.Network.RPC
 
         private JObject GetInvokeResult(byte[] script, IVerifiable checkWitnessHashes = null)
         {
-            ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke);
-            JObject json = new JObject();
-            json["script"] = script.ToHexString();
-            json["state"] = engine.State;
-            json["gas_consumed"] = engine.GasConsumed.ToString();
-            try
+            using (ApplicationEngine engine = ApplicationEngine.Run(script, checkWitnessHashes, extraGAS: maxGasInvoke))
             {
-                json["stack"] = new JArray(engine.ResultStack.Select(p => p.ToParameter().ToJson()));
-                JObject notifications = engine.Service.Notifications.Select(q =>
+                JObject json = new JObject();
+                json["script"] = script.ToHexString();
+                json["state"] = engine.State;
+                json["gas_consumed"] = engine.GasConsumed.ToString();
+                try
                 {
-                    JObject notification = new JObject();
-                    notification["contract"] = q.ScriptHash.ToString();
-                    try
+                    json["stack"] = new JArray(engine.ResultStack.Select(p => p.ToParameter().ToJson()));
+                    JObject notifications = engine.Service.Notifications.Select(q =>
                     {
-                        notification["state"] = q.State.ToParameter().ToJson();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        notification["state"] = "error: recursive reference";
-                    }
-                    return notification;
-                }).ToArray();
-                json["notifications"] = notifications;
+                        JObject notification = new JObject();
+                        notification["contract"] = q.ScriptHash.ToString();
+                        try
+                        {
+                            notification["state"] = q.State.ToParameter().ToJson();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            notification["state"] = "error: recursive reference";
+                        }
+                        return notification;
+                    }).ToArray();
+                    json["notifications"] = notifications;
+                }
+                catch (InvalidOperationException)
+                {
+                    json["stack"] = "error: recursive reference";
+                }
+                return json;
             }
-            catch (InvalidOperationException)
-            {
-                json["stack"] = "error: recursive reference";
-            }
-            return json;
         }
 
         private static JObject GetRelayResult(RelayResultReason reason)
