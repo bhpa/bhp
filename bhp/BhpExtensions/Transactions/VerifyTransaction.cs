@@ -21,7 +21,7 @@ namespace Bhp.BhpExtensions.Transactions
         /// <returns></returns>
         public static string IsDoubleSpend(Snapshot snapshot, Transaction tx)
         {
-            if (tx.Inputs.Length == 0) return "Input is empty.";
+            if (tx.Inputs.Length == 0) return "success";
             foreach (var group in tx.Inputs.GroupBy(p => p.PrevHash))
             {
                 UnspentCoinState state = snapshot.UnspentCoins.TryGet(group.Key);
