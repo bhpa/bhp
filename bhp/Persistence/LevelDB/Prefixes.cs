@@ -1,4 +1,6 @@
-﻿namespace Bhp.Persistence.LevelDB
+﻿using System;
+
+namespace Bhp.Persistence.LevelDB
 {
     internal static class Prefixes
     {
@@ -24,5 +26,6 @@
          *
          * Note: The saved consensus state uses the Prefix 0xf4
          */
+        public static readonly byte[] ROOT_KEY = BitConverter.GetBytes(ProtocolSettings.Default.Magic);
     }
 }
